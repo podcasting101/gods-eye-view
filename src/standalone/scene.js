@@ -1,9 +1,18 @@
 import { createApplicationScene } from '../app/scene.js';
 import { createApplicationRequestServices } from '../services/requests.js';
+import { loadPflStation } from '../pfl/station.js';
+
 /** Supply standalone request services when directly constructing a scene. */
-export function createStandaloneScene(options) {
-  return createApplicationScene({
+export async function createStandaloneScene(options) {
+  const scene = await createApplicationScene({
     requestServices: createApplicationRequestServices(),
     ...options,
   });
+  const station = await loadPflStation({
+    viewer: scene.viewer,
+    cesiumToken: options.cesiumToken,
+    signal: options.signal,
+  });
+  options.defer?.(() => station.destroy());
+  return { ...scene, pflStation: station };
 }

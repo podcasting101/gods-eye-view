@@ -1,5 +1,11 @@
 const clean = (value) => String(value || '').trim();
 
+// Paul, 2026-10-13: boot on the keyless globe while the October Google
+// Photorealistic quota is exhausted. Keep provider loading callable for an
+// explicit user action and flip this deployment default after the reset.
+export const PHOTOREAL_AT_STARTUP = false;
+export const PHOTOREAL_TIMEOUT_MS = 20000;
+
 /**
  * Decide which map provider can deliver the best startup experience.
  * @param {{googleApiKey?: string, cesiumToken?: string}} credentials
@@ -22,16 +28,24 @@ export function selectMapStartupRoute({
  * available, ion is the recovery path.
  *
  * @param {object} Cesium
- * @param {{googleApiKey?: string, cesiumToken?: string, googleTokens?: {token: Function}|null}} credentials
+ * @param {{googleApiKey?: string, cesiumToken?: string, googleTokens?: {token: Function}|null, enabled?: boolean, timeoutMs?: number}} credentials
  * @returns {Promise<{tileset: object|null, route: 'google-direct'|'google-token'|'google-ion'|'osm', errors: Error[]}>}
  */
 export async function loadPhotorealisticTileset(
   Cesium,
-  { googleApiKey = '', cesiumToken = '', googleTokens = null } = {},
+  {
+    googleApiKey = '',
+    cesiumToken = '',
+    googleTokens = null,
+    enabled = true,
+    timeoutMs = PHOTOREAL_TIMEOUT_MS,
+  } = {},
 ) {
   const googleKey = clean(googleApiKey);
   const ionToken = clean(cesiumToken);
   const errors = [];
+
+  if (!enabled) return { tileset: null, route: 'osm', errors };
 
   const attempts = [];
   if (googleKey)
@@ -52,7 +66,11 @@ export async function loadPhotorealisticTileset(
 
   for (const attempt of attempts) {
     try {
-      const tileset = await attempt.create();
+      const tileset = await withTimeout(
+        Promise.resolve().then(attempt.create),
+        timeoutMs,
+        attempt.route,
+      );
       return { tileset, route: attempt.route, errors };
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
@@ -60,6 +78,27 @@ export async function loadPhotorealisticTileset(
   }
 
   return { tileset: null, route: 'osm', errors };
+}
+
+/** Bound each provider attempt so an upstream hang cannot stall the app. */
+function withTimeout(promise, ms, route) {
+  let timer;
+  let timedOut = false;
+  const owned = promise.then((tileset) => {
+    // A provider may still allocate after our startup deadline. Release that
+    // late result because the caller can no longer take ownership of it.
+    if (timedOut && tileset && !tileset.isDestroyed?.()) tileset.destroy?.();
+    return tileset;
+  });
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      reject(
+        new Error(`Photoreal tileset load timed out after ${ms} ms (${route})`),
+      );
+    }, ms);
+  });
+  return Promise.race([owned, timeout]).finally(() => clearTimeout(timer));
 }
 
 /** Pass credentials to the source instead of changing SDK-wide defaults. */

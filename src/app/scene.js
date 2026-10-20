@@ -7,7 +7,10 @@ import {
 import { registerDataCredits } from '../data/dataCredits.js';
 import { configureCreditKeyboardAccess } from '../creditKeyboard.js';
 import { MapStackController } from '../mapStackController.js';
-import { loadPhotorealisticTileset } from '../mapStartup.js';
+import {
+  loadPhotorealisticTileset,
+  PHOTOREAL_AT_STARTUP,
+} from '../mapStartup.js';
 import { initLogoGaze } from '../logoGaze.js';
 import {
   uninstallRenderGovernor,
@@ -61,13 +64,14 @@ export async function createApplicationScene({
   registerDataCredits(viewer, credits);
   configureCreditKeyboardAccess(document);
   loaderStatus.textContent =
-    googleApiKey || googleTokens || cesiumToken
+    PHOTOREAL_AT_STARTUP && (googleApiKey || googleTokens || cesiumToken)
       ? t('Loading Google 3D Tiles...')
       : t('Loading the keyless globe...');
   const photoreal = await loadPhotorealisticTileset(Cesium, {
     googleApiKey,
     googleTokens,
     cesiumToken,
+    enabled: PHOTOREAL_AT_STARTUP,
   });
   const tileset = photoreal.tileset;
   // A provider can finish after cancellation; retain ownership of its result.

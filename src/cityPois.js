@@ -15,6 +15,25 @@
  *   buildingHeight — estimated height of landmark center above ground (meters)
  */
 export const CITY_POIS = {
+  pfl_liverpool: {
+    name: 'PFL Liverpool',
+    groundElevation: -26.19,
+    viewBounds: {
+      southwest: { lat: 29.2, lng: -95.3 },
+      northeast: { lat: 29.3, lng: -95.15 },
+    },
+    pois: [
+      {
+        name: 'Sovereign Anchor',
+        lat: 29.2469,
+        lon: -95.2313,
+        alt: 550,
+        pitch: -28,
+        heading: 180,
+        buildingHeight: 2,
+      },
+    ],
+  },
   austin: {
     name: 'Austin',
     groundElevation: 150, // meters above WGS84 ellipsoid

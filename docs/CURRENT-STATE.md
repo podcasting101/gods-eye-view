@@ -1,5 +1,37 @@
 # God's Eye View Current State
 
+## PFL Liverpool station and astronomy — October 20, 2026
+
+The standalone application loads the PFL Liverpool station at the Sovereign
+Anchor (`29.2469 N, 95.2313 W`) on one fixed surveyed datum. The Lisa Muse
+model, self-hosted front-yard Gaussian splat, sign, optional ion chair and five
+yard-camera frames are independent additions: a missing private asset does not
+block the globe, and application shutdown removes every primitive, entity,
+credit and Arrange-mode input handler they own. The chair is skipped when no
+Cesium ion token is configured; the local station remains available.
+
+Yard-frame arrangements retain the `gev-yardframes-layout-v1` local-storage
+contract. Arrange mode holds continuous rendering while active, explicitly
+requests a frame after scene changes and provides 90-degree rotation plus a
+per-frame reset. Every image polygon supplies bottom-left through top-left
+texture coordinates, so Cesium cannot rotate an oblique camera image when its
+dominant projection axis changes. The bed frame remains standing by default
+and is laid flat only by an explicit saved or editor choice. Exact registration
+with the photographed road remains a visual calibration performed from the
+camera view; the editor preserves that adjustment locally.
+
+The sky uses the catalogue-star and Milky Way implementation in
+`src/sky/starrySky.js`. Stars are placed in ICRF/J2000 and the complete sky is
+rotated into Earth-fixed coordinates for the current simulation time, so the
+astronomy view is tied to the globe and clock rather than a decorative page.
+
+Startup currently selects the keyless Esri/OSM globe even when Google or ion
+credentials are present. October's Google Photorealistic quota is exhausted and
+the provider can hang instead of rejecting; `PHOTOREAL_AT_STARTUP` records that
+temporary deployment choice. Explicit provider loads remain available and each
+attempt has a 20-second ceiling, so restoring photoreal startup after the quota
+reset cannot make application startup unbounded again.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,

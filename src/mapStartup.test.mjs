@@ -65,6 +65,54 @@ test('no credentials skip photoreal loading and preserve keyless startup', async
   assert.equal(Cesium.calls.length, 0);
 });
 
+test('startup can disable photoreal loading without touching credentials', async () => {
+  const Cesium = fakeCesium([{ id: 'must-not-load' }]);
+  const result = await loadPhotorealisticTileset(Cesium, {
+    googleApiKey: 'google-secret',
+    cesiumToken: 'ion-secret',
+    enabled: false,
+  });
+  assert.equal(result.tileset, null);
+  assert.equal(result.route, 'osm');
+  assert.equal(result.errors.length, 0);
+  assert.equal(Cesium.calls.length, 0);
+});
+
+test('a hung photoreal provider times out and preserves keyless startup', async () => {
+  const Cesium = fakeCesium([new Promise(() => {})]);
+  const result = await loadPhotorealisticTileset(Cesium, {
+    googleApiKey: 'google-secret',
+    timeoutMs: 5,
+  });
+  assert.equal(result.tileset, null);
+  assert.equal(result.route, 'osm');
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0].message, /timed out after 5 ms/);
+});
+
+test('a tileset allocated after timeout is destroyed instead of leaked', async () => {
+  let resolveTileset;
+  const pending = new Promise((resolve) => {
+    resolveTileset = resolve;
+  });
+  const Cesium = fakeCesium([pending]);
+  const resultPromise = loadPhotorealisticTileset(Cesium, {
+    googleApiKey: 'google-secret',
+    timeoutMs: 5,
+  });
+  const result = await resultPromise;
+  let destroyed = false;
+  resolveTileset({
+    isDestroyed: () => false,
+    destroy: () => {
+      destroyed = true;
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(result.route, 'osm');
+  assert.equal(destroyed, true);
+});
+
 test('a direct Google key is preferred', async () => {
   const tileset = { id: 'direct' };
   const Cesium = fakeCesium([tileset]);
