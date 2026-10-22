@@ -10,10 +10,12 @@ import {
  * Yard frames — Paul's own photos laid into the scene (card #93
  * close-zoom layer), FRUSTUM-TRUE v2 (2026-10-12).
  *
- * Each photo defaults to a north-up quad lying just above the surveyed
- * ground. The original camera pose remains available through Arrange mode's
- * standing placement, but the overview must read as a ground plan rather
- * than a set of tilted panels floating above the yard.
+ * Each photo hangs as a quad IN FRONT OF its camera, perpendicular
+ * to the camera's view axis, sized by the camera's field of view.
+ * Stand at the camera's position (camLat/camLon, camHeightM above
+ * the surveyed grade) and look along headingDeg/pitchDeg: the photo
+ * overlays the real yard. From any other angle it reads as what it
+ * is — a tilted panel in space, tilted at the camera's angle.
  *
  * Camera positions SOLVED 2026-10-12 (registry: YARD_CAMERAS.md):
  * position ±3 m, heading ±12 deg, height ±1 m. FOV values are the
@@ -28,10 +30,9 @@ import {
  * tilt / raise / resize it from the panel (or keys). A frame can
  * also be laid FLAT, face to the sky — the bed photo reads
  * right-side-up when you look straight down at it. Arrangements
- * persist in localStorage (key gev-yardframes-layout-v2) and merge
- * over the built-in defaults below on every load. The v2 key is an
- * intentional one-time reset: v1 stored the old floating-panel defaults,
- * so loading it would immediately undo the repaired ground placement.
+ * persist in localStorage (key gev-yardframes-layout-v1) and merge
+ * over the built-in defaults below on every load; nothing here
+ * changes the default scene when Arrange mode is off.
  */
 export const YARD_FRAMES = [
   {
@@ -104,7 +105,6 @@ export const YARD_FRAMES = [
 const DEFAULT_FOV_H_DEG = 103;
 const DEFAULT_FOV_V_DEG = 66;
 const DEFAULT_DISTANCE_M = 6.5;
-export const DEFAULT_GROUND_CLEARANCE_M = 0.08;
 
 const FRAME_CREDIT = new Cesium.Credit(
   'Yard frames — photos by Paul Prime, Oct 2026',
@@ -115,38 +115,28 @@ const FRAME_CREDIT = new Cesium.Credit(
 // Parametric frame rendering
 // ---------------------------------------------------------------------------
 
-export const LAYOUT_KEY = 'gev-yardframes-layout-v2';
-export const LEGACY_LAYOUT_KEY = 'gev-yardframes-layout-v1';
+export const LAYOUT_KEY = 'gev-yardframes-layout-v1';
 const ENTITY_PREFIX = 'yardframe:';
 const OUTLINE_ID = 'gev-arrange-outline';
 export const FRAME_TEXTURE_COORDINATES = Object.freeze([
-  // Cesium's HTML-image upload treats v=0 as the source image's top edge.
-  // Map that edge to the quad's TL/TR positions; the previous WebGL-style
-  // assumption put the tree and every timestamp upside down on the ground.
-  Object.freeze([0, 1]),
-  Object.freeze([1, 1]),
-  Object.freeze([1, 0]),
   Object.freeze([0, 0]),
+  Object.freeze([1, 0]),
+  Object.freeze([1, 1]),
+  Object.freeze([0, 1]),
 ]);
 
 /** Built-in params for one frame definition (the pre-editor values). */
 export function defaultParams(f) {
-  const flat = f.flat !== false;
   return {
     camLat: f.camLat,
     camLon: f.camLon,
     camHeightM: f.camHeightM,
-    groundOffsetM: f.groundOffsetM ?? DEFAULT_GROUND_CLEARANCE_M,
-    // Camera headings describe where wall-mounted cameras looked. They are
-    // not useful ground-plan orientation: the south-facing tree camera read
-    // upside down from the Liverpool anchor. Ground frames start north-up;
-    // an explicitly standing definition retains its camera heading.
-    headingDeg: flat ? (f.groundHeadingDeg ?? 0) : f.headingDeg,
+    headingDeg: f.headingDeg,
     pitchDeg: f.pitchDeg || 0,
     distanceM: f.distanceM || DEFAULT_DISTANCE_M,
     fovHDeg: f.fovHDeg || DEFAULT_FOV_H_DEG,
     fovVDeg: f.fovVDeg || DEFAULT_FOV_V_DEG,
-    flat,
+    flat: f.flat === true,
   };
 }
 
@@ -168,27 +158,6 @@ function loadSavedLayout() {
 }
 
 const toRad = (deg) => (deg * Math.PI) / 180;
-
-function normalizedHeading(deg) {
-  return ((Number(deg || 0) % 360) + 360) % 360;
-}
-
-/** Height above the shared ellipsoid datum used by a frame's anchor. */
-export function frameAnchorHeightM(p) {
-  return (
-    STORED_GROUND_HEIGHT_M +
-    (p.flat
-      ? Number.isFinite(p.groundOffsetM)
-        ? p.groundOffsetM
-        : DEFAULT_GROUND_CLEARANCE_M
-      : p.camHeightM)
-  );
-}
-
-/** Rotate a selected frame half a turn without changing its landing. */
-export function flipFrameParams(p) {
-  p.headingDeg = normalizedHeading(Number(p.headingDeg || 0) + 180);
-}
 
 /**
  * Quad corners for a params object, ordered BL, BR, TR, TL in photo
@@ -216,7 +185,7 @@ export function computeCorners(p) {
   const anchor = Cesium.Cartesian3.fromDegrees(
     p.camLon,
     p.camLat,
-    frameAnchorHeightM(p),
+    STORED_GROUND_HEIGHT_M + p.camHeightM,
   );
   const enu = Cesium.Transforms.eastNorthUpToFixedFrame(anchor);
   const dist = p.distanceM || DEFAULT_DISTANCE_M;
@@ -292,7 +261,6 @@ function buildFrameEntity(viewer, def, params) {
     // Pin every image to BL, BR, TR, TL. Cesium's automatic planar
     // projection may rotate an oblique quad as its dominant axis changes;
     // explicit coordinates keep the road line and the bed frame registered.
-    // FRAME_TEXTURE_COORDINATES also accounts for Cesium's top-origin image V.
     textureCoordinates: new Cesium.PolygonHierarchy(
       FRAME_TEXTURE_COORDINATES.map(([x, y]) => new Cesium.Cartesian2(x, y)),
     ),
@@ -342,7 +310,7 @@ function saveLayout() {
     for (const [id, st] of frameState) frames[id] = { ...st.params };
     window.localStorage.setItem(
       LAYOUT_KEY,
-      JSON.stringify({ version: 2, savedAt: new Date().toISOString(), frames }),
+      JSON.stringify({ version: 1, savedAt: new Date().toISOString(), frames }),
     );
   } catch (error) {
     console.warn('[YardFrames] could not save layout:', error);
@@ -350,9 +318,13 @@ function saveLayout() {
 }
 
 /**
- * Load the yard frames as a ground-plan overlay. A frame can still be stood up
- * in Arrange mode, which reuses the original frustum geometry. Saved v2
- * Arrange-mode params merge over the repaired built-in values.
+ * Frustum-true v2 renderer (built 2026-10-13; the v2 data rewrite
+ * dropped this function, which broke every fresh boot — the
+ * standalone scene imports it). Each photo hangs as a quad IN FRONT
+ * OF its camera, perpendicular to the view axis, sized by the
+ * camera FOV at distanceM: stand at the camera and the photo
+ * overlays the real yard; from elsewhere it reads as a tilted panel.
+ * Saved Arrange-mode params merge over the built-in values.
  */
 export function loadYardFrames({ viewer }) {
   destroyYardFrames(viewer);
@@ -402,7 +374,7 @@ const STEP = {
 };
 const ARRANGE_HINT =
   'Click a photo to select it, then drag it across the ground to move it. ' +
-  'Use the buttons (or keys Q/E, X, R/F, PgUp/PgDn, -/=, arrow keys) to fine-tune. ' +
+  'Use the buttons (or keys Q/E, R/F, PgUp/PgDn, -/=, arrow keys) to fine-tune. ' +
   'Everything saves by itself.';
 let editor = null;
 
@@ -413,7 +385,7 @@ function arrangeReadout(p) {
     '° · Tilt ' +
     Math.round(p.pitchDeg) +
     '° · Height ' +
-    (p.flat ? p.groundOffsetM : p.camHeightM).toFixed(2) +
+    p.camHeightM.toFixed(2) +
     ' m · Size ' +
     p.distanceM.toFixed(1) +
     ' m · ' +
@@ -487,15 +459,9 @@ function applyChange(viewer, id, mutate) {
   const st = frameState.get(id);
   if (!st) return;
   mutate(st.params);
-  st.params.headingDeg = normalizedHeading(st.params.headingDeg);
+  st.params.headingDeg = ((st.params.headingDeg % 360) + 360) % 360;
   st.params.pitchDeg = Math.max(-90, Math.min(90, st.params.pitchDeg));
   st.params.distanceM = Math.max(0.5, st.params.distanceM);
-  st.params.groundOffsetM = Math.max(
-    0.02,
-    Number.isFinite(st.params.groundOffsetM)
-      ? st.params.groundOffsetM
-      : DEFAULT_GROUND_CLEARANCE_M,
-  );
   rebuildFrame(viewer, id);
   saveLayout();
 }
@@ -505,11 +471,6 @@ function nudgeParams(p, northM, eastM) {
   const dLon = eastM / (111320 * Math.cos(toRad(p.camLat)));
   p.camLat += dLat;
   p.camLon += dLon;
-}
-
-function adjustFrameHeight(p, deltaM) {
-  if (p.flat) p.groundOffsetM += deltaM;
-  else p.camHeightM += deltaM;
 }
 
 function pickGround(viewer, windowPosition) {
@@ -597,10 +558,6 @@ function installHandlers(viewer) {
           p.headingDeg += STEP.headingDeg;
         });
         break;
-      case 'x':
-      case 'X':
-        change(flipFrameParams);
-        break;
       case 'r':
       case 'R':
         change((p) => {
@@ -614,10 +571,14 @@ function installHandlers(viewer) {
         });
         break;
       case 'PageUp':
-        change((p) => adjustFrameHeight(p, STEP.heightM));
+        change((p) => {
+          p.camHeightM += STEP.heightM;
+        });
         break;
       case 'PageDown':
-        change((p) => adjustFrameHeight(p, -STEP.heightM));
+        change((p) => {
+          p.camHeightM -= STEP.heightM;
+        });
         break;
       case '-':
       case '_':
@@ -664,13 +625,13 @@ function removeHandlers(viewer) {
 }
 
 const EDITOR_CSS = `
-.gev-arrange-toggle{position:fixed;left:20px;bottom:20px;z-index:9999;
+.gev-arrange-toggle{position:fixed;left:calc(50% + 148px);top:18px;z-index:9999;
   font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.14em;
   color:#e8eaed;background:rgba(12,12,20,.85);border:1px solid rgba(0,212,255,.45);
   border-radius:10px;padding:11px 16px;cursor:pointer;backdrop-filter:blur(8px)}
 .gev-arrange-toggle[aria-pressed="true"]{background:rgba(0,212,255,.22);color:#fff}
-.gev-arrange-panel{position:fixed;left:20px;bottom:66px;z-index:9999;width:312px;
-  max-height:calc(100vh - 96px);overflow-y:auto;color:#e8eaed;
+.gev-arrange-panel{position:fixed;left:348px;top:68px;z-index:9999;width:312px;
+  max-height:calc(100vh - 180px);overflow-y:auto;color:#e8eaed;
   background:rgba(12,12,20,.9);border:1px solid rgba(255,255,255,.12);
   border-radius:16px;padding:14px;backdrop-filter:blur(10px);
   font-family:'Inter',sans-serif;font-size:14px}
@@ -750,18 +711,21 @@ function buildPanel(viewer) {
   addBtn('Rotate 90°  ↻', (p) => {
     p.headingDeg += 90;
   });
-  addBtn('Flip 180°', flipFrameParams, {
-    wide: true,
-    className: 'gev-preset',
-  });
+  addBtn('Flip 180°', (p) => {
+    p.headingDeg += 180;
+  }, { wide: true, className: 'gev-preset' });
   addBtn('Tilt up', (p) => {
     p.pitchDeg += STEP.pitchDeg;
   });
   addBtn('Tilt down', (p) => {
     p.pitchDeg -= STEP.pitchDeg;
   });
-  addBtn('Raise', (p) => adjustFrameHeight(p, STEP.heightM));
-  addBtn('Lower', (p) => adjustFrameHeight(p, -STEP.heightM));
+  addBtn('Raise', (p) => {
+    p.camHeightM += STEP.heightM;
+  });
+  addBtn('Lower', (p) => {
+    p.camHeightM -= STEP.heightM;
+  });
   addBtn('Bigger', (p) => {
     p.distanceM += STEP.sizeM;
   });
@@ -822,7 +786,6 @@ function buildPanel(viewer) {
   resetBtn.addEventListener('click', () => {
     try {
       window.localStorage.removeItem(LAYOUT_KEY);
-      window.localStorage.removeItem(LEGACY_LAYOUT_KEY);
     } catch (e) {
       /* ignore */
     }
