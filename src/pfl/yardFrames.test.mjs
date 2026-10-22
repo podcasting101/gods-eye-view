@@ -3,7 +3,10 @@ import test from 'node:test';
 import * as Cesium from 'cesium';
 import {
   computeCorners,
+  DEFAULT_GROUND_CLEARANCE_M,
   defaultParams,
+  flipFrameParams,
+  frameAnchorHeightM,
   FRAME_TEXTURE_COORDINATES,
   LAYOUT_KEY,
   YARD_FRAMES,
@@ -13,7 +16,7 @@ function localCorners(params) {
   const anchor = Cesium.Cartesian3.fromDegrees(
     params.camLon,
     params.camLat,
-    -26.19 + params.camHeightM,
+    frameAnchorHeightM(params),
   );
   const inverse = Cesium.Matrix4.inverseTransformation(
     Cesium.Transforms.eastNorthUpToFixedFrame(anchor),
@@ -31,18 +34,18 @@ function bearingDegrees(vector) {
 }
 
 test('yard frame layout keeps the published persistence key and corner UVs', () => {
-  assert.equal(LAYOUT_KEY, 'gev-yardframes-layout-v1');
+  assert.equal(LAYOUT_KEY, 'gev-yardframes-layout-v2');
   assert.deepEqual(FRAME_TEXTURE_COORDINATES, [
-    [0, 0],
-    [1, 0],
-    [1, 1],
     [0, 1],
+    [1, 1],
+    [1, 0],
+    [0, 0],
   ]);
 });
 
 test('road frame right edge follows the real-road cross-axis', () => {
   const road = YARD_FRAMES.find((frame) => frame.id === 'back-yard-cam1-plan');
-  const params = defaultParams(road);
+  const params = defaultParams({ ...road, flat: false });
   const [bottomLeft, bottomRight] = localCorners(params);
   const right = Cesium.Cartesian3.subtract(
     bottomRight,
@@ -55,9 +58,23 @@ test('road frame right edge follows the real-road cross-axis', () => {
   assert.equal(params.flat, false);
 });
 
+test('yard frames default to north-up ground placement', () => {
+  for (const frame of YARD_FRAMES) {
+    const params = defaultParams(frame);
+    assert.equal(params.flat, true, frame.id);
+    assert.equal(params.headingDeg, 0, frame.id);
+    assert.equal(params.groundOffsetM, DEFAULT_GROUND_CLEARANCE_M, frame.id);
+    assert.equal(
+      frameAnchorHeightM(params),
+      -26.19 + DEFAULT_GROUND_CLEARANCE_M,
+      frame.id,
+    );
+  }
+});
+
 test('flat frames point upward without mirroring their top edge', () => {
   const road = YARD_FRAMES.find((frame) => frame.id === 'back-yard-cam1-plan');
-  const params = { ...defaultParams(road), flat: true };
+  const params = defaultParams(road);
   const [bottomLeft, bottomRight, topRight, topLeft] = localCorners(params);
   const right = Cesium.Cartesian3.subtract(
     bottomRight,
@@ -75,12 +92,24 @@ test('flat frames point upward without mirroring their top edge', () => {
     new Cesium.Cartesian3(),
   );
 
-  assert.ok(Math.abs(bearingDegrees(up) - 350) < 0.01);
+  const upBearing = bearingDegrees(up);
+  assert.ok(Math.min(upBearing, 360 - upBearing) < 0.01);
   assert.ok(normal.z > 0);
 });
 
-test('bed frame defaults to standing and can be laid flat explicitly', () => {
+test('per-frame flip turns an upside-down landing by 180 degrees', () => {
+  const params = defaultParams(YARD_FRAMES[0]);
+  flipFrameParams(params);
+  assert.equal(params.headingDeg, 180);
+  flipFrameParams(params);
+  assert.equal(params.headingDeg, 0);
+});
+
+test('a frame can still opt into the original standing camera placement', () => {
   const bed = YARD_FRAMES.find((frame) => frame.id === 'bed-station-20261012');
-  assert.equal(defaultParams(bed).flat, false);
-  assert.equal(defaultParams({ ...bed, flat: true }).flat, true);
+  assert.equal(defaultParams(bed).flat, true);
+  const standing = defaultParams({ ...bed, flat: false });
+  assert.equal(standing.flat, false);
+  assert.equal(standing.headingDeg, bed.headingDeg);
+  assert.equal(frameAnchorHeightM(standing), -26.19 + bed.camHeightM);
 });
