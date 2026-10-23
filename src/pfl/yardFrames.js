@@ -116,30 +116,33 @@ const DEFAULT_DISTANCE_M = 6.5;
 const CALIBRATED_HOUSE_SURVEY = {
   'back-yard-cam1-plan': {
     // East front driveway (RV, red van, white Tesla on left; Beaver solar arch on right; Palm Dr ahead)
-    // Aligned with Palm Drive (heading 190°, roll +2°) so its road & Beaver solar arch stitch seamlessly into Yard Overview (Wyze V4)!
-    camLat: 29.24755,
-    camLon: -95.23135,
-    camHeightM: 5.6,
-    headingDeg: 190,
-    pitchDeg: -26,
-    distanceM: 5.6,
-    widthScale: 0.84,
-    rollDeg: 2,
+    // Landmark-solved to stitch directly onto the left edge of Yard Overview (Wyze V4) over the white RV & east driveway
+    camLat: 29.247535,
+    camLon: -95.23132,
+    camHeightM: 7.49,
+    headingDeg: 218,
+    pitchDeg: -18,
+    distanceM: 7.4,
+    widthScale: 0.88,
+    rollDeg: 14,
     flat: false,
     texRot: 0,
+    hiddenByStitch: true,
   },
   'yard-overview-20261012': {
-    // Mounted on W wall of yellow house looking SW (205°) across solar arch & utility pole toward neighbor's blue house & right-side oak tree
-    camLat: 29.24755,
-    camLon: -95.23144,
-    camHeightM: 5.8,
-    headingDeg: 205,
-    pitchDeg: -14,
-    distanceM: 6.4,
-    widthScale: 0.76,
-    rollDeg: -5,
+    // Landmark-rectified Wyze Cam V4 overview (+ stitched Cam1 composite): pins the blue house across the pond,
+    // Palm Drive road (left & right), neighbor's oak tree on the right, little yellow pump house, and Beaver solar arch
+    camLat: 29.247584,
+    camLon: -95.231408,
+    camHeightM: 10.12,
+    headingDeg: 236,
+    pitchDeg: -8,
+    distanceM: 13.8,
+    widthScale: 0.96,
+    rollDeg: 0,
     flat: false,
     texRot: 0,
+    stitchedPano: true,
   },
   'house-side-20261012': {
     // Between yellow house W wall and Beaver solar arch, looking NNW (348°) toward back yard & bayou
@@ -287,30 +290,19 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedHouseSurveyV5) {
+    if (parsed && !parsed.fixedHouseSurveyV6) {
       // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (north-lawn trees + bayou dock)
       if (!frames['back-yard-cam2-water']) {
         frames['back-yard-cam2-water'] = { ...CALIBRATED_HOUSE_SURVEY['back-yard-cam2-water'] };
       }
-      // 2. For `yard-overview-20261012`: keep Paul's quad center, refine size (6.4m) and roll (-5°)
-      //    so the right-side neighbor's tree & road match the satellite map cleanly
-      if (frames['yard-overview-20261012']) {
-        const yo = frames['yard-overview-20261012'];
-        const cGeo = getFrameCenterGeo(yo);
-        yo.distanceM = 6.4;
-        yo.widthScale = 0.76;
-        yo.headingDeg = 205;
-        yo.pitchDeg = -14;
-        yo.rollDeg = -5;
-        cGeo.heightM = Math.min(cGeo.heightM, 5.4);
-        pinFrameCenterGeo(yo, cGeo);
-      } else {
-        frames['yard-overview-20261012'] = { ...CALIBRATED_HOUSE_SURVEY['yard-overview-20261012'] };
-      }
-      // 3. Apply calibrated house-relative placements for `back-yard-cam1-plan` (road-matched to Palm Dr),
-      //    `house-side-20261012` (compact along W wall so it doesn't poke through Yard Overview),
-      //    and `bed-station-20261012` (centered on yellow house roof)
-      for (const id of ['back-yard-cam1-plan', 'house-side-20261012', 'bed-station-20261012']) {
+      // 2. Apply landmark-solved & stitched house survey placements for the front yard (`yard-overview-20261012` + `back-yard-cam1-plan`),
+      //    `house-side-20261012` (compact along W wall), and `bed-station-20261012` (centered on yellow house roof)
+      for (const id of [
+        'yard-overview-20261012',
+        'back-yard-cam1-plan',
+        'house-side-20261012',
+        'bed-station-20261012',
+      ]) {
         frames[id] = {
           ...(frames[id] || {}),
           ...CALIBRATED_HOUSE_SURVEY[id],
@@ -320,6 +312,7 @@ function loadSavedLayout() {
       parsed.fixedHouseSurveyV3 = true;
       parsed.fixedHouseSurveyV4 = true;
       parsed.fixedHouseSurveyV5 = true;
+      parsed.fixedHouseSurveyV6 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -404,6 +397,11 @@ export function computeCorners(p) {
     h / 2,
     new Cesium.Cartesian3(),
   );
+  const sxMin = p.stitchedPano ? -1.505 : -1;
+  const syMin = p.stitchedPano ? -2.3067 : -1;
+  const minLocalZ = -p.camHeightM + 0.45;
+  const Hrad = toRad(p.headingDeg || 0);
+  const rayCot = 1.0 / Math.tan(toRad(24));
   const corner = (sx, sy) => {
     const local = new Cesium.Cartesian3();
     Cesium.Cartesian3.add(
@@ -416,10 +414,16 @@ export function computeCorners(p) {
       Cesium.Cartesian3.multiplyByScalar(hh, sy, new Cesium.Cartesian3()),
       local,
     );
+    if (p.stitchedPano && !p.flat && local.z < minLocalZ) {
+      const dz = minLocalZ - local.z;
+      local.x -= Math.sin(Hrad) * dz * rayCot;
+      local.y -= Math.cos(Hrad) * dz * rayCot;
+      local.z = minLocalZ;
+    }
     return Cesium.Matrix4.multiplyByPoint(enu, local, new Cesium.Cartesian3());
   };
   return {
-    positions: [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)],
+    positions: [corner(sxMin, syMin), corner(1, syMin), corner(1, 1), corner(sxMin, 1)],
     widthM: w,
     heightM: h,
     distanceM: dist,
@@ -433,12 +437,17 @@ function buildFrameEntity(viewer, def, params) {
   const stale = viewer.entities.getById(entityId);
   if (stale) viewer.entities.remove(stale);
   const opacity = typeof params.opacity === 'number' ? params.opacity : 1.0;
-  const matProps = { image: def.image };
-  if (opacity < 0.99) {
+  const imgUrl =
+    def.id === 'yard-overview-20261012' && params.stitchedPano
+      ? '/yard-frames/front-yard-stitched-2026-10-12.png'
+      : def.image;
+  const matProps = { image: imgUrl };
+  if (opacity < 0.99 || params.stitchedPano) {
     matProps.color = Cesium.Color.WHITE.withAlpha(opacity);
     matProps.transparent = true;
   }
   const polygon = {
+    show: !(def.id === 'back-yard-cam1-plan' && params.hiddenByStitch),
     hierarchy: new Cesium.PolygonHierarchy(positions),
     material: new Cesium.ImageMaterialProperty(matProps),
     perPositionHeight: true,
@@ -506,6 +515,7 @@ function saveLayout() {
         fixedHouseSurveyV3: true,
         fixedHouseSurveyV4: true,
         fixedHouseSurveyV5: true,
+        fixedHouseSurveyV6: true,
         savedAt: new Date().toISOString(),
         frames,
       }),
@@ -952,20 +962,48 @@ function buildPanel(viewer) {
   panel.appendChild(hdr);
   makePanelDraggable(panel, hdr);
 
-  const flyBtn = makeButton('✈️ Fly to Yard (All 5 Photos)', 'gev-wide gev-preset');
-  flyBtn.style.cssText = 'width:100%;min-height:28px;margin-bottom:6px;font-size:11.5px';
+  const flyBtn = makeButton('✈️ Fly to Yard (Registered View)', 'gev-wide gev-preset');
+  flyBtn.style.cssText = 'width:100%;min-height:28px;margin-bottom:5px;font-size:11.5px';
   flyBtn.addEventListener('click', () => {
     viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(-95.23142, 29.24788, 65),
+      destination: Cesium.Cartesian3.fromDegrees(
+        -95.23088,
+        29.24798,
+        STORED_GROUND_HEIGHT_M + 42,
+      ),
       orientation: {
-        heading: Cesium.Math.toRadians(192),
-        pitch: Cesium.Math.toRadians(-38),
+        heading: Cesium.Math.toRadians(226),
+        pitch: Cesium.Math.toRadians(-24),
         roll: 0,
       },
       duration: 1.2,
     });
   });
   panel.appendChild(flyBtn);
+
+  const stitchBtn = makeButton('🧵 Unified Stitch (Cam1+V4): ON', 'gev-wide gev-preset');
+  stitchBtn.style.cssText = 'width:100%;min-height:26px;margin-bottom:6px;font-size:11px';
+  const syncStitchBtn = () => {
+    const yo = frameState.get('yard-overview-20261012')?.params;
+    const isOn = Boolean(yo?.stitchedPano);
+    stitchBtn.textContent = isOn
+      ? '🧵 Unified Stitch (Cam1+V4): ON'
+      : '🧵 Unified Stitch (Cam1+V4): OFF';
+  };
+  stitchBtn.addEventListener('click', () => {
+    const yo = frameState.get('yard-overview-20261012');
+    const c1 = frameState.get('back-yard-cam1-plan');
+    if (!yo || !c1) return;
+    const next = !yo.params.stitchedPano;
+    yo.params.stitchedPano = next;
+    c1.params.hiddenByStitch = next;
+    rebuildFrame(viewer, 'yard-overview-20261012');
+    rebuildFrame(viewer, 'back-yard-cam1-plan');
+    saveLayout();
+    syncStitchBtn();
+  });
+  setTimeout(syncStitchBtn, 0);
+  panel.appendChild(stitchBtn);
 
   const name = document.createElement('div');
   name.className = 'gev-frame-name';
