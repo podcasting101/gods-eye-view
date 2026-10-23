@@ -115,40 +115,41 @@ const DEFAULT_DISTANCE_M = 6.5;
  */
 const CALIBRATED_HOUSE_SURVEY = {
   'back-yard-cam1-plan': {
-    // Mounted on SW roof peak of yellow house looking S (176°) over front driveway (left) & solar arch (right) toward Palm Dr
+    // East front driveway (RV, red van, white Tesla on left; Beaver solar arch on right; Palm Dr ahead)
+    // Placed over the east driveway / front yard so it does not collide with Yard Overview (Wyze V4)
     camLat: 29.24756,
-    camLon: -95.23140,
-    camHeightM: 6.8,
-    headingDeg: 176,
-    pitchDeg: -28,
-    distanceM: 8.5,
-    widthScale: 0.90,
+    camLon: -95.23134,
+    camHeightM: 6.2,
+    headingDeg: 175,
+    pitchDeg: -36,
+    distanceM: 6.2,
+    widthScale: 0.85,
     rollDeg: 0,
     flat: false,
     texRot: 0,
   },
   'yard-overview-20261012': {
-    // Mounted on W wall of yellow house looking SSW (198°) across solar arch & utility pole toward neighbor's blue house & right-side oak tree
+    // Mounted on W wall of yellow house looking SW (205°) across solar arch & utility pole toward neighbor's blue house & right-side oak tree
     camLat: 29.24755,
     camLon: -95.23143,
-    camHeightM: 5.8,
-    headingDeg: 198,
-    pitchDeg: -16,
-    distanceM: 7.4,
-    widthScale: 0.82,
+    camHeightM: 6.2,
+    headingDeg: 205,
+    pitchDeg: -14,
+    distanceM: 7.2,
+    widthScale: 0.78,
     rollDeg: -2,
     flat: false,
     texRot: 0,
   },
   'house-side-20261012': {
-    // Looking NNW (348°) between yellow house W wall (right) and Beaver solar arch (left) toward back yard & bayou
-    camLat: 29.24750,
-    camLon: -95.23145,
+    // Between yellow house W wall and Beaver solar arch, looking NNW (348°) toward back yard & bayou
+    camLat: 29.24756,
+    camLon: -95.23146,
     camHeightM: 3.4,
     headingDeg: 348,
-    pitchDeg: -10,
-    distanceM: 5.5,
-    widthScale: 0.90,
+    pitchDeg: -8,
+    distanceM: 4.2,
+    widthScale: 0.88,
     rollDeg: 0,
     flat: false,
     texRot: 0,
@@ -160,20 +161,20 @@ const CALIBRATED_HOUSE_SURVEY = {
     camHeightM: 5.0,
     headingDeg: 352,
     pitchDeg: -18,
-    distanceM: 7.0,
+    distanceM: 6.5,
     widthScale: 0.92,
     rollDeg: 0,
     flat: false,
     texRot: 0,
   },
   'bed-station-20261012': {
-    // Inside the yellow house roof footprint
-    camLat: 29.24759,
-    camLon: -95.23139,
+    // Inside the NE bedroom of the yellow house roof footprint, laid flat facing sky
+    camLat: 29.24761,
+    camLon: -95.23136,
     camHeightM: 3.2,
-    headingDeg: 0,
+    headingDeg: 180,
     pitchDeg: -5,
-    distanceM: 3.5,
+    distanceM: 2.8,
     fovHDeg: 68,
     fovVDeg: 37,
     widthScale: 1.0,
@@ -285,26 +286,29 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedHouseSurveyV3) {
-      // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (he said "the back-yard-cam, I think I've got it lined up fairly well")
+    if (parsed && !parsed.fixedHouseSurveyV4) {
+      // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (north-lawn trees + bayou dock)
       if (!frames['back-yard-cam2-water']) {
         frames['back-yard-cam2-water'] = { ...CALIBRATED_HOUSE_SURVEY['back-yard-cam2-water'] };
       }
-      // 2. For `yard-overview-20261012` (where Paul lined up the house across the street + road,
-      //    but the photo was too wide and the right-side neighbor's tree was not lined up):
-      //    keep his aligned center/location while trimming widthScale to 0.80, size by 0.86x (center-locked!),
-      //    and applying a -2° roll so the right-side tree pulls in to match the satellite tree!
+      // 2. For `yard-overview-20261012`: in V3 its size was still 13.3m (~33m wide!) and Spin was 236°,
+      //    so it collided with the other photos and stretched past the neighbor's tree.
+      //    Keep Paul's quad center, but size it to realistic front-yard scale (distanceM = 7.2m, widthScale = 0.78)
+      //    and align Spin to 206° (SSW toward the blue house across Palm Dr and the right-side neighbor's oak tree).
       if (frames['yard-overview-20261012']) {
         const yo = frames['yard-overview-20261012'];
         const cGeo = getFrameCenterGeo(yo);
-        yo.distanceM = Math.max(2.5, Number((yo.distanceM || 6.5) * 0.86));
-        yo.widthScale = 0.80;
-        yo.rollDeg = typeof yo.rollDeg === 'number' ? yo.rollDeg : -2;
+        yo.distanceM = 7.2;
+        yo.widthScale = 0.78;
+        yo.headingDeg = 206;
+        yo.pitchDeg = -14;
+        yo.rollDeg = -2;
+        cGeo.heightM = Math.min(cGeo.heightM, 6.2);
         pinFrameCenterGeo(yo, cGeo);
       } else {
         frames['yard-overview-20261012'] = { ...CALIBRATED_HOUSE_SURVEY['yard-overview-20261012'] };
       }
-      // 3. Apply calibrated house-relative placements for the remaining 3 photos around the yellow house
+      // 3. Apply non-overlapping calibrated house-relative placements for the remaining 3 photos
       for (const id of ['back-yard-cam1-plan', 'house-side-20261012', 'bed-station-20261012']) {
         frames[id] = {
           ...(frames[id] || {}),
@@ -313,6 +317,7 @@ function loadSavedLayout() {
       }
       parsed.fixedSidewaysRoadV1 = true;
       parsed.fixedHouseSurveyV3 = true;
+      parsed.fixedHouseSurveyV4 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -497,6 +502,7 @@ function saveLayout() {
         version: 1,
         fixedSidewaysRoadV1: true,
         fixedHouseSurveyV3: true,
+        fixedHouseSurveyV4: true,
         savedAt: new Date().toISOString(),
         frames,
       }),
@@ -855,16 +861,16 @@ function removeHandlers(viewer) {
 }
 
 const EDITOR_CSS = `
-.gev-arrange-toggle{position:fixed;left:8px;top:14px;z-index:9999;
-  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.10em;
+.gev-arrange-toggle{position:fixed;left:8px;top:62px;z-index:9999;
+  font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.08em;
   color:#e8eaed;background:rgba(12,12,20,.88);border:1px solid rgba(0,212,255,.45);
-  border-radius:8px;padding:7px 11px;cursor:pointer;backdrop-filter:blur(8px)}
+  border-radius:8px;padding:6px 10px;cursor:pointer;backdrop-filter:blur(8px)}
 .gev-arrange-toggle[aria-pressed="true"]{background:rgba(0,212,255,.22);color:#fff}
-.gev-arrange-panel{position:fixed;left:8px;top:52px;z-index:9999;width:226px;
-  max-height:calc(100vh - 68px);overflow-y:auto;color:#e8eaed;
+.gev-arrange-panel{position:fixed;left:8px;top:98px;z-index:9999;width:216px;
+  max-height:calc(100vh - 110px);overflow-y:auto;color:#e8eaed;
   background:rgba(10,12,18,.92);border:1px solid rgba(0,212,255,.28);
-  border-radius:12px;padding:10px;backdrop-filter:blur(10px);
-  font-family:'Inter',sans-serif;font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.55)}
+  border-radius:12px;padding:9px;backdrop-filter:blur(10px);
+  font-family:'Inter',sans-serif;font-size:11.5px;box-shadow:0 8px 28px rgba(0,0,0,.55)}
 .gev-arrange-panel h3{margin:0;font-family:'JetBrains Mono',monospace;
   font-size:10.5px;letter-spacing:.12em;color:#00d4ff;cursor:move;user-select:none}
 .gev-arrange-panel .gev-frame-name{font-weight:600;font-size:11.5px;margin:4px 0 2px;line-height:1.25}
