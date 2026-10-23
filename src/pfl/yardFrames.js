@@ -539,8 +539,6 @@ function installHandlers(viewer) {
         }
         viewer.scene.screenSpaceCameraController.enableInputs = false;
       }
-    } else {
-      selectFrame(viewer, null);
     }
   }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
   handler.setInputAction((evt) => {
@@ -699,10 +697,32 @@ function buildPanel(viewer) {
   const panel = document.createElement('div');
   panel.className = 'gev-arrange-panel';
   panel.id = 'gev-arrange-panel';
+  const hdr = document.createElement('div');
+  hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px';
   const title = document.createElement('h3');
+  title.style.margin = '0';
   // i18n-ignore: private PFL operator surface is intentionally English.
-  title.textContent = 'ARRANGE FRAMES';
-  panel.appendChild(title);
+  title.textContent = '✥ ARRANGE YARD PHOTOS';
+  hdr.appendChild(title);
+  const closeBtn = makeButton('✕ Hide');
+  closeBtn.style.cssText = 'min-height:28px;padding:3px 10px;font-size:12px';
+  closeBtn.addEventListener('click', () => setArrange(viewer, false));
+  hdr.appendChild(closeBtn);
+  panel.appendChild(hdr);
+  const flyBtn = makeButton('✈️ Fly to Liverpool Yard (All 5 Photos)', 'gev-wide gev-preset');
+  flyBtn.style.cssText = 'width:100%;min-height:36px;margin-bottom:8px;font-size:13px';
+  flyBtn.addEventListener('click', () => {
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(-95.23140, 29.24732, 75),
+      orientation: {
+        heading: Cesium.Math.toRadians(0),
+        pitch: Cesium.Math.toRadians(-45),
+        roll: 0,
+      },
+      duration: 1.2,
+    });
+  });
+  panel.appendChild(flyBtn);
   const name = document.createElement('div');
   name.className = 'gev-frame-name';
   name.dataset.role = 'frame-name';
@@ -865,14 +885,24 @@ function buildPanel(viewer) {
 function setArrange(viewer, on) {
   if (!editor) return;
   editor.on = on;
+  const label = on ? '✥ ARRANGE YARD PHOTOS: ON' : '✥ ARRANGE YARD PHOTOS';
   editor.toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
   // i18n-ignore: private PFL operator surface is intentionally English.
-  editor.toggle.textContent = on ? '✥ ARRANGE FRAMES: ON' : '✥ ARRANGE FRAMES';
+  editor.toggle.textContent = label;
+  if (editor.dockBtn) {
+    editor.dockBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    // i18n-ignore: private PFL operator surface is intentionally English.
+    editor.dockBtn.textContent = label;
+  }
   editor.panel.style.display = on ? 'block' : 'none';
   if (on) {
     holdContinuousRender('yardframes-arrange');
     installHandlers(viewer);
-    refreshPanel();
+    if (!editor.selectedId && frameState.has('yard-overview-20261012')) {
+      selectFrame(viewer, 'yard-overview-20261012');
+    } else {
+      refreshPanel();
+    }
   } else {
     removeHandlers(viewer);
     selectFrame(viewer, null);
@@ -883,24 +913,38 @@ function setArrange(viewer, on) {
 
 function installArrangeToggle(viewer) {
   if (typeof document === 'undefined') return;
-  const old = document.getElementById('gev-arrange-toggle');
-  if (old) old.remove();
-  const oldPanel = document.getElementById('gev-arrange-panel');
-  if (oldPanel) oldPanel.remove();
+  for (const id of ['gev-arrange-toggle', 'gev-arrange-dock-btn', 'gev-arrange-panel']) {
+    document.getElementById(id)?.remove();
+  }
   if (!document.getElementById('gev-arrange-css')) {
     const style = document.createElement('style');
     style.id = 'gev-arrange-css';
     style.textContent = EDITOR_CSS;
     document.head.appendChild(style);
   }
-  const toggle = makeButton('✥ ARRANGE FRAMES', 'gev-arrange-toggle');
+  const toggle = makeButton('✥ ARRANGE YARD PHOTOS', 'gev-arrange-toggle');
   toggle.id = 'gev-arrange-toggle';
   toggle.setAttribute('aria-pressed', 'false');
   document.body.appendChild(toggle);
+
+  let dockBtn = null;
+  const locationBar = document.getElementById('location-bar');
+  if (locationBar && locationBar.parentElement) {
+    dockBtn = makeButton('✥ ARRANGE YARD PHOTOS');
+    dockBtn.id = 'gev-arrange-dock-btn';
+    dockBtn.style.cssText =
+      'width:100%;min-height:38px;margin:4px 0;padding:8px 12px;' +
+      "font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;letter-spacing:.12em;" +
+      'color:#00d4ff;background:rgba(0,212,255,.14);border:1px solid rgba(0,212,255,.55);' +
+      'border-radius:10px;cursor:pointer;text-align:center';
+    locationBar.insertAdjacentElement('afterend', dockBtn);
+  }
+
   const panel = buildPanel(viewer);
   editor = {
     viewer,
     toggle,
+    dockBtn,
     panel,
     handler: null,
     keyHandler: null,
@@ -913,4 +957,14 @@ function installArrangeToggle(viewer) {
     on: false,
   };
   toggle.addEventListener('click', () => setArrange(viewer, !editor.on));
+  dockBtn?.addEventListener('click', () => setArrange(viewer, !editor.on));
+  window.addEventListener('keydown', (e) => {
+    if (e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      if (editor) setArrange(viewer, !editor.on);
+    }
+  });
+  setArrange(viewer, true);
 }

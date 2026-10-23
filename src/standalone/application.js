@@ -72,6 +72,23 @@ export function createStandaloneApplication({
         signal: context.signal,
         surface: scene.operations.surface,
       });
+      if (!import.meta.env?.MAPILLARY_CLIENT_TOKEN) {
+        const sl = catalog.get?.('street-level');
+        if (sl && typeof sl.setParams === 'function') {
+          const origSetParams = sl.setParams.bind(sl);
+          sl.setParams = (params = {}) => {
+            if (!params?.providerSwitches && params?.mapillary !== false) {
+              return origSetParams({
+                ...params,
+                mapillary: false,
+                providerSwitches: 'kartaview-1',
+              });
+            }
+            return origSetParams(params);
+          };
+          sl.setProviderEnabled?.('kartaview', true);
+        }
+      }
       return scene;
     },
     createControls: (context) =>
