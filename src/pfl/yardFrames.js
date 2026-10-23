@@ -137,6 +137,7 @@ export function defaultParams(f) {
     fovHDeg: f.fovHDeg || DEFAULT_FOV_H_DEG,
     fovVDeg: f.fovVDeg || DEFAULT_FOV_V_DEG,
     flat: f.flat === true,
+    texRot: f.texRot || 0,
   };
 }
 
@@ -147,7 +148,25 @@ function loadSavedLayout() {
     const raw = window.localStorage.getItem(LAYOUT_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    return (parsed && parsed.frames) || {};
+    const frames = (parsed && parsed.frames) || {};
+    if (parsed && !parsed.fixedSidewaysRoadV1) {
+      let migrated = false;
+      for (const id of ['back-yard-cam1-plan', 'yard-overview-20261012']) {
+        const fp = frames[id];
+        if (fp && typeof fp.headingDeg === 'number') {
+          const h = ((fp.headingDeg % 360) + 360) % 360;
+          if (h >= 180 && h <= 315) {
+            fp.headingDeg = (h + 90) % 360;
+            migrated = true;
+          }
+        }
+      }
+      parsed.fixedSidewaysRoadV1 = true;
+      if (migrated) {
+        window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
+      }
+    }
+    return frames;
   } catch (error) {
     console.warn(
       '[YardFrames] saved layout unreadable, using built-ins:',
@@ -262,7 +281,13 @@ function buildFrameEntity(viewer, def, params) {
     // projection may rotate an oblique quad as its dominant axis changes;
     // explicit coordinates keep the road line and the bed frame registered.
     textureCoordinates: new Cesium.PolygonHierarchy(
-      FRAME_TEXTURE_COORDINATES.map(([x, y]) => new Cesium.Cartesian2(x, y)),
+      (() => {
+        const steps = (((Math.round(Number(params.texRot || 0) / 90) % 4) + 4) % 4);
+        return FRAME_TEXTURE_COORDINATES.map((_, i) => {
+          const [x, y] = FRAME_TEXTURE_COORDINATES[(i + steps) % 4];
+          return new Cesium.Cartesian2(x, y);
+        });
+      })(),
     ),
   };
   const entity = viewer.entities.add({
@@ -310,7 +335,7 @@ function saveLayout() {
     for (const [id, st] of frameState) frames[id] = { ...st.params };
     window.localStorage.setItem(
       LAYOUT_KEY,
-      JSON.stringify({ version: 1, savedAt: new Date().toISOString(), frames }),
+      JSON.stringify({ version: 1, fixedSidewaysRoadV1: true, savedAt: new Date().toISOString(), frames }),
     );
   } catch (error) {
     console.warn('[YardFrames] could not save layout:', error);
@@ -452,6 +477,12 @@ function refreshPanel() {
   }
   editor.panel.querySelectorAll('[data-needs-selection]').forEach((b) => {
     b.disabled = !st;
+  });
+  editor.panel.querySelectorAll('[data-frame-select]').forEach((b) => {
+    const active = b.dataset.frameSelect === (editor.selectedId || '');
+    b.setAttribute('aria-pressed', active ? 'true' : 'false');
+    b.style.borderColor = active ? '#00d4ff' : 'rgba(255,255,255,.14)';
+    b.style.background = active ? 'rgba(0,212,255,.22)' : 'rgba(255,255,255,.06)';
   });
 }
 
@@ -686,6 +717,33 @@ function buildPanel(viewer) {
   hint.textContent = ARRANGE_HINT;
   panel.appendChild(hint);
 
+  const pickSection = document.createElement('div');
+  pickSection.className = 'gev-section';
+  // i18n-ignore: private PFL operator surface is intentionally English.
+  pickSection.textContent = 'SELECT PHOTO';
+  panel.appendChild(pickSection);
+  const pickGrid = document.createElement('div');
+  pickGrid.className = 'gev-grid';
+  pickGrid.style.marginBottom = '10px';
+  const shortNames = {
+    'back-yard-cam1-plan': '1. Back Yard Cam1 (Road)',
+    'yard-overview-20261012': '2. Yard Overview (Wyze V4)',
+    'house-side-20261012': '3. Yellow House Side (HD)',
+    'back-yard-cam2-water': '4. Water / Dock (Cam2)',
+    'bed-station-20261012': '5. Bed Station (Inside)',
+  };
+  for (const f of YARD_FRAMES) {
+    const pb = makeButton(shortNames[f.id] || f.id, 'gev-wide');
+    pb.dataset.frameSelect = f.id;
+    pb.style.minHeight = '34px';
+    pb.style.fontSize = '12.5px';
+    pb.style.textAlign = 'left';
+    pb.style.padding = '6px 10px';
+    pb.addEventListener('click', () => selectFrame(viewer, f.id));
+    pickGrid.appendChild(pb);
+  }
+  panel.appendChild(pickGrid);
+
   const grid = document.createElement('div');
   grid.className = 'gev-grid';
   const addBtn = (text, fn, opts = {}) => {
@@ -711,6 +769,12 @@ function buildPanel(viewer) {
   addBtn('Rotate 90°  ↻', (p) => {
     p.headingDeg += 90;
   });
+  addBtn('⟲  Turn Photo 90°', (p) => {
+    p.texRot = (((Number(p.texRot || 0) - 90) % 360) + 360) % 360;
+  }, { className: 'gev-preset' });
+  addBtn('Turn Photo 90°  ⟳', (p) => {
+    p.texRot = (((Number(p.texRot || 0) + 90) % 360) + 360) % 360;
+  }, { className: 'gev-preset' });
   addBtn('Flip 180°', (p) => {
     p.headingDeg += 180;
   }, { wide: true, className: 'gev-preset' });

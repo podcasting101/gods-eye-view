@@ -18,6 +18,7 @@ export function createEsriImagery() {
       credit:
         'Powered by Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
       enablePickFeatures: false,
+      maximumLevel: 19,
     },
   );
 }
