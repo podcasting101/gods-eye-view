@@ -132,14 +132,14 @@ const CALIBRATED_HOUSE_SURVEY = {
   'yard-overview-20261012': {
     // Landmark-rectified Wyze Cam V4 overview (+ stitched Cam1 composite): pins the blue house across the pond,
     // Palm Drive road (left & right), neighbor's oak tree on the right, little yellow pump house, and Beaver solar arch
-    camLat: 29.247598,
-    camLon: -95.231468,
-    camHeightM: 12.88,
+    camLat: 29.247615,
+    camLon: -95.231449,
+    camHeightM: 16.84,
     headingDeg: 198,
     pitchDeg: -18,
-    distanceM: 13.2,
-    widthScale: 0.90,
-    rollDeg: -3,
+    distanceM: 16.7,
+    widthScale: 1.15,
+    rollDeg: -12,
     flat: false,
     texRot: 0,
     stitchedPano: true,
@@ -290,7 +290,7 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedHouseSurveyV7) {
+    if (parsed && !parsed.fixedHouseSurveyV8) {
       // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (north-lawn trees + bayou dock)
       if (!frames['back-yard-cam2-water']) {
         frames['back-yard-cam2-water'] = { ...CALIBRATED_HOUSE_SURVEY['back-yard-cam2-water'] };
@@ -314,6 +314,7 @@ function loadSavedLayout() {
       parsed.fixedHouseSurveyV5 = true;
       parsed.fixedHouseSurveyV6 = true;
       parsed.fixedHouseSurveyV7 = true;
+      parsed.fixedHouseSurveyV8 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -509,6 +510,7 @@ function saveLayout() {
         fixedHouseSurveyV5: true,
         fixedHouseSurveyV6: true,
         fixedHouseSurveyV7: true,
+        fixedHouseSurveyV8: true,
         savedAt: new Date().toISOString(),
         frames,
       }),
