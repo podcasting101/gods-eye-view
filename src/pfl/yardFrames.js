@@ -116,40 +116,41 @@ const DEFAULT_DISTANCE_M = 6.5;
 const CALIBRATED_HOUSE_SURVEY = {
   'back-yard-cam1-plan': {
     // East front driveway (RV, red van, white Tesla on left; Beaver solar arch on right; Palm Dr ahead)
-    // Placed over the east driveway / front yard so it does not collide with Yard Overview (Wyze V4)
-    camLat: 29.24756,
-    camLon: -95.23134,
-    camHeightM: 6.2,
-    headingDeg: 175,
-    pitchDeg: -36,
-    distanceM: 6.2,
-    widthScale: 0.85,
-    rollDeg: 0,
+    // Aligned with Palm Drive (heading 190°, roll +2°) so its road & Beaver solar arch stitch seamlessly into Yard Overview (Wyze V4)!
+    camLat: 29.24755,
+    camLon: -95.23135,
+    camHeightM: 5.6,
+    headingDeg: 190,
+    pitchDeg: -26,
+    distanceM: 5.6,
+    widthScale: 0.84,
+    rollDeg: 2,
     flat: false,
     texRot: 0,
   },
   'yard-overview-20261012': {
     // Mounted on W wall of yellow house looking SW (205°) across solar arch & utility pole toward neighbor's blue house & right-side oak tree
     camLat: 29.24755,
-    camLon: -95.23143,
-    camHeightM: 6.2,
+    camLon: -95.23144,
+    camHeightM: 5.8,
     headingDeg: 205,
     pitchDeg: -14,
-    distanceM: 7.2,
-    widthScale: 0.78,
-    rollDeg: -2,
+    distanceM: 6.4,
+    widthScale: 0.76,
+    rollDeg: -5,
     flat: false,
     texRot: 0,
   },
   'house-side-20261012': {
     // Between yellow house W wall and Beaver solar arch, looking NNW (348°) toward back yard & bayou
-    camLat: 29.24756,
-    camLon: -95.23146,
-    camHeightM: 3.4,
+    // Kept compact at ground level alongside the W wall so it never pokes through Yard Overview
+    camLat: 29.24758,
+    camLon: -95.23143,
+    camHeightM: 2.6,
     headingDeg: 348,
     pitchDeg: -8,
-    distanceM: 4.2,
-    widthScale: 0.88,
+    distanceM: 3.2,
+    widthScale: 0.85,
     rollDeg: 0,
     flat: false,
     texRot: 0,
@@ -168,9 +169,9 @@ const CALIBRATED_HOUSE_SURVEY = {
     texRot: 0,
   },
   'bed-station-20261012': {
-    // Inside the NE bedroom of the yellow house roof footprint, laid flat facing sky
-    camLat: 29.24761,
-    camLon: -95.23136,
+    // Inside the center of the yellow house roof footprint, laid flat facing sky
+    camLat: 29.24758,
+    camLon: -95.23139,
     camHeightM: 3.2,
     headingDeg: 180,
     pitchDeg: -5,
@@ -286,29 +287,29 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedHouseSurveyV4) {
+    if (parsed && !parsed.fixedHouseSurveyV5) {
       // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (north-lawn trees + bayou dock)
       if (!frames['back-yard-cam2-water']) {
         frames['back-yard-cam2-water'] = { ...CALIBRATED_HOUSE_SURVEY['back-yard-cam2-water'] };
       }
-      // 2. For `yard-overview-20261012`: in V3 its size was still 13.3m (~33m wide!) and Spin was 236°,
-      //    so it collided with the other photos and stretched past the neighbor's tree.
-      //    Keep Paul's quad center, but size it to realistic front-yard scale (distanceM = 7.2m, widthScale = 0.78)
-      //    and align Spin to 206° (SSW toward the blue house across Palm Dr and the right-side neighbor's oak tree).
+      // 2. For `yard-overview-20261012`: keep Paul's quad center, refine size (6.4m) and roll (-5°)
+      //    so the right-side neighbor's tree & road match the satellite map cleanly
       if (frames['yard-overview-20261012']) {
         const yo = frames['yard-overview-20261012'];
         const cGeo = getFrameCenterGeo(yo);
-        yo.distanceM = 7.2;
-        yo.widthScale = 0.78;
-        yo.headingDeg = 206;
+        yo.distanceM = 6.4;
+        yo.widthScale = 0.76;
+        yo.headingDeg = 205;
         yo.pitchDeg = -14;
-        yo.rollDeg = -2;
-        cGeo.heightM = Math.min(cGeo.heightM, 6.2);
+        yo.rollDeg = -5;
+        cGeo.heightM = Math.min(cGeo.heightM, 5.4);
         pinFrameCenterGeo(yo, cGeo);
       } else {
         frames['yard-overview-20261012'] = { ...CALIBRATED_HOUSE_SURVEY['yard-overview-20261012'] };
       }
-      // 3. Apply non-overlapping calibrated house-relative placements for the remaining 3 photos
+      // 3. Apply calibrated house-relative placements for `back-yard-cam1-plan` (road-matched to Palm Dr),
+      //    `house-side-20261012` (compact along W wall so it doesn't poke through Yard Overview),
+      //    and `bed-station-20261012` (centered on yellow house roof)
       for (const id of ['back-yard-cam1-plan', 'house-side-20261012', 'bed-station-20261012']) {
         frames[id] = {
           ...(frames[id] || {}),
@@ -318,6 +319,7 @@ function loadSavedLayout() {
       parsed.fixedSidewaysRoadV1 = true;
       parsed.fixedHouseSurveyV3 = true;
       parsed.fixedHouseSurveyV4 = true;
+      parsed.fixedHouseSurveyV5 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -503,6 +505,7 @@ function saveLayout() {
         fixedSidewaysRoadV1: true,
         fixedHouseSurveyV3: true,
         fixedHouseSurveyV4: true,
+        fixedHouseSurveyV5: true,
         savedAt: new Date().toISOString(),
         frames,
       }),
