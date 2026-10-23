@@ -145,6 +145,7 @@ v4_corners = np.array([[0, 0], [W, 0], [W, H], [0, H]], dtype=np.float64)
 all_corners = np.vstack([c1_corners, v4_corners])
 min_x, min_y = np.floor(all_corners.min(axis=0)).astype(int)
 max_x, max_y = np.ceil(all_corners.max(axis=0)).astype(int)
+max_y = min(max_y, int(1.35 * H))
 pano_w = max_x - min_x
 pano_h = max_y - min_y
 

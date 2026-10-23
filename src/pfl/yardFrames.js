@@ -117,14 +117,14 @@ const CALIBRATED_HOUSE_SURVEY = {
   'back-yard-cam1-plan': {
     // East front driveway (RV, red van, white Tesla on left; Beaver solar arch on right; Palm Dr ahead)
     // Landmark-solved to stitch directly onto the left edge of Yard Overview (Wyze V4) over the white RV & east driveway
-    camLat: 29.247535,
-    camLon: -95.23132,
-    camHeightM: 7.49,
-    headingDeg: 218,
-    pitchDeg: -18,
-    distanceM: 7.4,
-    widthScale: 0.88,
-    rollDeg: 14,
+    camLat: 29.24756,
+    camLon: -95.23134,
+    camHeightM: 6.2,
+    headingDeg: 175,
+    pitchDeg: -36,
+    distanceM: 6.2,
+    widthScale: 0.85,
+    rollDeg: 0,
     flat: false,
     texRot: 0,
     hiddenByStitch: true,
@@ -132,14 +132,14 @@ const CALIBRATED_HOUSE_SURVEY = {
   'yard-overview-20261012': {
     // Landmark-rectified Wyze Cam V4 overview (+ stitched Cam1 composite): pins the blue house across the pond,
     // Palm Drive road (left & right), neighbor's oak tree on the right, little yellow pump house, and Beaver solar arch
-    camLat: 29.247584,
-    camLon: -95.231408,
-    camHeightM: 10.12,
-    headingDeg: 236,
-    pitchDeg: -8,
-    distanceM: 13.8,
-    widthScale: 0.96,
-    rollDeg: 0,
+    camLat: 29.247598,
+    camLon: -95.231468,
+    camHeightM: 12.88,
+    headingDeg: 198,
+    pitchDeg: -18,
+    distanceM: 13.2,
+    widthScale: 0.90,
+    rollDeg: -3,
     flat: false,
     texRot: 0,
     stitchedPano: true,
@@ -290,7 +290,7 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedHouseSurveyV6) {
+    if (parsed && !parsed.fixedHouseSurveyV7) {
       // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (north-lawn trees + bayou dock)
       if (!frames['back-yard-cam2-water']) {
         frames['back-yard-cam2-water'] = { ...CALIBRATED_HOUSE_SURVEY['back-yard-cam2-water'] };
@@ -313,6 +313,7 @@ function loadSavedLayout() {
       parsed.fixedHouseSurveyV4 = true;
       parsed.fixedHouseSurveyV5 = true;
       parsed.fixedHouseSurveyV6 = true;
+      parsed.fixedHouseSurveyV7 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -398,10 +399,7 @@ export function computeCorners(p) {
     new Cesium.Cartesian3(),
   );
   const sxMin = p.stitchedPano ? -1.505 : -1;
-  const syMin = p.stitchedPano ? -2.3067 : -1;
-  const minLocalZ = -p.camHeightM + 0.45;
-  const Hrad = toRad(p.headingDeg || 0);
-  const rayCot = 1.0 / Math.tan(toRad(24));
+  const syMin = p.stitchedPano ? -1.70 : -1;
   const corner = (sx, sy) => {
     const local = new Cesium.Cartesian3();
     Cesium.Cartesian3.add(
@@ -414,12 +412,6 @@ export function computeCorners(p) {
       Cesium.Cartesian3.multiplyByScalar(hh, sy, new Cesium.Cartesian3()),
       local,
     );
-    if (p.stitchedPano && !p.flat && local.z < minLocalZ) {
-      const dz = minLocalZ - local.z;
-      local.x -= Math.sin(Hrad) * dz * rayCot;
-      local.y -= Math.cos(Hrad) * dz * rayCot;
-      local.z = minLocalZ;
-    }
     return Cesium.Matrix4.multiplyByPoint(enu, local, new Cesium.Cartesian3());
   };
   return {
@@ -516,6 +508,7 @@ function saveLayout() {
         fixedHouseSurveyV4: true,
         fixedHouseSurveyV5: true,
         fixedHouseSurveyV6: true,
+        fixedHouseSurveyV7: true,
         savedAt: new Date().toISOString(),
         frames,
       }),
@@ -962,20 +955,20 @@ function buildPanel(viewer) {
   panel.appendChild(hdr);
   makePanelDraggable(panel, hdr);
 
-  const flyBtn = makeButton('✈️ Fly to Yard (Registered View)', 'gev-wide gev-preset');
+  const flyBtn = makeButton('✈️ Fly to Yard (417 Palm Dr)', 'gev-wide gev-preset');
   flyBtn.style.cssText = 'width:100%;min-height:28px;margin-bottom:5px;font-size:11.5px';
   flyBtn.addEventListener('click', () => {
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(
-        -95.23088,
-        29.24798,
-        STORED_GROUND_HEIGHT_M + 42,
+    const center = Cesium.Cartesian3.fromDegrees(
+      -95.23148,
+      29.24752,
+      STORED_GROUND_HEIGHT_M + 3,
+    );
+    viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(center, 24), {
+      offset: new Cesium.HeadingPitchRange(
+        Cesium.Math.toRadians(192),
+        Cesium.Math.toRadians(-26),
+        62,
       ),
-      orientation: {
-        heading: Cesium.Math.toRadians(226),
-        pitch: Cesium.Math.toRadians(-24),
-        roll: 0,
-      },
       duration: 1.2,
     });
   });
@@ -1311,4 +1304,12 @@ function installArrangeToggle(viewer) {
     }
   });
   setArrange(viewer, true);
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      window.location.reload();
+    }
+  });
 }

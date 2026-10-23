@@ -25,11 +25,11 @@ export const CITY_POIS = {
     pois: [
       {
         name: 'Sovereign Anchor',
-        lat: 29.2469,
-        lon: -95.2313,
-        alt: 550,
-        pitch: -28,
-        heading: 180,
+        lat: 29.24752,
+        lon: -95.23144,
+        alt: 68,
+        pitch: -26,
+        heading: 192,
         buildingHeight: 2,
       },
     ],

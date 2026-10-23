@@ -10,8 +10,8 @@ import { loadYardFrames } from './yardFrames.js';
 export const SOVEREIGN_ANCHOR = Object.freeze({
   id: 'lisa-muse-sovereign-anchor',
   name: 'Lisa Muse — Sovereign Anchor',
-  latitude: 29.2469,
-  longitude: -95.2313,
+  latitude: 29.24752,
+  longitude: -95.23144,
   // The model is center-origin and its feet sit 0.998 m below that origin.
   modelOriginLiftM: 0.998,
 });

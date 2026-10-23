@@ -9,7 +9,7 @@ test('Sovereign Anchor uses the handed-off Liverpool coordinate and datum', () =
       latitude: SOVEREIGN_ANCHOR.latitude,
       longitude: SOVEREIGN_ANCHOR.longitude,
     },
-    { latitude: 29.2469, longitude: -95.2313 },
+    { latitude: 29.24752, longitude: -95.23144 },
   );
   assert.equal(sovereignAnchorHeight(), -24.392);
 });
