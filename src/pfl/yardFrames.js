@@ -25,14 +25,13 @@ import {
  * ARRANGE MODE (2026-10-19, Paul: "give me a way to drag and drop
  * and reposition the images"): rendering is parametric — every
  * frame is built from a params object and can be rebuilt in place.
- * The "Arrange frames" toggle (bottom-left) turns on a drag editor:
- * click a photo to select it, drag it across the ground, then spin /
- * tilt / raise / resize it from the panel (or keys). A frame can
- * also be laid FLAT, face to the sky — the bed photo reads
- * right-side-up when you look straight down at it. Arrangements
- * persist in localStorage (key gev-yardframes-layout-v1) and merge
- * over the built-in defaults below on every load; nothing here
- * changes the default scene when Arrange mode is off.
+ * The "Arrange frames" toggle turns on a drag editor docked to the
+ * far left edge of the screen: click a photo to select it, drag it
+ * across the ground, then spin / tilt / roll / raise / resize /
+ * adjust width from the panel (or keys) with the quad's 3D center
+ * locked in place so landmarks never shift during resizing or rotation.
+ * Arrangements persist in localStorage (key gev-yardframes-layout-v1)
+ * and merge over the built-in defaults below on every load.
  */
 export const YARD_FRAMES = [
   {
@@ -106,6 +105,84 @@ const DEFAULT_FOV_H_DEG = 103;
 const DEFAULT_FOV_V_DEG = 66;
 const DEFAULT_DISTANCE_M = 6.5;
 
+/**
+ * Calibrated house-relative survey placements for 417 Palm Drive, Liverpool, TX:
+ * - Yellow House roof: lat 29.24758, lon -95.23139
+ * - Chocolate Bayou dock (North): lat 29.24778, lon -95.23145
+ * - Palm Drive road (South): lat 29.24735
+ * - East front driveway (RV, red van, white Tesla): lat 29.24746, lon -95.23134
+ * - West front yard (Beaver solar arch, dome, utility pole, neighbor's oak tree): lat 29.24748, lon -95.23152
+ */
+const CALIBRATED_HOUSE_SURVEY = {
+  'back-yard-cam1-plan': {
+    // Mounted on SW roof peak of yellow house looking S (176°) over front driveway (left) & solar arch (right) toward Palm Dr
+    camLat: 29.24756,
+    camLon: -95.23140,
+    camHeightM: 6.8,
+    headingDeg: 176,
+    pitchDeg: -28,
+    distanceM: 8.5,
+    widthScale: 0.90,
+    rollDeg: 0,
+    flat: false,
+    texRot: 0,
+  },
+  'yard-overview-20261012': {
+    // Mounted on W wall of yellow house looking SSW (198°) across solar arch & utility pole toward neighbor's blue house & right-side oak tree
+    camLat: 29.24755,
+    camLon: -95.23143,
+    camHeightM: 5.8,
+    headingDeg: 198,
+    pitchDeg: -16,
+    distanceM: 7.4,
+    widthScale: 0.82,
+    rollDeg: -2,
+    flat: false,
+    texRot: 0,
+  },
+  'house-side-20261012': {
+    // Looking NNW (348°) between yellow house W wall (right) and Beaver solar arch (left) toward back yard & bayou
+    camLat: 29.24750,
+    camLon: -95.23145,
+    camHeightM: 3.4,
+    headingDeg: 348,
+    pitchDeg: -10,
+    distanceM: 5.5,
+    widthScale: 0.90,
+    rollDeg: 0,
+    flat: false,
+    texRot: 0,
+  },
+  'back-yard-cam2-water': {
+    // Back yard water & dock camera (aligned with the north lawn trees & Chocolate Bayou dock)
+    camLat: 29.24764,
+    camLon: -95.23145,
+    camHeightM: 5.0,
+    headingDeg: 352,
+    pitchDeg: -18,
+    distanceM: 7.0,
+    widthScale: 0.92,
+    rollDeg: 0,
+    flat: false,
+    texRot: 0,
+  },
+  'bed-station-20261012': {
+    // Inside the yellow house roof footprint
+    camLat: 29.24759,
+    camLon: -95.23139,
+    camHeightM: 3.2,
+    headingDeg: 0,
+    pitchDeg: -5,
+    distanceM: 3.5,
+    fovHDeg: 68,
+    fovVDeg: 37,
+    widthScale: 1.0,
+    rollDeg: 0,
+    flat: true,
+    texRot: 0,
+  },
+};
+
 const FRAME_CREDIT = new Cesium.Credit(
   'Yard frames — photos by Paul Prime, Oct 2026',
   true,
@@ -141,30 +218,103 @@ export function defaultParams(f) {
   };
 }
 
-/** Saved arrangement (id -> params) from localStorage, or {} when none. */
+const toRad = (deg) => (deg * Math.PI) / 180;
+
+/**
+ * Compute the 3D world-space center of a photo quad (lat, lon, heightM above STORED_GROUND_HEIGHT_M).
+ * Locking this center while resizing/spinning/tilting prevents the photo from jumping off landmarks!
+ */
+function getFrameCenterGeo(p) {
+  if (p.flat) {
+    return {
+      lat: p.camLat,
+      lon: p.camLon,
+      heightM: p.camHeightM,
+    };
+  }
+  const dist = p.distanceM || DEFAULT_DISTANCE_M;
+  const H = toRad(p.headingDeg || 0);
+  const P = toRad(p.pitchDeg || 0);
+  const eastM = Math.sin(H) * Math.cos(P) * dist;
+  const northM = Math.cos(H) * Math.cos(P) * dist;
+  const upM = Math.sin(P) * dist;
+  const lat = p.camLat + northM / 111320;
+  const lon = p.camLon + eastM / (111320 * Math.cos(toRad(p.camLat)));
+  const heightM = p.camHeightM + upM;
+  return { lat, lon, heightM };
+}
+
+/**
+ * Re-anchor camLat/camLon/camHeightM so the quad's 3D center stays pinned at `centerGeo`
+ * after changing distanceM (size), headingDeg (spin), or pitchDeg (tilt).
+ */
+function pinFrameCenterGeo(p, centerGeo) {
+  if (!centerGeo) return;
+  if (p.flat) {
+    p.camLat = centerGeo.lat;
+    p.camLon = centerGeo.lon;
+    p.camHeightM = centerGeo.heightM;
+    return;
+  }
+  const dist = p.distanceM || DEFAULT_DISTANCE_M;
+  const H = toRad(p.headingDeg || 0);
+  const P = toRad(p.pitchDeg || 0);
+  const eastM = Math.sin(H) * Math.cos(P) * dist;
+  const northM = Math.cos(H) * Math.cos(P) * dist;
+  const upM = Math.sin(P) * dist;
+  p.camLat = centerGeo.lat - northM / 111320;
+  p.camLon = centerGeo.lon - eastM / (111320 * Math.cos(toRad(centerGeo.lat)));
+  p.camHeightM = centerGeo.heightM - upM;
+}
+
+/** Saved arrangement (id -> params) from localStorage, with house-survey calibration migration. */
 function loadSavedLayout() {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return {};
     const raw = window.localStorage.getItem(LAYOUT_KEY);
-    if (!raw) return {};
+    if (!raw) {
+      const initial = {
+        version: 1,
+        fixedSidewaysRoadV1: true,
+        fixedHouseSurveyV3: true,
+        savedAt: new Date().toISOString(),
+        frames: { ...CALIBRATED_HOUSE_SURVEY },
+      };
+      window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(initial));
+      return initial.frames;
+    }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedSidewaysRoadV1) {
-      let migrated = false;
-      for (const id of ['back-yard-cam1-plan', 'yard-overview-20261012']) {
-        const fp = frames[id];
-        if (fp && typeof fp.headingDeg === 'number') {
-          const h = ((fp.headingDeg % 360) + 360) % 360;
-          if (h >= 180 && h <= 315) {
-            fp.headingDeg = (h + 90) % 360;
-            migrated = true;
-          }
-        }
+    if (parsed && !parsed.fixedHouseSurveyV3) {
+      // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (he said "the back-yard-cam, I think I've got it lined up fairly well")
+      if (!frames['back-yard-cam2-water']) {
+        frames['back-yard-cam2-water'] = { ...CALIBRATED_HOUSE_SURVEY['back-yard-cam2-water'] };
+      }
+      // 2. For `yard-overview-20261012` (where Paul lined up the house across the street + road,
+      //    but the photo was too wide and the right-side neighbor's tree was not lined up):
+      //    keep his aligned center/location while trimming widthScale to 0.80, size by 0.86x (center-locked!),
+      //    and applying a -2° roll so the right-side tree pulls in to match the satellite tree!
+      if (frames['yard-overview-20261012']) {
+        const yo = frames['yard-overview-20261012'];
+        const cGeo = getFrameCenterGeo(yo);
+        yo.distanceM = Math.max(2.5, Number((yo.distanceM || 6.5) * 0.86));
+        yo.widthScale = 0.80;
+        yo.rollDeg = typeof yo.rollDeg === 'number' ? yo.rollDeg : -2;
+        pinFrameCenterGeo(yo, cGeo);
+      } else {
+        frames['yard-overview-20261012'] = { ...CALIBRATED_HOUSE_SURVEY['yard-overview-20261012'] };
+      }
+      // 3. Apply calibrated house-relative placements for the remaining 3 photos around the yellow house
+      for (const id of ['back-yard-cam1-plan', 'house-side-20261012', 'bed-station-20261012']) {
+        frames[id] = {
+          ...(frames[id] || {}),
+          ...CALIBRATED_HOUSE_SURVEY[id],
+        };
       }
       parsed.fixedSidewaysRoadV1 = true;
-      if (migrated) {
-        window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
-      }
+      parsed.fixedHouseSurveyV3 = true;
+      parsed.frames = frames;
+      window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
     return frames;
   } catch (error) {
@@ -176,29 +326,12 @@ function loadSavedLayout() {
   }
 }
 
-const toRad = (deg) => (deg * Math.PI) / 180;
-
 /**
  * Quad corners for a params object, ordered BL, BR, TR, TL in photo
  * space (bottom-left, bottom-right, top-right, top-left).
  *
- * Standing (flat falsy): the frustum-true v2 placement, unchanged —
- * the quad hangs distanceM in front of the camera, perpendicular to
- * the view axis (headingDeg/pitchDeg), sized by the camera FOV.
- *
- * Flat (flat === true): the quad lies horizontal at the anchor,
- * normal = local up, centered on the anchor point, same FOV size
- * formula (distanceM becomes the size knob). Orientation reasoning:
- * let U = the photo's "up" direction on the ground = headingDeg
- * rotated clockwise from north, U = (sin H, cos H, 0) in ENU, and
- * R = the photo's "right" = (cos H, -sin H, 0). Then R x U = +Z
- * (local up) for every H, so the face points at the sky and the
- * image is NOT mirrored seen from above; the photo's top edge
- * (TL-TR) points along the heading, so at heading 0 the top of the
- * photo points north and it reads right-side-up from above with
- * north up. buildFrameEntity also pins explicit textureCoordinates
- * for flat frames so Cesium's default polygon ST projection cannot
- * rotate the image inside the quad.
+ * Supports optional `widthScale` (horizontal aspect correction) and
+ * `rollDeg` (in-plane rotation of the photo around its view axis).
  */
 export function computeCorners(p) {
   const anchor = Cesium.Cartesian3.fromDegrees(
@@ -208,13 +341,14 @@ export function computeCorners(p) {
   );
   const enu = Cesium.Transforms.eastNorthUpToFixedFrame(anchor);
   const dist = p.distanceM || DEFAULT_DISTANCE_M;
-  const w = 2 * dist * Math.tan(toRad((p.fovHDeg || DEFAULT_FOV_H_DEG) / 2));
+  const wScale = typeof p.widthScale === 'number' && p.widthScale > 0 ? p.widthScale : 1;
+  const w = 2 * dist * Math.tan(toRad((p.fovHDeg || DEFAULT_FOV_H_DEG) / 2)) * wScale;
   const h = 2 * dist * Math.tan(toRad((p.fovVDeg || DEFAULT_FOV_V_DEG) / 2));
   let right;
   let up;
   let center;
   if (p.flat) {
-    const H = toRad(p.headingDeg || 0);
+    const H = toRad((p.headingDeg || 0) + (p.rollDeg || 0));
     right = new Cesium.Cartesian3(Math.cos(H), -Math.sin(H), 0);
     up = new Cesium.Cartesian3(Math.sin(H), Math.cos(H), 0);
     center = new Cesium.Cartesian3(0, 0, 0);
@@ -226,9 +360,27 @@ export function computeCorners(p) {
       Math.cos(H) * Math.cos(P),
       Math.sin(P),
     );
-    right = new Cesium.Cartesian3(Math.cos(H), -Math.sin(H), 0);
-    up = new Cesium.Cartesian3();
-    Cesium.Cartesian3.cross(right, fwd, up);
+    const right0 = new Cesium.Cartesian3(Math.cos(H), -Math.sin(H), 0);
+    const up0 = new Cesium.Cartesian3();
+    Cesium.Cartesian3.cross(right0, fwd, up0);
+    const rollRad = toRad(p.rollDeg || 0);
+    if (rollRad !== 0) {
+      const cR = Math.cos(rollRad);
+      const sR = Math.sin(rollRad);
+      right = new Cesium.Cartesian3(
+        right0.x * cR - up0.x * sR,
+        right0.y * cR - up0.y * sR,
+        right0.z * cR - up0.z * sR,
+      );
+      up = new Cesium.Cartesian3(
+        right0.x * sR + up0.x * cR,
+        right0.y * sR + up0.y * cR,
+        right0.z * sR + up0.z * cR,
+      );
+    } else {
+      right = right0;
+      up = up0;
+    }
     center = Cesium.Cartesian3.multiplyByScalar(
       fwd,
       dist,
@@ -273,9 +425,15 @@ function buildFrameEntity(viewer, def, params) {
   const entityId = ENTITY_PREFIX + def.id;
   const stale = viewer.entities.getById(entityId);
   if (stale) viewer.entities.remove(stale);
+  const opacity = typeof params.opacity === 'number' ? params.opacity : 1.0;
+  const matProps = { image: def.image };
+  if (opacity < 0.99) {
+    matProps.color = Cesium.Color.WHITE.withAlpha(opacity);
+    matProps.transparent = true;
+  }
   const polygon = {
     hierarchy: new Cesium.PolygonHierarchy(positions),
-    material: new Cesium.ImageMaterialProperty({ image: def.image }),
+    material: new Cesium.ImageMaterialProperty(matProps),
     perPositionHeight: true,
     // Pin every image to BL, BR, TR, TL. Cesium's automatic planar
     // projection may rotate an oblique quad as its dominant axis changes;
@@ -303,11 +461,11 @@ function buildFrameEntity(viewer, def, params) {
       'x' +
       heightM.toFixed(1) +
       ' m at ' +
-      distanceM +
+      distanceM.toFixed(1) +
       ' m from cam ' +
-      params.camLat +
+      params.camLat.toFixed(6) +
       ', ' +
-      params.camLon +
+      params.camLon.toFixed(6) +
       (params.flat ? ' (lying flat, face to the sky)' : ''),
   );
   governorRequestRender('yardframes-build');
@@ -335,7 +493,13 @@ function saveLayout() {
     for (const [id, st] of frameState) frames[id] = { ...st.params };
     window.localStorage.setItem(
       LAYOUT_KEY,
-      JSON.stringify({ version: 1, fixedSidewaysRoadV1: true, savedAt: new Date().toISOString(), frames }),
+      JSON.stringify({
+        version: 1,
+        fixedSidewaysRoadV1: true,
+        fixedHouseSurveyV3: true,
+        savedAt: new Date().toISOString(),
+        frames,
+      }),
     );
   } catch (error) {
     console.warn('[YardFrames] could not save layout:', error);
@@ -343,13 +507,7 @@ function saveLayout() {
 }
 
 /**
- * Frustum-true v2 renderer (built 2026-10-13; the v2 data rewrite
- * dropped this function, which broke every fresh boot — the
- * standalone scene imports it). Each photo hangs as a quad IN FRONT
- * OF its camera, perpendicular to the view axis, sized by the
- * camera FOV at distanceM: stand at the camera and the photo
- * overlays the real yard; from elsewhere it reads as a tilted panel.
- * Saved Arrange-mode params merge over the built-in values.
+ * Frustum-true v2 renderer. Saved Arrange-mode params merge over the built-in values.
  */
 export function loadYardFrames({ viewer }) {
   destroyYardFrames(viewer);
@@ -374,6 +532,7 @@ export function destroyYardFrames(viewer) {
     if (editor.on) releaseContinuousRender('yardframes-arrange');
     removeHandlers(viewer);
     editor.toggle?.remove();
+    editor.dockBtn?.remove();
     editor.panel?.remove();
     editor = null;
   }
@@ -387,34 +546,40 @@ export function destroyYardFrames(viewer) {
 }
 
 // ---------------------------------------------------------------------------
-// Arrange mode — drag-and-drop frame editor (Paul, 2026-10-19)
+// Arrange mode — docked far-left drag-and-drop frame editor
 // ---------------------------------------------------------------------------
 
 const STEP = {
-  headingDeg: 2,
-  pitchDeg: 2,
+  headingDeg: 1.5,
+  pitchDeg: 1.5,
+  rollDeg: 1.0,
   heightM: 0.25,
-  sizeM: 0.5,
-  nudgeM: 0.5,
+  sizeM: 0.35,
+  widthScale: 0.03,
+  nudgeM: 0.4,
 };
 const ARRANGE_HINT =
-  'Click a photo to select it, then drag it across the ground to move it. ' +
-  'Use the buttons (or keys Q/E, R/F, PgUp/PgDn, -/=, arrow keys) to fine-tune. ' +
-  'Everything saves by itself.';
+  'Drag header to move panel. Click any photo on map to drag it. ' +
+  'Size, Width, Spin & Roll keep the photo center locked in place.';
 let editor = null;
 
 function arrangeReadout(p) {
+  const wPct = Math.round((typeof p.widthScale === 'number' ? p.widthScale : 1) * 100);
+  const roll = Math.round(p.rollDeg || 0);
   return (
     'Spin ' +
     Math.round(((p.headingDeg % 360) + 360) % 360) +
     '° · Tilt ' +
     Math.round(p.pitchDeg) +
-    '° · Height ' +
-    p.camHeightM.toFixed(2) +
-    ' m · Size ' +
+    '° · Roll ' +
+    roll +
+    '°\nSize ' +
     p.distanceM.toFixed(1) +
-    ' m · ' +
-    (p.flat ? 'LYING FLAT — face to the sky' : 'Standing')
+    'm · Width ' +
+    wPct +
+    '% · H ' +
+    p.camHeightM.toFixed(1) +
+    'm'
   );
 }
 
@@ -459,21 +624,35 @@ function refreshPanel() {
   const st = editor.selectedId ? frameState.get(editor.selectedId) : null;
   const nameEl = editor.panel.querySelector('[data-role="frame-name"]');
   const readEl = editor.panel.querySelector('[data-role="frame-readout"]');
+  const sizeSlider = editor.panel.querySelector('[data-role="size-slider"]');
+  const widthSlider = editor.panel.querySelector('[data-role="width-slider"]');
+  const opacitySlider = editor.panel.querySelector('[data-role="opacity-slider"]');
   if (nameEl) {
     // i18n-ignore: private PFL operator surface is intentionally English.
     nameEl.textContent = st
       ? st.def.title
-      : 'Click a photo in the scene to select it.';
+      : 'Click a photo to select it.';
   }
   if (readEl) {
     if (!st) {
       // i18n-ignore: private PFL operator surface is intentionally English.
       readEl.textContent = 'Nothing selected.';
     } else {
-      const p = st.params;
       // i18n-ignore: private PFL operator surface is intentionally English.
-      readEl.textContent = arrangeReadout(p);
+      readEl.textContent = arrangeReadout(st.params);
     }
+  }
+  if (sizeSlider) {
+    sizeSlider.disabled = !st;
+    if (st) sizeSlider.value = String(st.params.distanceM || DEFAULT_DISTANCE_M);
+  }
+  if (widthSlider) {
+    widthSlider.disabled = !st;
+    if (st) widthSlider.value = String(typeof st.params.widthScale === 'number' ? st.params.widthScale : 1);
+  }
+  if (opacitySlider) {
+    opacitySlider.disabled = !st;
+    if (st) opacitySlider.value = String(typeof st.params.opacity === 'number' ? st.params.opacity : 1);
   }
   editor.panel.querySelectorAll('[data-needs-selection]').forEach((b) => {
     b.disabled = !st;
@@ -486,13 +665,25 @@ function refreshPanel() {
   });
 }
 
-function applyChange(viewer, id, mutate) {
+/**
+ * Apply a change to frame `id`. When `opts.lockCenter` is true (default for
+ * spin, tilt, size, roll, and width changes), the quad's 3D world center is
+ * preserved so landmarks in the photo never jump off the satellite map!
+ */
+function applyChange(viewer, id, mutate, opts = {}) {
   const st = frameState.get(id);
   if (!st) return;
+  const centerBefore = opts.lockCenter ? getFrameCenterGeo(st.params) : null;
   mutate(st.params);
   st.params.headingDeg = ((st.params.headingDeg % 360) + 360) % 360;
   st.params.pitchDeg = Math.max(-90, Math.min(90, st.params.pitchDeg));
-  st.params.distanceM = Math.max(0.5, st.params.distanceM);
+  st.params.distanceM = Math.max(0.5, Math.min(40, st.params.distanceM));
+  if (typeof st.params.widthScale === 'number') {
+    st.params.widthScale = Math.max(0.35, Math.min(2.0, st.params.widthScale));
+  }
+  if (centerBefore) {
+    pinFrameCenterGeo(st.params, centerBefore);
+  }
   rebuildFrame(viewer, id);
   saveLayout();
 }
@@ -570,8 +761,8 @@ function installHandlers(viewer) {
     const id = editor.selectedId;
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-    const change = (fn) => {
-      applyChange(viewer, id, fn);
+    const change = (fn, lockCenter = false) => {
+      applyChange(viewer, id, fn, { lockCenter });
       e.preventDefault();
     };
     switch (e.key) {
@@ -579,59 +770,69 @@ function installHandlers(viewer) {
       case 'Q':
         change((p) => {
           p.headingDeg -= STEP.headingDeg;
-        });
+        }, true);
         break;
       case 'e':
       case 'E':
         change((p) => {
           p.headingDeg += STEP.headingDeg;
-        });
+        }, true);
         break;
       case 'r':
       case 'R':
         change((p) => {
           p.pitchDeg += STEP.pitchDeg;
-        });
+        }, true);
         break;
       case 'f':
       case 'F':
         change((p) => {
           p.pitchDeg -= STEP.pitchDeg;
-        });
+        }, true);
         break;
       case 'PageUp':
         change((p) => {
           p.camHeightM += STEP.heightM;
-        });
+        }, false);
         break;
       case 'PageDown':
         change((p) => {
           p.camHeightM -= STEP.heightM;
-        });
+        }, false);
         break;
       case '-':
       case '_':
         change((p) => {
           p.distanceM -= STEP.sizeM;
-        });
+        }, true);
         break;
       case '=':
       case '+':
         change((p) => {
           p.distanceM += STEP.sizeM;
-        });
+        }, true);
+        break;
+      case '[':
+        change((p) => {
+          p.widthScale = (typeof p.widthScale === 'number' ? p.widthScale : 1) - STEP.widthScale;
+        }, true);
+        break;
+      case ']':
+        change((p) => {
+          p.widthScale = (typeof p.widthScale === 'number' ? p.widthScale : 1) + STEP.widthScale;
+        }, true);
         break;
       case 'ArrowUp':
-        change((p) => nudgeParams(p, STEP.nudgeM, 0));
+        change((p) => nudgeParams(p, STEP.nudgeM, 0), false);
         break;
       case 'ArrowDown':
-        change((p) => nudgeParams(p, -STEP.nudgeM, 0));
+        change((p) => nudgeParams(p, -STEP.nudgeM, 0), false);
         break;
       case 'ArrowLeft':
-        change((p) => nudgeParams(p, 0, -STEP.nudgeM));
+        change((p) => nudgeParams(p, 0, -STEP.nudgeM), false);
         break;
       case 'ArrowRight':
-        change((p) => nudgeParams(p, 0, STEP.nudgeM));
+        change((p) => nudgeParams(p, 0, STEP.nudgeM), false);
         break;
       default:
         break;
@@ -654,35 +855,38 @@ function removeHandlers(viewer) {
 }
 
 const EDITOR_CSS = `
-.gev-arrange-toggle{position:fixed;left:calc(50% + 148px);top:18px;z-index:9999;
-  font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.14em;
-  color:#e8eaed;background:rgba(12,12,20,.85);border:1px solid rgba(0,212,255,.45);
-  border-radius:10px;padding:11px 16px;cursor:pointer;backdrop-filter:blur(8px)}
+.gev-arrange-toggle{position:fixed;left:8px;top:14px;z-index:9999;
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.10em;
+  color:#e8eaed;background:rgba(12,12,20,.88);border:1px solid rgba(0,212,255,.45);
+  border-radius:8px;padding:7px 11px;cursor:pointer;backdrop-filter:blur(8px)}
 .gev-arrange-toggle[aria-pressed="true"]{background:rgba(0,212,255,.22);color:#fff}
-.gev-arrange-panel{position:fixed;left:348px;top:68px;z-index:9999;width:312px;
-  max-height:calc(100vh - 180px);overflow-y:auto;color:#e8eaed;
-  background:rgba(12,12,20,.9);border:1px solid rgba(255,255,255,.12);
-  border-radius:16px;padding:14px;backdrop-filter:blur(10px);
-  font-family:'Inter',sans-serif;font-size:14px}
-.gev-arrange-panel h3{margin:0 0 4px;font-family:'JetBrains Mono',monospace;
-  font-size:12px;letter-spacing:.16em;color:#00d4ff}
-.gev-arrange-panel .gev-frame-name{font-weight:600;margin:6px 0 2px;line-height:1.3}
-.gev-arrange-panel .gev-readout{font-family:'JetBrains Mono',monospace;font-size:11px;
-  color:rgba(232,234,237,.65);margin-bottom:10px;line-height:1.5}
-.gev-arrange-panel .gev-hint{font-size:12.5px;color:rgba(232,234,237,.75);
-  line-height:1.45;margin:0 0 10px}
-.gev-arrange-panel .gev-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.gev-arrange-panel button{font-family:'Inter',sans-serif;font-size:14px;min-height:42px;
+.gev-arrange-panel{position:fixed;left:8px;top:52px;z-index:9999;width:226px;
+  max-height:calc(100vh - 68px);overflow-y:auto;color:#e8eaed;
+  background:rgba(10,12,18,.92);border:1px solid rgba(0,212,255,.28);
+  border-radius:12px;padding:10px;backdrop-filter:blur(10px);
+  font-family:'Inter',sans-serif;font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.55)}
+.gev-arrange-panel h3{margin:0;font-family:'JetBrains Mono',monospace;
+  font-size:10.5px;letter-spacing:.12em;color:#00d4ff;cursor:move;user-select:none}
+.gev-arrange-panel .gev-frame-name{font-weight:600;font-size:11.5px;margin:4px 0 2px;line-height:1.25}
+.gev-arrange-panel .gev-readout{font-family:'JetBrains Mono',monospace;font-size:10px;
+  color:rgba(232,234,237,.72);margin-bottom:6px;line-height:1.4;white-space:pre-line}
+.gev-arrange-panel .gev-hint{font-size:10.5px;color:rgba(232,234,237,.65);
+  line-height:1.35;margin:0 0 6px}
+.gev-arrange-panel .gev-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.gev-arrange-panel button{font-family:'Inter',sans-serif;font-size:11.5px;min-height:28px;
   color:#e8eaed;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
-  border-radius:10px;cursor:pointer;padding:8px 6px}
+  border-radius:7px;cursor:pointer;padding:4px 5px}
 .gev-arrange-panel button:hover:not(:disabled){border-color:rgba(0,212,255,.6);
-  background:rgba(0,212,255,.12)}
+  background:rgba(0,212,255,.14)}
 .gev-arrange-panel button:disabled{opacity:.35;cursor:default}
 .gev-arrange-panel .gev-wide{grid-column:1 / -1}
 .gev-arrange-panel .gev-preset{background:rgba(0,212,255,.14);
   border-color:rgba(0,212,255,.5);font-weight:600}
-.gev-arrange-panel .gev-section{font-family:'JetBrains Mono',monospace;font-size:11px;
-  letter-spacing:.14em;color:rgba(232,234,237,.55);margin:12px 0 6px}
+.gev-arrange-panel .gev-section{font-family:'JetBrains Mono',monospace;font-size:9.5px;
+  letter-spacing:.12em;color:rgba(232,234,237,.55);margin:8px 0 4px}
+.gev-arrange-panel .gev-slider-row{display:flex;align-items:center;gap:6px;margin:4px 0;font-size:11px}
+.gev-arrange-panel .gev-slider-row label{min-width:48px;color:rgba(232,234,237,.8)}
+.gev-arrange-panel .gev-slider-row input[type="range"]{flex:1;accent-color:#00d4ff;cursor:pointer}
 `;
 
 function makeButton(text, className) {
@@ -693,36 +897,67 @@ function makeButton(text, className) {
   return b;
 }
 
+function makePanelDraggable(panel, handle) {
+  let draggingPanel = false;
+  let startX = 0;
+  let startY = 0;
+  let origLeft = 8;
+  let origTop = 52;
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.target && e.target.tagName === 'BUTTON') return;
+    draggingPanel = true;
+    const rect = panel.getBoundingClientRect();
+    origLeft = rect.left;
+    origTop = rect.top;
+    startX = e.clientX;
+    startY = e.clientY;
+    handle.setPointerCapture?.(e.pointerId);
+    e.preventDefault();
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (!draggingPanel) return;
+    const nx = Math.max(0, Math.min(window.innerWidth - 180, origLeft + (e.clientX - startX)));
+    const ny = Math.max(0, Math.min(window.innerHeight - 80, origTop + (e.clientY - startY)));
+    panel.style.left = nx + 'px';
+    panel.style.top = ny + 'px';
+  });
+  window.addEventListener('pointerup', () => {
+    draggingPanel = false;
+  });
+}
+
 function buildPanel(viewer) {
   const panel = document.createElement('div');
   panel.className = 'gev-arrange-panel';
   panel.id = 'gev-arrange-panel';
   const hdr = document.createElement('div');
-  hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px';
+  hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;cursor:move';
   const title = document.createElement('h3');
-  title.style.margin = '0';
   // i18n-ignore: private PFL operator surface is intentionally English.
   title.textContent = '✥ ARRANGE YARD PHOTOS';
   hdr.appendChild(title);
-  const closeBtn = makeButton('✕ Hide');
-  closeBtn.style.cssText = 'min-height:28px;padding:3px 10px;font-size:12px';
+  const closeBtn = makeButton('✕');
+  closeBtn.style.cssText = 'min-height:22px;padding:1px 7px;font-size:11px';
   closeBtn.addEventListener('click', () => setArrange(viewer, false));
   hdr.appendChild(closeBtn);
   panel.appendChild(hdr);
-  const flyBtn = makeButton('✈️ Fly to Liverpool Yard (All 5 Photos)', 'gev-wide gev-preset');
-  flyBtn.style.cssText = 'width:100%;min-height:36px;margin-bottom:8px;font-size:13px';
+  makePanelDraggable(panel, hdr);
+
+  const flyBtn = makeButton('✈️ Fly to Yard (All 5 Photos)', 'gev-wide gev-preset');
+  flyBtn.style.cssText = 'width:100%;min-height:28px;margin-bottom:6px;font-size:11.5px';
   flyBtn.addEventListener('click', () => {
     viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(-95.23140, 29.24732, 75),
+      destination: Cesium.Cartesian3.fromDegrees(-95.23142, 29.24788, 65),
       orientation: {
-        heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-45),
+        heading: Cesium.Math.toRadians(192),
+        pitch: Cesium.Math.toRadians(-38),
         roll: 0,
       },
       duration: 1.2,
     });
   });
   panel.appendChild(flyBtn);
+
   const name = document.createElement('div');
   name.className = 'gev-frame-name';
   name.dataset.role = 'frame-name';
@@ -744,7 +979,7 @@ function buildPanel(viewer) {
   panel.appendChild(pickSection);
   const pickGrid = document.createElement('div');
   pickGrid.className = 'gev-grid';
-  pickGrid.style.marginBottom = '10px';
+  pickGrid.style.marginBottom = '6px';
   const shortNames = {
     'back-yard-cam1-plan': '1. Back Yard Cam1 (Road)',
     'yard-overview-20261012': '2. Yard Overview (Wyze V4)',
@@ -755,14 +990,53 @@ function buildPanel(viewer) {
   for (const f of YARD_FRAMES) {
     const pb = makeButton(shortNames[f.id] || f.id, 'gev-wide');
     pb.dataset.frameSelect = f.id;
-    pb.style.minHeight = '34px';
-    pb.style.fontSize = '12.5px';
+    pb.style.minHeight = '26px';
+    pb.style.fontSize = '11px';
     pb.style.textAlign = 'left';
-    pb.style.padding = '6px 10px';
+    pb.style.padding = '3px 7px';
     pb.addEventListener('click', () => selectFrame(viewer, f.id));
     pickGrid.appendChild(pb);
   }
   panel.appendChild(pickGrid);
+
+  // Sliders for smooth Size, Width (Aspect), and See-Thru Opacity
+  const makeSliderRow = (labelTxt, role, min, max, step, val, onInput) => {
+    const row = document.createElement('div');
+    row.className = 'gev-slider-row';
+    const lbl = document.createElement('label');
+    // i18n-ignore: private PFL operator surface is intentionally English.
+    lbl.textContent = labelTxt;
+    const inp = document.createElement('input');
+    inp.type = 'range';
+    inp.min = String(min);
+    inp.max = String(max);
+    inp.step = String(step);
+    inp.value = String(val);
+    inp.dataset.role = role;
+    inp.addEventListener('input', () => {
+      if (!editor || !editor.selectedId) return;
+      onInput(Number(inp.value));
+    });
+    row.appendChild(lbl);
+    row.appendChild(inp);
+    panel.appendChild(row);
+  };
+
+  makeSliderRow('Size', 'size-slider', 1.5, 18, 0.1, 6.5, (v) => {
+    applyChange(viewer, editor.selectedId, (p) => {
+      p.distanceM = v;
+    }, { lockCenter: true });
+  });
+  makeSliderRow('Width', 'width-slider', 0.45, 1.35, 0.01, 0.85, (v) => {
+    applyChange(viewer, editor.selectedId, (p) => {
+      p.widthScale = v;
+    }, { lockCenter: true });
+  });
+  makeSliderRow('See-Thru', 'opacity-slider', 0.25, 1.0, 0.05, 1.0, (v) => {
+    applyChange(viewer, editor.selectedId, (p) => {
+      p.opacity = v;
+    }, { lockCenter: false });
+  });
 
   const grid = document.createElement('div');
   grid.className = 'gev-grid';
@@ -772,65 +1046,87 @@ function buildPanel(viewer) {
     if (!opts.always) b.dataset.needsSelection = '1';
     b.addEventListener('click', () => {
       if (!editor || !editor.selectedId) return;
-      applyChange(viewer, editor.selectedId, fn);
+      applyChange(viewer, editor.selectedId, fn, { lockCenter: Boolean(opts.lockCenter) });
     });
     grid.appendChild(b);
     return b;
   };
-  addBtn('↺  Spin left', (p) => {
+  addBtn('Smaller −', (p) => {
+    p.distanceM -= STEP.sizeM;
+  }, { lockCenter: true, className: 'gev-preset' });
+  addBtn('Bigger +', (p) => {
+    p.distanceM += STEP.sizeM;
+  }, { lockCenter: true, className: 'gev-preset' });
+  addBtn('Narrower ◂', (p) => {
+    p.widthScale = (typeof p.widthScale === 'number' ? p.widthScale : 1) - STEP.widthScale;
+  }, { lockCenter: true, className: 'gev-preset' });
+  addBtn('Wider ▸', (p) => {
+    p.widthScale = (typeof p.widthScale === 'number' ? p.widthScale : 1) + STEP.widthScale;
+  }, { lockCenter: true, className: 'gev-preset' });
+  addBtn('↶ Roll left', (p) => {
+    p.rollDeg = (p.rollDeg || 0) - STEP.rollDeg;
+  }, { lockCenter: true });
+  addBtn('Roll right ↷', (p) => {
+    p.rollDeg = (p.rollDeg || 0) + STEP.rollDeg;
+  }, { lockCenter: true });
+  addBtn('↺ Spin left', (p) => {
     p.headingDeg -= STEP.headingDeg;
-  });
-  addBtn('Spin right  ↻', (p) => {
+  }, { lockCenter: true });
+  addBtn('Spin right ↻', (p) => {
     p.headingDeg += STEP.headingDeg;
-  });
-  addBtn('↺  Rotate 90°', (p) => {
+  }, { lockCenter: true });
+  addBtn('↺ Rotate 90°', (p) => {
     p.headingDeg -= 90;
-  });
-  addBtn('Rotate 90°  ↻', (p) => {
+  }, { lockCenter: true });
+  addBtn('Rotate 90° ↻', (p) => {
     p.headingDeg += 90;
-  });
-  addBtn('⟲  Turn Photo 90°', (p) => {
+  }, { lockCenter: true });
+  addBtn('⟲ Turn Photo 90°', (p) => {
     p.texRot = (((Number(p.texRot || 0) - 90) % 360) + 360) % 360;
-  }, { className: 'gev-preset' });
-  addBtn('Turn Photo 90°  ⟳', (p) => {
+  });
+  addBtn('Turn Photo 90° ⟳', (p) => {
     p.texRot = (((Number(p.texRot || 0) + 90) % 360) + 360) % 360;
-  }, { className: 'gev-preset' });
+  });
   addBtn('Flip 180°', (p) => {
     p.headingDeg += 180;
-  }, { wide: true, className: 'gev-preset' });
+  }, { wide: true, lockCenter: true });
   addBtn('Tilt up', (p) => {
     p.pitchDeg += STEP.pitchDeg;
-  });
+  }, { lockCenter: true });
   addBtn('Tilt down', (p) => {
     p.pitchDeg -= STEP.pitchDeg;
-  });
+  }, { lockCenter: true });
   addBtn('Raise', (p) => {
     p.camHeightM += STEP.heightM;
   });
   addBtn('Lower', (p) => {
     p.camHeightM -= STEP.heightM;
   });
-  addBtn('Bigger', (p) => {
-    p.distanceM += STEP.sizeM;
-  });
-  addBtn('Smaller', (p) => {
-    p.distanceM -= STEP.sizeM;
-  });
-  addBtn('◀  Nudge west', (p) => nudgeParams(p, 0, -STEP.nudgeM));
-  addBtn('Nudge east  ▶', (p) => nudgeParams(p, 0, STEP.nudgeM));
-  addBtn('▲  Nudge north', (p) => nudgeParams(p, STEP.nudgeM, 0));
-  addBtn('▼  Nudge south', (p) => nudgeParams(p, -STEP.nudgeM, 0));
+  addBtn('◀ West', (p) => nudgeParams(p, 0, -STEP.nudgeM));
+  addBtn('East ▶', (p) => nudgeParams(p, 0, STEP.nudgeM));
+  addBtn('▲ North', (p) => nudgeParams(p, STEP.nudgeM, 0));
+  addBtn('▼ South', (p) => nudgeParams(p, -STEP.nudgeM, 0));
   addBtn(
     'Lay flat — face the sky',
     (p) => {
       p.flat = true;
     },
-    { wide: true, className: 'gev-preset' },
+    { wide: true },
   );
   addBtn(
     'Stand up',
     (p) => {
       p.flat = false;
+    },
+    { wide: true },
+  );
+  addBtn(
+    'Snap selected to House Survey',
+    (p) => {
+      const id = editor?.selectedId;
+      if (id && CALIBRATED_HOUSE_SURVEY[id]) {
+        Object.assign(p, CALIBRATED_HOUSE_SURVEY[id]);
+      }
     },
     { wide: true, className: 'gev-preset' },
   );
@@ -838,7 +1134,7 @@ function buildPanel(viewer) {
     'Reset selected frame',
     (p) => {
       const st = editor?.selectedId ? frameState.get(editor.selectedId) : null;
-      if (st) Object.assign(p, defaultParams(st.def));
+      if (st) Object.assign(p, defaultParams(st.def), CALIBRATED_HOUSE_SURVEY[st.def.id] || {});
     },
     { wide: true },
   );
@@ -865,7 +1161,7 @@ function buildPanel(viewer) {
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   });
   foot.appendChild(exportBtn);
-  const resetBtn = makeButton('Reset to built-in layout');
+  const resetBtn = makeButton('Reset all 5 to House Survey');
   resetBtn.classList.add('gev-wide');
   resetBtn.addEventListener('click', () => {
     try {
@@ -916,12 +1212,13 @@ function installArrangeToggle(viewer) {
   for (const id of ['gev-arrange-toggle', 'gev-arrange-dock-btn', 'gev-arrange-panel']) {
     document.getElementById(id)?.remove();
   }
-  if (!document.getElementById('gev-arrange-css')) {
-    const style = document.createElement('style');
-    style.id = 'gev-arrange-css';
-    style.textContent = EDITOR_CSS;
-    document.head.appendChild(style);
-  }
+  const oldCss = document.getElementById('gev-arrange-css');
+  if (oldCss) oldCss.remove();
+  const style = document.createElement('style');
+  style.id = 'gev-arrange-css';
+  style.textContent = EDITOR_CSS;
+  document.head.appendChild(style);
+
   const toggle = makeButton('✥ ARRANGE YARD PHOTOS', 'gev-arrange-toggle');
   toggle.id = 'gev-arrange-toggle';
   toggle.setAttribute('aria-pressed', 'false');
@@ -933,8 +1230,8 @@ function installArrangeToggle(viewer) {
     dockBtn = makeButton('✥ ARRANGE YARD PHOTOS');
     dockBtn.id = 'gev-arrange-dock-btn';
     dockBtn.style.cssText =
-      'width:100%;min-height:38px;margin:4px 0;padding:8px 12px;' +
-      "font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;letter-spacing:.12em;" +
+      'width:100%;min-height:36px;margin:4px 0;padding:7px 10px;' +
+      "font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;letter-spacing:.10em;" +
       'color:#00d4ff;background:rgba(0,212,255,.14);border:1px solid rgba(0,212,255,.55);' +
       'border-radius:10px;cursor:pointer;text-align:center';
     locationBar.insertAdjacentElement('afterend', dockBtn);
