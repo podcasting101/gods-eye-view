@@ -130,18 +130,17 @@ const CALIBRATED_HOUSE_SURVEY = {
     hiddenByStitch: true,
   },
   'yard-overview-20261012': {
-    // Multi-pin ground-warped & perspective-linked Wyze Cam V4 + Cam1 stitched composite:
-    // High-smoothness (reg=0.055) elastic mesh keeps straight lines (road, utility pole, solar panels, Blue House)
-    // undistorted while pinning the Blue House across the pond, Palm Drive road, White RV on East driveway,
-    // Oak Tree & Pump House on West lawn, and stopping at the SW front wall of the Yellow House.
-    camLat: 29.247269,
-    camLon: -95.231588,
+    // Calibrated directly to Paul's cyan frame in 8b787dab.jpg:
+    // Aligns the neighbor's culvert, telephone pole, little yellow pump house,
+    // Monaco Beaver solar arch, and White RV / Red Van / Tesla on the original driveway.
+    camLat: 29.247320,
+    camLon: -95.231560,
     camHeightM: 0.45,
     headingDeg: 198,
     pitchDeg: -18,
-    distanceM: 16.7,
-    widthScale: 1.0,
-    rollDeg: 0,
+    distanceM: 17.5,
+    widthScale: 0.88,
+    rollDeg: 5,
     flat: true,
     texRot: 0,
     stitchedPano: true,
@@ -293,7 +292,7 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedHouseSurveyV10) {
+    if (parsed && !parsed.fixedHouseSurveyV11) {
       // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (north-lawn trees + bayou dock)
       if (!frames['back-yard-cam2-water']) {
         frames['back-yard-cam2-water'] = { ...CALIBRATED_HOUSE_SURVEY['back-yard-cam2-water'] };
@@ -320,6 +319,7 @@ function loadSavedLayout() {
       parsed.fixedHouseSurveyV8 = true;
       parsed.fixedHouseSurveyV9 = true;
       parsed.fixedHouseSurveyV10 = true;
+      parsed.fixedHouseSurveyV11 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -528,6 +528,7 @@ function saveLayout() {
         fixedHouseSurveyV8: true,
         fixedHouseSurveyV9: true,
         fixedHouseSurveyV10: true,
+        fixedHouseSurveyV11: true,
         savedAt: new Date().toISOString(),
         frames,
       }),
