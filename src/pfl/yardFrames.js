@@ -131,11 +131,11 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'yard-overview-20261012': {
     // Multi-pin ground-warped & perspective-linked Wyze Cam V4 + Cam1 stitched composite:
-    // Pins Arrow 2 (Blue House across the pond) directly onto Arrow 1 (29.24707, -95.23163),
-    // Palm Drive road East-to-West, White RV / Red Van / Tesla on East driveway, Oak Tree & Pump House on West lawn,
-    // and pins the bottom edge along the SW front wall of the Yellow House so the Yellow House roof is never covered.
-    camLat: 29.247270,
-    camLon: -95.231630,
+    // High-smoothness (reg=0.055) elastic mesh keeps straight lines (road, utility pole, solar panels, Blue House)
+    // undistorted while pinning the Blue House across the pond, Palm Drive road, White RV on East driveway,
+    // Oak Tree & Pump House on West lawn, and stopping at the SW front wall of the Yellow House.
+    camLat: 29.247269,
+    camLon: -95.231588,
     camHeightM: 0.45,
     headingDeg: 198,
     pitchDeg: -18,
@@ -293,7 +293,7 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedHouseSurveyV9) {
+    if (parsed && !parsed.fixedHouseSurveyV10) {
       // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (north-lawn trees + bayou dock)
       if (!frames['back-yard-cam2-water']) {
         frames['back-yard-cam2-water'] = { ...CALIBRATED_HOUSE_SURVEY['back-yard-cam2-water'] };
@@ -319,6 +319,7 @@ function loadSavedLayout() {
       parsed.fixedHouseSurveyV7 = true;
       parsed.fixedHouseSurveyV8 = true;
       parsed.fixedHouseSurveyV9 = true;
+      parsed.fixedHouseSurveyV10 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -354,11 +355,11 @@ export function computeCorners(p) {
       : 1;
   const w =
     p.stitchedPano && p.flat
-      ? 59.22 * (dist / 16.7) * wScale
+      ? 58.82 * (dist / 16.7) * wScale
       : 2 * dist * Math.tan(toRad((p.fovHDeg || DEFAULT_FOV_H_DEG) / 2)) * wScale;
   const h =
     p.stitchedPano && p.flat
-      ? 79.66 * (dist / 16.7)
+      ? 70.54 * (dist / 16.7)
       : 2 * dist * Math.tan(toRad((p.fovVDeg || DEFAULT_FOV_V_DEG) / 2)) * tiltFactor;
   let right;
   let up;
@@ -526,6 +527,7 @@ function saveLayout() {
         fixedHouseSurveyV7: true,
         fixedHouseSurveyV8: true,
         fixedHouseSurveyV9: true,
+        fixedHouseSurveyV10: true,
         savedAt: new Date().toISOString(),
         frames,
       }),

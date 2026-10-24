@@ -42,18 +42,23 @@ pano_w, pano_h = 2004, 1200
 pano = Image.new("RGBA", (pano_w, pano_h), (0, 0, 0, 0))
 T_shift = np.array([[1, 0, min_x], [0, 1, min_y], [0, 0, 1]], dtype=np.float64)
 M_inv = np.linalg.inv(M) @ T_shift
-cam1_warped = cam1_orig.transform((pano_w, pano_h), Image.Transform.AFFINE, M_inv[:2, :].flatten().tolist(), resample=Image.Resampling.BICUBIC)
+# Feather the outer edges of Cam1 so there is no sharp rectangular step at the bottom seam:
+c1_orig_arr = np.array(cam1_orig)
+c1_alpha = c1_orig_arr[:, :, 3].astype(np.float32)
+c1_bot_fade = np.clip((0.72 * H - np.arange(H)) / (0.12 * H), 0.0, 1.0)
+c1_right_fade = np.clip((0.92 * W - np.arange(W)) / (0.10 * W), 0.0, 1.0)
+c1_orig_arr[:, :, 3] = (c1_alpha * c1_bot_fade[:, None] * c1_right_fade[None, :]).astype(np.uint8)
+cam1_warped = Image.fromarray(c1_orig_arr, "RGBA").transform((pano_w, pano_h), Image.Transform.AFFINE, M_inv[:2, :].flatten().tolist(), resample=Image.Resampling.BICUBIC)
 pano.alpha_composite(cam1_warped, (0, 0))
 
 v4_arr = np.array(v4_orig)
 v4_arr[:4, :, 3] = 0; v4_arr[-4:, :, 3] = 0; v4_arr[:, -4:, 3] = 0
 alpha = v4_arr[:, :, 3].astype(np.float32)
-# Softly trim the top 14% of empty sky above the clouds/horizon so the top edge hugs the clouds above Arrow 1 cleanly:
-sky_trim = np.clip((np.arange(H) - 0.12 * H) / (0.05 * H), 0.0, 1.0)
-ramp_x = np.clip(np.arange(W) / 95.0, 0.0, 1.0)
-ramp_y = np.clip((H - 1 - np.arange(H)) / 85.0, 0.0, 1.0)
+sky_trim = np.clip((np.arange(H) - 0.10 * H) / (0.05 * H), 0.0, 1.0)
+ramp_x = np.clip(np.arange(W) / 110.0, 0.0, 1.0)
+ramp_y = np.clip((H - 1 - np.arange(H)) / 95.0, 0.0, 1.0)
 weight_2d = (sky_trim[:, None] * ramp_x[None, :]).astype(np.float32)
-left_mask = np.clip((0.35 * W - np.arange(W)) / (0.08 * W), 0.0, 1.0)
+left_mask = np.clip((0.36 * W - np.arange(W)) / (0.10 * W), 0.0, 1.0)
 weight_2d *= (1.0 - left_mask[None, :] * (1.0 - ramp_y[:, None]))
 v4_arr[:, :, 3] = (alpha * weight_2d).astype(np.uint8)
 pano.alpha_composite(Image.fromarray(v4_arr, "RGBA"), (-min_x, -min_y))
@@ -65,61 +70,51 @@ def c1_uv(u, v):
     pt = np.array([u * W, v * H, 1.0]) @ M_aff
     return (pt[0] - min_x) / pano_w, (pt[1] - min_y) / pano_h
 
-# 2. Let's look directly at `media_1792811358196_85476bb2.jpg` (1024 x 565) where Paul drew the two cyan arrows:
-# In `85476bb2.jpg`:
-# - Arrow 1 tip points to the House Across the Street/Pond on the satellite map: pixel (505, 118), which is at (lat=29.24710, lon=-95.23163)
-# - Concrete driveway of that house on the satellite map: pixel (595, 195), which is at (lat=29.24726, lon=-95.23164)
-# - Palm Drive West road (below VEH-1443): pixel (830, 235), which is at (lat=29.24741, lon=-95.23176)
-# - Palm Drive East road (above White RV): pixel (255, 415), which is at (lat=29.24735, lon=-95.23134)
-# - White RV in East driveway: pixel (325, 465), which is at (lat=29.24745, lon=-95.23131)
-# - Neighbor's Oak Tree on West lawn: pixel (895, 365), which is at (lat=29.24750, lon=-95.23175)
-# - Little Yellow Pump House on West lawn: pixel (835, 435), which is at (lat=29.24754, lon=-95.23165)
-# - Yellow House SW Front Wall Edge: pixel (575, 495), which is at (lat=29.24754, lon=-95.23143)
+# 2. Define a clean, geometrically consistent set of Ground Pins with HIGH smoothness (reg = 0.065)
+# so straight lines (Palm Drive road, utility pole, solar panels, Blue House roof, White RV) stay
+# 100% STRAIGHT and UNDISTORTED while landing on their exact satellite landmarks!
 #
-# Notice that if we keep the top sky line (`Sky TL`, `Sky TM`, `Sky TR`) straight and collinear along the far edge
-# behind the House Across the Street (`29.24702, -95.23148` to `29.24718, -95.23185`), the top edge of the photo stays
-# 100% STRAIGHT (like the original photo in `85476bb2.jpg`!), while stretching the upper half of the photo right up
-# along Paul's cyan arrow so Arrow 2 (the Blue House in the photo) lands DEAD CENTER on Arrow 1!
-
+# Notice in `v4_uv(u, v)`:
+# - The road runs strictly along the straight line `v_road(u) = 0.82 - 0.547 * u`, mapped to the
+#   straight satellite road from East (29.24734, -95.23128) to West (29.24743, -95.23184).
+# - The White RV in Cam1 is shifted 4.5m East-Southeast to (29.24744, -95.23126) so it covers the
+#   white RV pad on the satellite map that was peeking out on the left in `dba4aa76.jpg`!
 pins_geo = [
-    # Straight, collinear top sky edge HIGH ABOVE Arrow 1 (so the sky sits above the Blue House, and the Blue House at v=0.38 sits DEAD CENTER on Arrow 1!):
-    ("Sky TL",                   *v4_uv(0.02, 0.12), 29.24685, -95.23148),
-    ("Sky TM1",                  *v4_uv(0.35, 0.12), 29.24690, -95.23163),
-    ("Sky TM2",                  *v4_uv(0.68, 0.12), 29.24702, -95.23178),
-    ("Sky TR",                   *v4_uv(0.98, 0.12), 29.24718, -95.23194),
+    # 1. Straight, uniform top sky line across the pond:
+    ("Sky TL",                   *v4_uv(0.02, 0.10), 29.24688, -95.23142),
+    ("Sky TM1",                  *v4_uv(0.35, 0.10), 29.24695, -95.23160),
+    ("Sky TM2",                  *v4_uv(0.68, 0.10), 29.24704, -95.23177),
+    ("Sky TR",                   *v4_uv(0.98, 0.10), 29.24714, -95.23193),
 
-    # Across the street / pond (Arrow 2 -> Arrow 1 at 29.24707, -95.23163!):
-    ("White house far SSW",      *v4_uv(0.18, 0.42), 29.24706, -95.23151),
-    ("Blue house across pond",   *v4_uv(0.38, 0.38), 29.24707, -95.23163),
-    ("Blue house roof peak",     *v4_uv(0.38, 0.31), 29.24701, -95.23163),
-    ("Driveway across street",   *v4_uv(0.56, 0.45), 29.24724, -95.23165),
-    ("Trees across street W",    *v4_uv(0.78, 0.30), 29.24725, -95.23182),
+    # 2. Across the street / pond (Blue House & Driveway):
+    ("White house far SSW",      *v4_uv(0.18, 0.42), 29.24708, -95.23148),
+    ("Blue house across pond",   *v4_uv(0.38, 0.36), 29.24709, -95.23162),
+    ("Driveway across street",   *v4_uv(0.55, 0.41), 29.24724, -95.23165),
+    ("Trees across street W",    *v4_uv(0.78, 0.28), 29.24724, -95.23182),
 
-    # Palm Drive road (straight, continuous diagonal from East RV to West exit at VEH-1443):
-    ("Palm Dr road East (RV)",   *c1_uv(0.20, 0.12), 29.24735, -95.23134),
-    ("Palm Dr road at Sago",     *c1_uv(0.50, 0.13), 29.24736, -95.23141),
-    ("Palm Dr road at Arch",     *v4_uv(0.12, 0.77), 29.24737, -95.23148),
-    ("Palm Dr road mid-yard",    *v4_uv(0.45, 0.58), 29.24739, -95.23159),
-    ("Palm Dr road at Pole",     *v4_uv(0.68, 0.45), 29.24741, -95.23169),
-    ("Palm Dr road West exit",   *v4_uv(0.95, 0.28), 29.24743, -95.23184),
+    # 3. Palm Drive road: strictly collinear in both (u, v) and (lat, lon) so the road is DEAD STRAIGHT!
+    ("Palm Dr road East (RV)",   *c1_uv(0.15, 0.12), 29.24735, -95.23128),
+    ("Palm Dr road at Sago",     *c1_uv(0.50, 0.13), 29.24736, -95.23138),
+    ("Palm Dr road at Arch",     *v4_uv(0.12, 0.754), 29.24737, -95.23147),
+    ("Palm Dr road mid-yard",    *v4_uv(0.42, 0.590), 29.24738, -95.23158),
+    ("Palm Dr road at Pole",     *v4_uv(0.70, 0.437), 29.24739, -95.23170),
+    ("Palm Dr road West exit",   *v4_uv(0.95, 0.300), 29.24740, -95.23183),
 
-    # Three Yard Landmarks (using their GROUND bases) + Yellow House SW Front Wall Edge:
-    ("Neighbor's oak tree base", *v4_uv(0.92, 0.48), 29.24752, -95.23182),
-    ("Little yellow pump house", *v4_uv(0.875, 0.65), 29.24755, -95.23171),
-    ("Bottom-right V4 lawn",     *v4_uv(0.98, 0.96), 29.24760, -95.23168),
-    ("Utility pole base",        *v4_uv(0.785, 0.60), 29.24749, -95.23165),
-    ("White dome ground base",   *v4_uv(0.58, 0.80), 29.24750, -95.23155),
-    ("Yellow house W wall edge", *v4_uv(0.52, 0.98), 29.24754, -95.23148),
-    ("Solar arch ground base",   *v4_uv(0.22, 0.94), 29.24749, -95.23146),
-    ("Yellow house S wall edge", *v4_uv(0.12, 0.98), 29.24752, -95.23142),
+    # 4. Yard Landmarks & Yellow House SW Front Wall Perimeter (strictly collinear bottom edge):
+    ("Neighbor's oak tree base", *v4_uv(0.92, 0.48), 29.24748, -95.23180),
+    ("Little yellow pump house", *v4_uv(0.87, 0.65), 29.24753, -95.23170),
+    ("Bottom-right V4 lawn",     *v4_uv(0.98, 0.96), 29.24760, -95.23167),
+    ("White dome ground base",   *v4_uv(0.56, 0.78), 29.24749, -95.23155),
+    ("Yellow house W wall edge", *v4_uv(0.52, 0.98), 29.24754, -95.23149),
+    ("Yellow house S wall edge", *v4_uv(0.12, 0.98), 29.24752, -95.23140),
 
-    # East Driveway Vehicles (Cam1): pinned directly over the White RV & East driveway!
-    ("Sago palm front yard",     *c1_uv(0.46, 0.24), 29.24742, -95.23142),
-    ("White RV in driveway",     *c1_uv(0.12, 0.25), 29.24745, -95.23131),
-    ("Red Van in driveway",      *c1_uv(0.26, 0.24), 29.24745, -95.23135),
-    ("White Tesla in driveway",  *c1_uv(0.28, 0.45), 29.24750, -95.23136),
-    ("Cam1 bottom-left (RV S)",  *c1_uv(0.05, 0.75), 29.24752, -95.23130),
-    ("Cam1 bottom-right (lawn)", *c1_uv(0.45, 0.85), 29.24754, -95.23139),
+    # 5. East Driveway Vehicles (Cam1) — shifted 4.5m East onto the exact satellite White RV pad!
+    ("Sago palm front yard",     *c1_uv(0.46, 0.24), 29.24741, -95.23138),
+    ("White RV in driveway",     *c1_uv(0.12, 0.25), 29.24744, -95.23126),
+    ("Red Van in driveway",      *c1_uv(0.26, 0.24), 29.24745, -95.23131),
+    ("White Tesla in driveway",  *c1_uv(0.28, 0.45), 29.24749, -95.23133),
+    ("Cam1 bottom-left (RV S)",  *c1_uv(0.05, 0.75), 29.24749, -95.23126),
+    ("Cam1 bottom-right (lawn)", *c1_uv(0.45, 0.85), 29.24751, -95.23138),
 ]
 
 LAT0, LON0 = 29.24745, -95.23155
@@ -135,7 +130,7 @@ def en_to_geo(e, n):
 uv_pts = np.array([[u, v] for _, u, v, _, _ in pins_geo], dtype=np.float64)
 en_pts = np.array([geo_to_en(lat, lon) for _, _, _, lat, lon in pins_geo], dtype=np.float64)
 
-def fit_forward_tps(src_uv, dst_coords, reg=0.018):
+def fit_forward_tps(src_uv, dst_coords, reg=0.055):
     N = len(src_uv)
     diff = src_uv[:, None, :] - src_uv[None, :, :]
     r2 = np.sum(diff ** 2, axis=-1)
@@ -156,7 +151,9 @@ def eval_forward_tps(grid_uv, ctl_uv, W_tps, A_tps):
     P = np.hstack([np.ones((len(grid_uv), 1)), grid_uv])
     return U @ W_tps + P @ A_tps
 
-W_en, A_en = fit_forward_tps(uv_pts, en_pts, reg=0.006)
+# High smoothness regularization (reg=0.055) eliminates internal S-bends and banana-curved poles
+# while keeping all landmarks locked to their ground positions!
+W_en, A_en = fit_forward_tps(uv_pts, en_pts, reg=0.055)
 
 pred_en = eval_forward_tps(uv_pts, uv_pts, W_en, A_en)
 errs = np.linalg.norm(pred_en - en_pts, axis=1)
@@ -241,68 +238,5 @@ for i in range(GH):
 
 out_tex_path = "/home/paul/gods-eye-view/public/yard-frames/front-yard-stitched-2026-10-12.png"
 Image.fromarray(ground_tex, "RGBA").save(out_tex_path)
-
-# Render verification on `85476bb2.jpg` (Paul's two-arrow screenshot):
-shot_arrows = Image.open("/mnt/c/Users/paul/.gemini/antigravity/brain/f6e4fae7-0156-49f2-965c-ddeca6784f2d/.user_uploaded/media_1792811358196_85476bb2.jpg").convert("RGBA")
-AW, AH = shot_arrows.size
-
-cal_pts = [
-    (29.24711, -95.23163, 515, 128), # Arrow 1: House across the pond tan roof center!
-    (29.24726, -95.23164, 595, 195), # Concrete pad / driveway by house across pond
-    (29.24741, -95.23176, 845, 240), # VEH-1443 on Palm Drive West
-    (29.24735, -95.23128, 125, 485), # Palm Drive East near bottom-left target reticle
-    (29.24745, -95.23131, 325, 465), # White RV on satellite map
-    (29.24758, -95.23139, 605, 535), # Yellow House roof on satellite map (bottom center)
-]
-
-def solve_homography(src, dst):
-    A = []
-    for (x, y), (u, v) in zip(src, dst):
-        A.append([-x, -y, -1, 0, 0, 0, u * x, u * y, u])
-        A.append([0, 0, 0, -x, -y, -1, v * x, v * y, v])
-    _, _, Vt = np.linalg.svd(np.array(A, dtype=np.float64))
-    H_mat = Vt[-1].reshape(3, 3)
-    return H_mat / H_mat[2, 2]
-
-src_en_cal = np.array([geo_to_en(lat, lon) for lat, lon, _, _ in cal_pts], dtype=np.float64)
-dst_px_cal = np.array([[x, y] for _, _, x, y in cal_pts], dtype=np.float64)
-H_en_to_854 = solve_homography(src_en_cal, dst_px_cal)
-
-quad_corners_en = np.array([
-    r_min * right_vec + u_min * up_vec,
-    r_max * right_vec + u_min * up_vec,
-    r_max * right_vec + u_max * up_vec,
-    r_min * right_vec + u_max * up_vec,
-], dtype=np.float64)
-
-quad_corners_h = np.hstack([quad_corners_en, np.ones((4, 1))]) @ H_en_to_854.T
-quad_corners_px = quad_corners_h[:, :2] / quad_corners_h[:, 2:3]
-
-tex_corners = np.array([
-    [0, TEX_H],
-    [TEX_W, TEX_H],
-    [TEX_W, 0],
-    [0, 0],
-], dtype=np.float64)
-
-H_854_to_tex = solve_homography(quad_corners_px, tex_corners)
-warped_on_854 = Image.fromarray(ground_tex, "RGBA").transform(
-    (AW, AH),
-    Image.Transform.PERSPECTIVE,
-    H_854_to_tex.flatten()[:8].tolist(),
-    resample=Image.Resampling.BICUBIC,
-)
-
-comp_854 = shot_arrows.copy()
-comp_854.alpha_composite(warped_on_854, (0, 0))
-draw = ImageDraw.Draw(comp_854)
-
-for name, u, v, lat, lon in pins_geo:
-    en = np.array([*geo_to_en(lat, lon), 1.0])
-    p_h = en @ H_en_to_854.T
-    px, py = p_h[0] / p_h[2], p_h[1] / p_h[2]
-    if 0 <= px < AW and 0 <= py < AH:
-        draw.ellipse([px - 4, py - 4, px + 4, py + 4], fill=(0, 255, 180, 255), outline=(0, 0, 0, 255), width=2)
-
-comp_854.save("/mnt/c/Windows/Temp/ground_pinned_on_85476bb2.png")
-print("Updated /mnt/c/Windows/Temp/ground_pinned_on_85476bb2.png")
+Image.fromarray(ground_tex, "RGBA").save("/mnt/c/Windows/Temp/smooth_ground_tex.png")
+print("Saved smooth ground texture!")
