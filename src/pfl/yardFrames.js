@@ -130,11 +130,11 @@ const CALIBRATED_HOUSE_SURVEY = {
     hiddenByStitch: true,
   },
   'yard-overview-20261012': {
-    // Calibrated directly to Paul's cyan frame in 8b787dab.jpg:
-    // Aligns the neighbor's culvert, telephone pole, little yellow pump house,
-    // Monaco Beaver solar arch, and White RV / Red Van / Tesla on the original driveway.
-    camLat: 29.247320,
-    camLon: -95.231560,
+    // Calibrated directly to Paul's See-Thru alignment in 28748c3f.jpg:
+    // House across the way sits on top of itself, neighbor's culvert & driveway match Palm Drive,
+    // telephone pole & little yellow pump house sit in place, and Monaco RV sits on the original driveway pad.
+    camLat: 29.247315,
+    camLon: -95.231524,
     camHeightM: 0.45,
     headingDeg: 198,
     pitchDeg: -18,
