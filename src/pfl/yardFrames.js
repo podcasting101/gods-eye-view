@@ -130,19 +130,22 @@ const CALIBRATED_HOUSE_SURVEY = {
     hiddenByStitch: true,
   },
   'yard-overview-20261012': {
-    // Landmark-rectified Wyze Cam V4 overview (+ stitched Cam1 composite): pins the blue house across the pond,
-    // Palm Drive road (left & right), neighbor's oak tree on the right, little yellow pump house, and Beaver solar arch
-    camLat: 29.247615,
-    camLon: -95.231449,
-    camHeightM: 16.84,
+    // Multi-pin ground-warped & perspective-linked Wyze Cam V4 + Cam1 stitched composite:
+    // Pins Arrow 2 (Blue House across the pond) directly onto Arrow 1 (29.24707, -95.23163),
+    // Palm Drive road East-to-West, White RV / Red Van / Tesla on East driveway, Oak Tree & Pump House on West lawn,
+    // and pins the bottom edge along the SW front wall of the Yellow House so the Yellow House roof is never covered.
+    camLat: 29.247270,
+    camLon: -95.231630,
+    camHeightM: 0.45,
     headingDeg: 198,
     pitchDeg: -18,
     distanceM: 16.7,
-    widthScale: 1.15,
-    rollDeg: -12,
-    flat: false,
+    widthScale: 1.0,
+    rollDeg: 0,
+    flat: true,
     texRot: 0,
     stitchedPano: true,
+    viewTiltCompensate: true,
   },
   'house-side-20261012': {
     // Between yellow house W wall and Beaver solar arch, looking NNW (348°) toward back yard & bayou
@@ -290,7 +293,7 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedHouseSurveyV8) {
+    if (parsed && !parsed.fixedHouseSurveyV9) {
       // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (north-lawn trees + bayou dock)
       if (!frames['back-yard-cam2-water']) {
         frames['back-yard-cam2-water'] = { ...CALIBRATED_HOUSE_SURVEY['back-yard-cam2-water'] };
@@ -315,6 +318,7 @@ function loadSavedLayout() {
       parsed.fixedHouseSurveyV6 = true;
       parsed.fixedHouseSurveyV7 = true;
       parsed.fixedHouseSurveyV8 = true;
+      parsed.fixedHouseSurveyV9 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -344,8 +348,18 @@ export function computeCorners(p) {
   const enu = Cesium.Transforms.eastNorthUpToFixedFrame(anchor);
   const dist = p.distanceM || DEFAULT_DISTANCE_M;
   const wScale = typeof p.widthScale === 'number' && p.widthScale > 0 ? p.widthScale : 1;
-  const w = 2 * dist * Math.tan(toRad((p.fovHDeg || DEFAULT_FOV_H_DEG) / 2)) * wScale;
-  const h = 2 * dist * Math.tan(toRad((p.fovVDeg || DEFAULT_FOV_V_DEG) / 2));
+  const tiltFactor =
+    !p.flat && p.viewTiltCompensate && typeof p._viewTiltScale === 'number'
+      ? p._viewTiltScale
+      : 1;
+  const w =
+    p.stitchedPano && p.flat
+      ? 59.22 * (dist / 16.7) * wScale
+      : 2 * dist * Math.tan(toRad((p.fovHDeg || DEFAULT_FOV_H_DEG) / 2)) * wScale;
+  const h =
+    p.stitchedPano && p.flat
+      ? 79.66 * (dist / 16.7)
+      : 2 * dist * Math.tan(toRad((p.fovVDeg || DEFAULT_FOV_V_DEG) / 2)) * tiltFactor;
   let right;
   let up;
   let center;
@@ -399,8 +413,8 @@ export function computeCorners(p) {
     h / 2,
     new Cesium.Cartesian3(),
   );
-  const sxMin = p.stitchedPano ? -1.505 : -1;
-  const syMin = p.stitchedPano ? -1.70 : -1;
+  const sxMin = p.stitchedPano && !p.flat ? -1.505 : -1;
+  const syMin = p.stitchedPano && !p.flat ? -1.70 : -1;
   const corner = (sx, sy) => {
     const local = new Cesium.Cartesian3();
     Cesium.Cartesian3.add(
@@ -511,6 +525,7 @@ function saveLayout() {
         fixedHouseSurveyV6: true,
         fixedHouseSurveyV7: true,
         fixedHouseSurveyV8: true,
+        fixedHouseSurveyV9: true,
         savedAt: new Date().toISOString(),
         frames,
       }),
@@ -519,6 +534,8 @@ function saveLayout() {
     console.warn('[YardFrames] could not save layout:', error);
   }
 }
+
+let viewTiltUnsub = null;
 
 /**
  * Frustum-true v2 renderer. Saved Arrange-mode params merge over the built-in values.
@@ -532,6 +549,23 @@ export function loadYardFrames({ viewer }) {
     const entity = buildFrameEntity(viewer, f, params);
     frameState.set(f.id, { def: f, params, entity });
   }
+  if (viewer?.camera?.changed?.addEventListener) {
+    let lastPitchDeg = null;
+    viewTiltUnsub = viewer.camera.changed.addEventListener(() => {
+      const pitchRad = viewer.camera.pitch;
+      const pitchDeg = Math.abs(Cesium.Math.toDegrees(pitchRad));
+      if (lastPitchDeg !== null && Math.abs(pitchDeg - lastPitchDeg) < 1.2) return;
+      lastPitchDeg = pitchDeg;
+      const clampedPitch = Math.max(14, Math.min(75, pitchDeg));
+      const scale = Math.min(1.65, Math.max(0.85, Math.tan(toRad(clampedPitch)) / Math.tan(toRad(24))));
+      for (const [id, st] of frameState) {
+        if (st.params.viewTiltCompensate && !st.params.flat) {
+          st.params._viewTiltScale = scale;
+          rebuildFrame(viewer, id);
+        }
+      }
+    });
+  }
   viewer.creditDisplay.addStaticCredit(FRAME_CREDIT);
   installArrangeToggle(viewer);
   return {
@@ -542,6 +576,14 @@ export function loadYardFrames({ viewer }) {
 
 /** Remove every yard-frame entity and editor surface owned by this module. */
 export function destroyYardFrames(viewer) {
+  if (typeof viewTiltUnsub === 'function') {
+    try {
+      viewTiltUnsub();
+    } catch (e) {
+      /* ignore */
+    }
+    viewTiltUnsub = null;
+  }
   if (editor?.viewer === viewer) {
     if (editor.on) releaseContinuousRender('yardframes-arrange');
     removeHandlers(viewer);
