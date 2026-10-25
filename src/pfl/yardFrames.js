@@ -1350,7 +1350,7 @@ function installArrangeToggle(viewer) {
       if (editor) setArrange(viewer, !editor.on);
     }
   });
-  setArrange(viewer, true);
+  setArrange(viewer, false);
 }
 
 if (import.meta.hot) {
