@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-10-26T08:38:40.486813-05:00",
+  "generated_at": "2026-10-26T08:45:17.329222-05:00",
   "coordinator": "Antigravity (Harry Maybourne) \u2014 Head of Covert Intelligence & Chief Designer of God's Eye View",
   "antigravity_gas_gauge": {
     "plan": "Google AI Ultra (g1-ultra-lite-tier)",
     "model": "gemini-4-argon-medium",
-    "session_remaining_pct": 89.17,
-    "session_used_pct": 10.83,
+    "session_remaining_pct": 88.3,
+    "session_used_pct": 11.7,
     "session_reset_iso": "2026-10-26T11:57:56-05:00",
-    "weekly_remaining_pct": 91.84,
-    "weekly_used_pct": 8.16,
+    "weekly_remaining_pct": 91.76,
+    "weekly_used_pct": 8.24,
     "weekly_reset_iso": "2026-10-31T09:32:00-05:00",
     "claude_gpt_weekly_remaining_pct": 100.0,
     "daily_target_pp": 15.0,
-    "today_burned_pp": 2.16,
-    "today_remaining_to_burn_pp": 12.84,
+    "today_burned_pp": 2.24,
+    "today_remaining_to_burn_pp": 12.76,
     "eod_target_weekly_remaining_pct": 77.0,
     "pace_verdict": "ACTIVE_BURNING_TOWARD_15PCT",
     "live_rpc_verified": true
@@ -120,6 +120,12 @@
   ],
   "postgres_latest_tasks": [
     {
+      "id": "22046",
+      "title": "PFL Harness Scorecard: allocation pacing, accepted output, and read-only treats",
+      "status": "in_progress",
+      "assigned_to": "@codex"
+    },
+    {
       "id": "22045",
       "title": "GEV + Neo4j Fusion Design Brief for elitespyworlds.com (Trello yOhampgQ)",
       "status": "completed",
@@ -184,12 +190,6 @@
       "title": "Gods Eye: deployed topology and ownership report",
       "status": "pending",
       "assigned_to": "@lisa"
-    },
-    {
-      "id": "22032",
-      "title": "Gods Eye: audit checkpoint dependencies and tests",
-      "status": "blocked",
-      "assigned_to": "@friday"
     }
   ]
 }
