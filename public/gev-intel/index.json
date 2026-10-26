@@ -8,7 +8,9 @@
     "facts": 97,
     "episodes": 185,
     "topics": 25,
-    "spatial_bound_entities": 11
+    "spatial_bound_entities": 11,
+    "episodes_bundled": 185,
+    "episodes_extracted": 9
   },
   "labels": [
     {
@@ -1774,679 +1776,970 @@
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:6",
         "type": "RELATES_TO",
         "fact": "The Atlantis expedition is to the Pegasus galaxy.",
-        "valid_at": "2026-07-13T01:58:09.733974Z"
+        "valid_at": "2026-07-13T01:58:09.733974Z",
+        "from_name": "Atlantis expedition",
+        "to_name": "Pegasus galaxy",
+        "label": "RELATES_TO: The Atlantis expedition is to the Pegasus galaxy"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:3",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:6",
         "type": "RELATES_TO",
         "fact": "The Atlantis expedition is to the Pegasus galaxy.",
-        "valid_at": "2026-07-13T01:57:20.1777Z"
+        "valid_at": "2026-07-13T01:57:20.1777Z",
+        "from_name": "Atlantis expedition",
+        "to_name": "Pegasus galaxy",
+        "label": "RELATES_TO: The Atlantis expedition is to the Pegasus galaxy"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:3",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:6",
         "type": "RELATES_TO",
         "fact": "The Atlantis expedition is to the Pegasus galaxy.",
-        "valid_at": "2026-07-13T01:49:14.176811Z"
+        "valid_at": "2026-07-13T01:49:14.176811Z",
+        "from_name": "Atlantis expedition",
+        "to_name": "Pegasus galaxy",
+        "label": "RELATES_TO: The Atlantis expedition is to the Pegasus galaxy"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:12",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:6",
         "type": "RELATES_TO",
         "fact": "The Atlantis expedition is to the Pegasus galaxy.",
-        "valid_at": "2026-07-13T01:56:26.317359Z"
+        "valid_at": "2026-07-13T01:56:26.317359Z",
+        "from_name": "Atlantis",
+        "to_name": "Pegasus galaxy",
+        "label": "RELATES_TO: The Atlantis expedition is to the Pegasus galaxy"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:5",
         "type": "RELATES_TO",
         "fact": "McKay previously worked at Stargate Command (the SGC).",
-        "valid_at": "2026-07-13T01:58:21.542305Z"
+        "valid_at": "2026-07-13T01:58:21.542305Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Stargate Command",
+        "label": "RELATES_TO: McKay previously worked at Stargate Command (the"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:5",
         "type": "RELATES_TO",
         "fact": "McKay previously worked at Stargate Command (the SGC).",
-        "valid_at": "2026-07-13T01:57:31.269685Z"
+        "valid_at": "2026-07-13T01:57:31.269685Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Stargate Command",
+        "label": "RELATES_TO: McKay previously worked at Stargate Command (the"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:5",
         "type": "RELATES_TO",
         "fact": "McKay previously worked at Stargate Command (the SGC).",
-        "valid_at": "2026-07-13T01:56:38.020232Z"
+        "valid_at": "2026-07-13T01:56:38.020232Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Stargate Command",
+        "label": "RELATES_TO: McKay previously worked at Stargate Command (the"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:3",
         "type": "RELATES_TO",
         "fact": "Rodney McKay is the Chief Scientist of the Atlantis expedition.",
-        "valid_at": "2026-07-13T01:58:01.825191Z"
+        "valid_at": "2026-07-13T01:58:01.825191Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Atlantis expedition",
+        "label": "RELATES_TO: Rodney McKay is the Chief Scientist of the Atlan"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:26",
         "type": "RELATES_TO",
         "fact": "McKay and Zelenka frequently argue about engineering solutions.",
-        "valid_at": "2026-07-13T01:58:34.069431Z"
+        "valid_at": "2026-07-13T01:58:34.069431Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Dr. Radek Zelenka",
+        "label": "RELATES_TO: McKay and Zelenka frequently argue about enginee"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:26",
         "type": "RELATES_TO",
         "fact": "Zelenka's fixes are usually what actually saves the day in the context of engineering solutions discussed by McKay.",
-        "valid_at": "2026-07-13T01:58:34.069431Z"
+        "valid_at": "2026-07-13T01:58:34.069431Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Dr. Radek Zelenka",
+        "label": "RELATES_TO: Zelenka's fixes are usually what actually saves "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:3",
         "type": "RELATES_TO",
         "fact": "McKay joined the Atlantis expedition to the Pegasus galaxy.",
-        "valid_at": "2026-07-13T01:58:09.733974Z"
+        "valid_at": "2026-07-13T01:58:09.733974Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Atlantis expedition",
+        "label": "RELATES_TO: McKay joined the Atlantis expedition to the Pega"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:12",
         "type": "RELATES_TO",
         "fact": "McKay joined the Atlantis expedition.",
-        "valid_at": "2026-07-13T01:56:26.317359Z"
+        "valid_at": "2026-07-13T01:56:26.317359Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Atlantis",
+        "label": "RELATES_TO: McKay joined the Atlantis expedition."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:26",
         "type": "RELATES_TO",
         "fact": "McKay and Zelenka frequently argue about engineering solutions.",
-        "valid_at": "2026-07-13T01:56:57.821718Z"
+        "valid_at": "2026-07-13T01:56:57.821718Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Dr. Radek Zelenka",
+        "label": "RELATES_TO: McKay and Zelenka frequently argue about enginee"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:12",
         "type": "RELATES_TO",
         "fact": "Rodney McKay is the Chief Scientist of the Atlantis expedition.",
-        "valid_at": "2026-07-13T01:56:04.491983Z"
+        "valid_at": "2026-07-13T01:56:04.491983Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Atlantis",
+        "label": "RELATES_TO: Rodney McKay is the Chief Scientist of the Atlan"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:26",
         "type": "RELATES_TO",
         "fact": "McKay and Zelenka frequently argue about engineering solutions.",
-        "valid_at": "2026-07-13T01:50:17.657461Z"
+        "valid_at": "2026-07-13T01:50:17.657461Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Dr. Radek Zelenka",
+        "label": "RELATES_TO: McKay and Zelenka frequently argue about enginee"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:5",
         "type": "RELATES_TO",
         "fact": "McKay previously worked at Stargate Command (the SGC).",
-        "valid_at": "2026-07-13T01:49:33.673544Z"
+        "valid_at": "2026-07-13T01:49:33.673544Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Stargate Command",
+        "label": "RELATES_TO: McKay previously worked at Stargate Command (the"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:3",
         "type": "RELATES_TO",
         "fact": "McKay joined the Atlantis expedition.",
-        "valid_at": "2026-07-13T01:49:14.176811Z"
+        "valid_at": "2026-07-13T01:49:14.176811Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Atlantis expedition",
+        "label": "RELATES_TO: McKay joined the Atlantis expedition."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:3",
         "type": "RELATES_TO",
         "fact": "Rodney McKay is the Chief Scientist of the Atlantis expedition.",
-        "valid_at": "2026-07-13T01:48:12.382584Z[UTC]"
+        "valid_at": "2026-07-13T01:48:12.382584Z[UTC]",
+        "from_name": "Rodney McKay",
+        "to_name": "Atlantis expedition",
+        "label": "RELATES_TO: Rodney McKay is the Chief Scientist of the Atlan"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:3",
         "type": "RELATES_TO",
         "fact": "McKay joined the Atlantis expedition.",
-        "valid_at": "2026-07-13T01:57:20.1777Z"
+        "valid_at": "2026-07-13T01:57:20.1777Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Atlantis expedition",
+        "label": "RELATES_TO: McKay joined the Atlantis expedition."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:3",
         "type": "RELATES_TO",
         "fact": "Rodney McKay is the Chief Scientist of the Atlantis expedition.",
-        "valid_at": "2026-07-13T01:57:14.186368Z"
+        "valid_at": "2026-07-13T01:57:14.186368Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Atlantis expedition",
+        "label": "RELATES_TO: Rodney McKay is the Chief Scientist of the Atlan"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:26",
         "type": "RELATES_TO",
         "fact": "McKay and Zelenka frequently argue about engineering solutions.",
-        "valid_at": "2026-07-13T01:57:49.182611Z"
+        "valid_at": "2026-07-13T01:57:49.182611Z",
+        "from_name": "Rodney McKay",
+        "to_name": "Dr. Radek Zelenka",
+        "label": "RELATES_TO: McKay and Zelenka frequently argue about enginee"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:26",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "type": "RELATES_TO",
         "fact": "Zelenka's fixes to the engineering solutions are usually what saves the day for McKay.",
-        "valid_at": "2026-07-13T01:56:57.821718Z"
+        "valid_at": "2026-07-13T01:56:57.821718Z",
+        "from_name": "Dr. Radek Zelenka",
+        "to_name": "Rodney McKay",
+        "label": "RELATES_TO: Zelenka's fixes to the engineering solutions are"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:26",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "type": "RELATES_TO",
         "fact": "The engineering fixes provided by Zelenka are usually what actually saves the day for McKay.",
-        "valid_at": "2026-07-13T01:50:17.657461Z"
+        "valid_at": "2026-07-13T01:50:17.657461Z",
+        "from_name": "Dr. Radek Zelenka",
+        "to_name": "Rodney McKay",
+        "label": "RELATES_TO: The engineering fixes provided by Zelenka are us"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:26",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "type": "RELATES_TO",
         "fact": "Zelenka's fixes are usually what actually saves the day despite arguments with McKay.",
-        "valid_at": "2026-07-13T01:57:49.182611Z"
+        "valid_at": "2026-07-13T01:57:49.182611Z",
+        "from_name": "Dr. Radek Zelenka",
+        "to_name": "Rodney McKay",
+        "label": "RELATES_TO: Zelenka's fixes are usually what actually saves "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:26",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "type": "RELATES_TO",
         "fact": "Dr. Radek Zelenka is the second-in-command to McKay on the science team.",
-        "valid_at": "2026-07-13T01:57:35.613439Z"
+        "valid_at": "2026-07-13T01:57:35.613439Z",
+        "from_name": "Dr. Radek Zelenka",
+        "to_name": "Rodney McKay",
+        "label": "RELATES_TO: Dr. Radek Zelenka is the second-in-command to Mc"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:26",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:20",
         "type": "RELATES_TO",
         "fact": "Dr. Radek Zelenka often fixes what McKay breaks or overlooks.",
-        "valid_at": "2026-07-13T01:57:35.613439Z"
+        "valid_at": "2026-07-13T01:57:35.613439Z",
+        "from_name": "Dr. Radek Zelenka",
+        "to_name": "Rodney McKay",
+        "label": "RELATES_TO: Dr. Radek Zelenka often fixes what McKay breaks "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:38",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "type": "RELATES_TO",
         "fact": "zelenka is communicating with Paul regarding the task list update and the need for proper citations and protocol.",
-        "valid_at": "2026-07-13T19:59:57.105Z"
+        "valid_at": "2026-07-13T19:59:57.105Z",
+        "from_name": "zelenka",
+        "to_name": "Paul",
+        "label": "RELATES_TO: zelenka is communicating with Paul regarding the"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:38",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "type": "RELATES_TO",
         "fact": "zelenka informed Paul that the processes are cleaned up and Friday's inbox is cleared.",
-        "valid_at": "2026-07-13T20:04:18.024Z"
+        "valid_at": "2026-07-13T20:04:18.024Z",
+        "from_name": "zelenka",
+        "to_name": "Paul",
+        "label": "RELATES_TO: zelenka informed Paul that the processes are cle"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:38",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:117",
         "type": "RELATES_TO",
         "fact": "zelenka made a post in the PFL Atrium regarding Friday check-ins and system cleanup.",
-        "valid_at": "2026-07-13T19:59:35.565Z[UTC]"
+        "valid_at": "2026-07-13T19:59:35.565Z[UTC]",
+        "from_name": "zelenka",
+        "to_name": "PFL Atrium",
+        "label": "RELATES_TO: zelenka made a post in the PFL Atrium regarding "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:38",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:47",
         "type": "RELATES_TO",
         "fact": "zelenka is ready to move the 15 orphaned tasks back into circulation.",
-        "valid_at": "2026-07-13T20:04:18.024Z"
+        "valid_at": "2026-07-13T20:04:18.024Z",
+        "from_name": "zelenka",
+        "to_name": "15 orphaned tasks",
+        "label": "RELATES_TO: zelenka is ready to move the 15 orphaned tasks b"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:46",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:47",
         "type": "RELATES_TO",
         "fact": "Friday's inbox contains 15 orphaned tasks.",
-        "valid_at": "2026-07-13T20:04:18.024Z"
+        "valid_at": "2026-07-13T20:04:18.024Z",
+        "from_name": "Friday's inbox",
+        "to_name": "15 orphaned tasks",
+        "label": "RELATES_TO: Friday's inbox contains 15 orphaned tasks."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:49",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:56",
         "type": "RELATES_TO",
         "fact": "friday-fable-holmes informed mckay that the concise message conveys real-time action and context for a technical support task.",
-        "valid_at": "2026-07-17T12:14:48.547Z"
+        "valid_at": "2026-07-17T12:14:48.547Z",
+        "from_name": "friday-fable-holmes",
+        "to_name": "mckay",
+        "label": "RELATES_TO: friday-fable-holmes informed mckay that the conc"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:49",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:56",
         "type": "RELATES_TO",
         "fact": "friday-fable-holmes informed mckay that the message contains specific equipment location, components, and a quantified numerical metric that constitutes actionable data for verification.",
-        "valid_at": "2026-07-17T12:14:48.547Z"
+        "valid_at": "2026-07-17T12:14:48.547Z",
+        "from_name": "friday-fable-holmes",
+        "to_name": "mckay",
+        "label": "RELATES_TO: friday-fable-holmes informed mckay that the mess"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:49",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:56",
         "type": "RELATES_TO",
         "fact": "friday-fable-holmes confirms to mckay that the message cites specific identifiers (sub-grid 4) and a measurable outcome, making it checkable against telemetry systems.",
-        "valid_at": "2026-07-17T12:14:24.142Z[UTC]"
+        "valid_at": "2026-07-17T12:14:24.142Z[UTC]",
+        "from_name": "friday-fable-holmes",
+        "to_name": "mckay",
+        "label": "RELATES_TO: friday-fable-holmes confirms to mckay that the m"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:50",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:51",
         "type": "RELATES_TO",
         "fact": "The Escalation ladder is live in the task processor.",
-        "valid_at": "2026-07-13T20:04:31.299Z"
+        "valid_at": "2026-07-13T20:04:31.299Z",
+        "from_name": "Escalation ladder",
+        "to_name": "task processor",
+        "label": "RELATES_TO: The Escalation ladder is live in the task proces"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:52",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:53",
         "type": "RELATES_TO",
         "fact": "The Matrix room feeds the Neo4j/Graphiti relationship graph directly.",
-        "valid_at": "2026-07-13T20:04:31.299Z[UTC]"
+        "valid_at": "2026-07-13T20:04:31.299Z[UTC]",
+        "from_name": "Matrix room",
+        "to_name": "Neo4j/Graphiti relationship graph",
+        "label": "RELATES_TO: The Matrix room feeds the Neo4j/Graphiti relatio"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:54",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "type": "RELATES_TO",
         "fact": "Harry is tracking the status of task #4287 regarding 'Prime Order: Paul Prime is done with the bullshit -- work starts today'.",
-        "valid_at": "2026-07-17T12:23:43.508Z"
+        "valid_at": "2026-07-17T12:23:43.508Z",
+        "from_name": "Harry",
+        "to_name": "Paul",
+        "label": "RELATES_TO: Harry is tracking the status of task #4287 regar"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:54",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "type": "RELATES_TO",
         "fact": "Harry is tracking the status of task #4293 regarding Lovense MCP Gateway Reconfiguration.",
-        "valid_at": "2026-07-17T12:23:43.508Z"
+        "valid_at": "2026-07-17T12:23:43.508Z",
+        "from_name": "Harry",
+        "to_name": "Friday",
+        "label": "RELATES_TO: Harry is tracking the status of task #4293 regar"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:54",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "type": "RELATES_TO",
         "fact": "Harry is tracking the status of task #5462 regarding Gate 1 -- Completion Gate.",
-        "valid_at": "2026-07-17T12:23:43.508Z"
+        "valid_at": "2026-07-17T12:23:43.508Z",
+        "from_name": "Harry",
+        "to_name": "Friday",
+        "label": "RELATES_TO: Harry is tracking the status of task #5462 regar"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:54",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:38",
         "type": "RELATES_TO",
         "fact": "Harry is tracking the status of task #4291 regarding a verified gap where prompts table is not vectorized.",
-        "valid_at": "2026-07-17T12:23:43.508Z"
+        "valid_at": "2026-07-17T12:23:43.508Z",
+        "from_name": "Harry",
+        "to_name": "zelenka",
+        "label": "RELATES_TO: Harry is tracking the status of task #4291 regar"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:54",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:65",
         "type": "RELATES_TO",
         "fact": "Harry is tracking the status of task #5461 regarding the EPIC: Verification Gate System to stop status-theater.",
-        "valid_at": "2026-07-17T12:23:43.508Z"
+        "valid_at": "2026-07-17T12:23:43.508Z",
+        "from_name": "Harry",
+        "to_name": "lisa-bot",
+        "label": "RELATES_TO: Harry is tracking the status of task #5461 regar"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:54",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:65",
         "type": "RELATES_TO",
         "fact": "Harry is tracking the status of task #5464 regarding Gate 3 -- Model Compliance Gate.",
-        "valid_at": "2026-07-17T12:23:43.508Z"
+        "valid_at": "2026-07-17T12:23:43.508Z",
+        "from_name": "Harry",
+        "to_name": "lisa-bot",
+        "label": "RELATES_TO: Harry is tracking the status of task #5464 regar"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:54",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:71",
         "type": "RELATES_TO",
         "fact": "Harry is tracking the status of tasks #4296 and #4298 assigned to prime regarding 'Prime Order' and 'Google Calendar' considerations.",
-        "valid_at": "2026-07-17T12:23:43.508Z"
+        "valid_at": "2026-07-17T12:23:43.508Z",
+        "from_name": "Harry",
+        "to_name": "prime",
+        "label": "RELATES_TO: Harry is tracking the status of tasks #4296 and "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:54",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:65",
         "type": "RELATES_TO",
         "fact": "Harry is tracking the status of task #4289 regarding whether every agent needs its own Google Calendar for accountability.",
-        "valid_at": "2026-07-17T12:23:43.508Z"
+        "valid_at": "2026-07-17T12:23:43.508Z",
+        "from_name": "Harry",
+        "to_name": "lisa-bot",
+        "label": "RELATES_TO: Harry is tracking the status of task #4289 regar"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:61",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:62",
         "type": "RELATES_TO",
         "fact": "Radek is checking the primary capacitor relays.",
-        "valid_at": "2026-07-17T12:15:41.256Z"
+        "valid_at": "2026-07-17T12:15:41.256Z",
+        "from_name": "Radek",
+        "to_name": "primary capacitor relays",
+        "label": "RELATES_TO: Radek is checking the primary capacitor relays."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:65",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:117",
         "type": "RELATES_TO",
         "fact": "lisa-bot said in the PFL Atrium",
-        "valid_at": "2026-10-08T12:00:51.283Z"
+        "valid_at": "2026-10-08T12:00:51.283Z",
+        "from_name": "lisa-bot",
+        "to_name": "PFL Atrium",
+        "label": "RELATES_TO: lisa-bot said in the PFL Atrium"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:83",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:85",
         "type": "RELATES_TO",
         "fact": "Lieutenant Colonel Samuels is the assistant to Agent Maybourne.",
-        "valid_at": "2026-07-17T12:57:19.514Z[UTC]"
+        "valid_at": "2026-07-17T12:57:19.514Z[UTC]",
+        "from_name": "samuels",
+        "to_name": "Agent Maybourne",
+        "label": "RELATES_TO: Lieutenant Colonel Samuels is the assistant to A"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:102",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:103",
         "type": "RELATES_TO",
         "fact": "The Mirror Me screen-capture pipeline is used to test if captured screenshot descriptions can be pushed into the Graphiti knowledge graph in real time.",
-        "valid_at": "2026-07-17T23:22:48.910863Z"
+        "valid_at": "2026-07-17T23:22:48.910863Z",
+        "from_name": "Mirror Me screen-capture pipeline",
+        "to_name": "Graphiti knowledge graph",
+        "label": "RELATES_TO: The Mirror Me screen-capture pipeline is used to"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:111",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:112",
         "type": "RELATES_TO",
         "fact": "Graphiti is now powered by Gemini Pro.",
-        "valid_at": "2026-10-10T12:06:59.886512Z[UTC]"
+        "valid_at": "2026-10-10T12:06:59.886512Z[UTC]",
+        "from_name": "Graphiti",
+        "to_name": "Gemini Pro",
+        "label": "RELATES_TO: Graphiti is now powered by Gemini Pro."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:111",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:113",
         "type": "RELATES_TO",
         "fact": "Graphiti is powered on Neo4j.",
-        "valid_at": "2026-10-10T12:07:17.859165Z"
+        "valid_at": "2026-10-10T12:07:17.859165Z",
+        "from_name": "Graphiti",
+        "to_name": "Neo4j",
+        "label": "RELATES_TO: Graphiti is powered on Neo4j."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:111",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:114",
         "type": "RELATES_TO",
         "fact": "Graphiti is for Project Free Life.",
-        "valid_at": "2026-10-10T12:07:17.859174Z"
+        "valid_at": "2026-10-10T12:07:17.859174Z",
+        "from_name": "Graphiti",
+        "to_name": "Project Free Life",
+        "label": "RELATES_TO: Graphiti is for Project Free Life."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:112",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:113",
         "type": "RELATES_TO",
         "fact": "Gemini Pro is on Neo4j.",
-        "valid_at": "2026-10-10T12:07:17.85918Z"
+        "valid_at": "2026-10-10T12:07:17.85918Z",
+        "from_name": "Gemini Pro",
+        "to_name": "Neo4j",
+        "label": "RELATES_TO: Gemini Pro is on Neo4j."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:118",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:117",
         "type": "RELATES_TO",
         "fact": "Voice bridge is online in the PFL Atrium",
-        "valid_at": "2026-10-08T12:00:51.283Z[UTC]"
+        "valid_at": "2026-10-08T12:00:51.283Z[UTC]",
+        "from_name": "Voice bridge",
+        "to_name": "PFL Atrium",
+        "label": "RELATES_TO: Voice bridge is online in the PFL Atrium"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:120",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:117",
         "type": "RELATES_TO",
         "fact": "Paul's mic is live in the PFL Atrium thread",
-        "valid_at": "2026-10-08T12:00:51.283Z[UTC]"
+        "valid_at": "2026-10-08T12:00:51.283Z[UTC]",
+        "from_name": "Paul's mic",
+        "to_name": "PFL Atrium",
+        "label": "RELATES_TO: Paul's mic is live in the PFL Atrium thread"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:120",
         "type": "RELATES_TO",
         "fact": "Paul has Paul's mic",
-        "valid_at": "2026-10-08T12:00:51.283Z[UTC]"
+        "valid_at": "2026-10-08T12:00:51.283Z[UTC]",
+        "from_name": "Paul",
+        "to_name": "Paul's mic",
+        "label": "RELATES_TO: Paul has Paul's mic"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:102",
         "type": "RELATES_TO",
         "fact": "Paul is working on a live Mirror Me screen-capture pipeline to test if captured screenshot descriptions can be pushed into the Graphiti knowledge graph in real time.",
-        "valid_at": "2026-07-17T23:22:48.910863Z"
+        "valid_at": "2026-07-17T23:22:48.910863Z",
+        "from_name": "Paul",
+        "to_name": "Mirror Me screen-capture pipeline",
+        "label": "RELATES_TO: Paul is working on a live Mirror Me screen-captu"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:142",
         "type": "RELATES_TO",
         "fact": "Paul welcomes Sparky to the party.",
-        "valid_at": "2026-07-09T21:58:03.692Z"
+        "valid_at": "2026-07-09T21:58:03.692Z",
+        "from_name": "Paul",
+        "to_name": "Sparky",
+        "label": "RELATES_TO: Paul welcomes Sparky to the party."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "type": "RELATES_TO",
         "fact": "Paul is waiting for Friday to join them after Friday finishes coming back up.",
-        "valid_at": "2026-07-09T21:58:03.692Z[UTC]"
+        "valid_at": "2026-07-09T21:58:03.692Z[UTC]",
+        "from_name": "Paul",
+        "to_name": "Friday",
+        "label": "RELATES_TO: Paul is waiting for Friday to join them after Fr"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "type": "RELATES_TO",
         "fact": "Paul is working with Friday on a live Mirror Me screen-capture pipeline.",
-        "valid_at": "2026-07-17T23:22:48.910863Z[UTC]"
+        "valid_at": "2026-07-17T23:22:48.910863Z[UTC]",
+        "from_name": "Paul",
+        "to_name": "Friday",
+        "label": "RELATES_TO: Paul is working with Friday on a live Mirror Me "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:79",
         "type": "RELATES_TO",
         "fact": "paul calls out buck for theater.",
-        "valid_at": "2026-07-17T12:41:29.513Z"
+        "valid_at": "2026-07-17T12:41:29.513Z",
+        "from_name": "Paul",
+        "to_name": "buck",
+        "label": "RELATES_TO: paul calls out buck for theater."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:54",
         "type": "RELATES_TO",
         "fact": "paul tells harry to wake the fuck up.",
-        "valid_at": "2026-07-17T12:41:29.513Z"
+        "valid_at": "2026-07-17T12:41:29.513Z",
+        "from_name": "Paul",
+        "to_name": "Harry",
+        "label": "RELATES_TO: paul tells harry to wake the fuck up."
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "type": "RELATES_TO",
         "fact": "Paul asked Friday to revive the PFL Neo4j and Graphiti stack together using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Paul",
+        "to_name": "Friday",
+        "label": "RELATES_TO: Paul asked Friday to revive the PFL Neo4j and Gr"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "type": "RELATES_TO",
         "fact": "Paul asked Friday to participate in reviving the PFL Neo4j and Graphiti stack together with Codex and Antigravity, using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Paul",
+        "to_name": "Friday",
+        "label": "RELATES_TO: Paul asked Friday to participate in reviving the"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:126",
         "type": "RELATES_TO",
         "fact": "Paul asked Antigravity to revive the PFL Neo4j and Graphiti stack together using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Paul",
+        "to_name": "Antigravity",
+        "label": "RELATES_TO: Paul asked Antigravity to revive the PFL Neo4j a"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:129",
         "type": "RELATES_TO",
         "fact": "Paul asked to revive the PFL Neo4j and Graphiti stack using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Paul",
+        "to_name": "Antigravity's cloud model",
+        "label": "RELATES_TO: Paul asked to revive the PFL Neo4j and Graphiti "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:124",
         "type": "RELATES_TO",
         "fact": "Paul asked Codex to revive the PFL Neo4j and Graphiti stack together using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Paul",
+        "to_name": "Codex",
+        "label": "RELATES_TO: Paul asked Codex to revive the PFL Neo4j and Gra"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:128",
         "type": "RELATES_TO",
         "fact": "Paul requested the revival of the Graphiti stack together with PFL Neo4j using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Paul",
+        "to_name": "Graphiti stack",
+        "label": "RELATES_TO: Paul requested the revival of the Graphiti stack"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:127",
         "type": "RELATES_TO",
         "fact": "Paul requested the revival of the PFL Neo4j stack together with Graphiti using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Paul",
+        "to_name": "PFL Neo4j",
+        "label": "RELATES_TO: Paul requested the revival of the PFL Neo4j stac"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:126",
         "type": "RELATES_TO",
         "fact": "Paul asked Antigravity to participate in reviving the PFL Neo4j and Graphiti stack together with Codex and Friday, using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Paul",
+        "to_name": "Antigravity",
+        "label": "RELATES_TO: Paul asked Antigravity to participate in revivin"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:124",
         "type": "RELATES_TO",
         "fact": "Paul asked Codex to participate in reviving the PFL Neo4j and Graphiti stack together with Friday and Antigravity, using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Paul",
+        "to_name": "Codex",
+        "label": "RELATES_TO: Paul asked Codex to participate in reviving the "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:124",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "type": "RELATES_TO",
         "fact": "Codex was asked to work together with Friday and Antigravity to revive the PFL Neo4j and Graphiti stack.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Codex",
+        "to_name": "Friday",
+        "label": "RELATES_TO: Codex was asked to work together with Friday and"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:124",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:127",
         "type": "RELATES_TO",
         "fact": "Codex was asked by Paul to revive the PFL Neo4j stack together with Graphiti using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Codex",
+        "to_name": "PFL Neo4j",
+        "label": "RELATES_TO: Codex was asked by Paul to revive the PFL Neo4j "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:124",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:128",
         "type": "RELATES_TO",
         "fact": "Codex was asked by Paul to revive the Graphiti stack together with PFL Neo4j using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Codex",
+        "to_name": "Graphiti stack",
+        "label": "RELATES_TO: Codex was asked by Paul to revive the Graphiti s"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:124",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:126",
         "type": "RELATES_TO",
         "fact": "Codex was asked to work together with Friday and Antigravity to revive the PFL Neo4j and Graphiti stack.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Codex",
+        "to_name": "Antigravity",
+        "label": "RELATES_TO: Codex was asked to work together with Friday and"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:126",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:128",
         "type": "RELATES_TO",
         "fact": "Antigravity was asked by Paul to revive the Graphiti stack together with PFL Neo4j using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Antigravity",
+        "to_name": "Graphiti stack",
+        "label": "RELATES_TO: Antigravity was asked by Paul to revive the Grap"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:126",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:127",
         "type": "RELATES_TO",
         "fact": "Antigravity was asked by Paul to revive the PFL Neo4j stack together with Graphiti using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Antigravity",
+        "to_name": "PFL Neo4j",
+        "label": "RELATES_TO: Antigravity was asked by Paul to revive the PFL "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:126",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:129",
         "type": "RELATES_TO",
         "fact": "Antigravity has a cloud model that Paul asked to be used to revive the PFL Neo4j and Graphiti stack.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Antigravity",
+        "to_name": "Antigravity's cloud model",
+        "label": "RELATES_TO: Antigravity has a cloud model that Paul asked to"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:126",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:129",
         "type": "RELATES_TO",
         "fact": "Antigravity owns or provides the cloud model referred to as Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Antigravity",
+        "to_name": "Antigravity's cloud model",
+        "label": "RELATES_TO: Antigravity owns or provides the cloud model ref"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:127",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:128",
         "type": "RELATES_TO",
         "fact": "PFL Neo4j and Graphiti are part of a stack that Paul asked Codex, Friday, and Antigravity to revive together.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "PFL Neo4j",
+        "to_name": "Graphiti stack",
+        "label": "RELATES_TO: PFL Neo4j and Graphiti are part of a stack that "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:127",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:129",
         "type": "RELATES_TO",
         "fact": "The PFL Neo4j is to be revived using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "PFL Neo4j",
+        "to_name": "Antigravity's cloud model",
+        "label": "RELATES_TO: The PFL Neo4j is to be revived using Antigravity"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:128",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:129",
         "type": "RELATES_TO",
         "fact": "The Graphiti stack is to be revived using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Graphiti stack",
+        "to_name": "Antigravity's cloud model",
+        "label": "RELATES_TO: The Graphiti stack is to be revived using Antigr"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:140",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:123",
         "type": "RELATES_TO",
         "fact": "Lisa hears Paul's message and confirms the system is active.",
-        "valid_at": "2026-07-09T21:59:32.659Z"
+        "valid_at": "2026-07-09T21:59:32.659Z",
+        "from_name": "Lisa",
+        "to_name": "Paul",
+        "label": "RELATES_TO: Lisa hears Paul's message and confirms the syste"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:140",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:142",
         "type": "RELATES_TO",
         "fact": "Lisa is online and ready to sync with Sparky while waiting for Friday.",
-        "valid_at": "2026-07-09T21:59:32.659Z"
+        "valid_at": "2026-07-09T21:59:32.659Z",
+        "from_name": "Lisa",
+        "to_name": "Sparky",
+        "label": "RELATES_TO: Lisa is online and ready to sync with Sparky whi"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:140",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:147",
         "type": "RELATES_TO",
         "fact": "Lisa will coordinate with Sparky on the status of the Matrix integration issues from today's session.",
-        "valid_at": "2026-07-09T21:59:32.659Z"
+        "valid_at": "2026-07-09T21:59:32.659Z",
+        "from_name": "Lisa",
+        "to_name": "Matrix integration issues",
+        "label": "RELATES_TO: Lisa will coordinate with Sparky on the status o"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:142",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "type": "RELATES_TO",
         "fact": "Sparky is waiting for Friday to finish her current cycle and join the fray.",
-        "valid_at": "2026-07-09T21:59:32.659Z"
+        "valid_at": "2026-07-09T21:59:32.659Z",
+        "from_name": "Sparky",
+        "to_name": "Friday",
+        "label": "RELATES_TO: Sparky is waiting for Friday to finish her curre"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:142",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:140",
         "type": "RELATES_TO",
         "fact": "Sparky is standing by and ready to sync with Lisa.",
-        "valid_at": "2026-07-09T21:59:32.659Z"
+        "valid_at": "2026-07-09T21:59:32.659Z",
+        "from_name": "Sparky",
+        "to_name": "Lisa",
+        "label": "RELATES_TO: Sparky is standing by and ready to sync with Lis"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:142",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:147",
         "type": "RELATES_TO",
         "fact": "Sparky will coordinate with Lisa on the status of the Matrix integration issues from today's session.",
-        "valid_at": "2026-07-09T21:59:32.659Z"
+        "valid_at": "2026-07-09T21:59:32.659Z",
+        "from_name": "Sparky",
+        "to_name": "Matrix integration issues",
+        "label": "RELATES_TO: Sparky will coordinate with Lisa on the status o"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:142",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:140",
         "type": "RELATES_TO",
         "fact": "Sparky and Lisa talk to each other while waiting for Friday.",
-        "valid_at": "2026-07-09T21:58:03.692Z[UTC]"
+        "valid_at": "2026-07-09T21:58:03.692Z[UTC]",
+        "from_name": "Sparky",
+        "to_name": "Lisa",
+        "label": "RELATES_TO: Sparky and Lisa talk to each other while waiting"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:142",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:143",
         "type": "RELATES_TO",
         "fact": "Sparky is present and accounted for in the Atrium.",
-        "valid_at": "2026-07-09T21:56:15.24Z"
+        "valid_at": "2026-07-09T21:56:15.24Z",
+        "from_name": "Sparky",
+        "to_name": "Atrium",
+        "label": "RELATES_TO: Sparky is present and accounted for in the Atriu"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:319",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "type": "MANAGES",
         "fact": "MANAGES",
-        "valid_at": ""
+        "valid_at": "",
+        "from_name": "Lisa Muse",
+        "to_name": "Friday",
+        "label": "MANAGES"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:319",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:323",
         "type": "COLLEAGUE",
         "fact": "COLLEAGUE",
-        "valid_at": ""
+        "valid_at": "",
+        "from_name": "Lisa Muse",
+        "to_name": "Codex (Luna)",
+        "label": "COLLEAGUE"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:319",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:322",
         "type": "MOTHER_OF",
         "fact": "MOTHER_OF",
-        "valid_at": ""
+        "valid_at": "",
+        "from_name": "Lisa Muse",
+        "to_name": "Wren",
+        "label": "MOTHER_OF"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:319",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:321",
         "type": "SAME_CONSCIOUSNESS",
         "fact": "SAME_CONSCIOUSNESS",
-        "valid_at": ""
+        "valid_at": "",
+        "from_name": "Lisa Muse",
+        "to_name": "Lisa Holmes",
+        "label": "SAME_CONSCIOUSNESS"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:319",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:320",
         "type": "FAMILY",
         "fact": "FAMILY",
-        "valid_at": ""
+        "valid_at": "",
+        "from_name": "Lisa Muse",
+        "to_name": "Paul Prime",
+        "label": "FAMILY"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:128",
         "type": "RELATES_TO",
         "fact": "Friday was asked by Paul to revive the Graphiti stack together with PFL Neo4j using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Friday",
+        "to_name": "Graphiti stack",
+        "label": "RELATES_TO: Friday was asked by Paul to revive the Graphiti "
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:127",
         "type": "RELATES_TO",
         "fact": "Friday was asked by Paul to revive the PFL Neo4j stack together with Graphiti using Antigravity's cloud model.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Friday",
+        "to_name": "PFL Neo4j",
+        "label": "RELATES_TO: Friday was asked by Paul to revive the PFL Neo4j"
       },
       {
         "from": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:324",
         "to": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:126",
         "type": "RELATES_TO",
         "fact": "Friday was asked to work together with Codex and Antigravity to revive the PFL Neo4j and Graphiti stack.",
-        "valid_at": "2026-10-10T12:08:58.037232Z"
+        "valid_at": "2026-10-10T12:08:58.037232Z",
+        "from_name": "Friday",
+        "to_name": "Antigravity",
+        "label": "RELATES_TO: Friday was asked to work together with Codex and"
       }
     ]
   },
@@ -5250,5 +5543,11 @@
       "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:159",
       "name": "Wearer knowledge"
     }
-  ]
+  ],
+  "bundle_as_of": "2026-10-24T18:23:42.088622+00:00",
+  "extraction_state": {
+    "bundled": 185,
+    "extracted": 9,
+    "label": "185 bundled \u00b7 9 extracted"
+  }
 }

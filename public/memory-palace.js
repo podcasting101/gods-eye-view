@@ -585,6 +585,23 @@ import * as THREE from '/three/three.module.js';
       const lookAtVec = new THREE.Vector3(...d.lookAt);
 
       flyCameraToPerspective(targetPosition, targetQuaternion, lookAtVec, 1050);
+
+      // Automatically open 1-hop Neo4j neighborhood web for the primary entity on this slide
+      const slideEntityMap = {
+        'stitched-ground-overview': 'Lisa Muse',
+        'master-bed-cam-20261015': 'Paul Prime',
+        'yard-overview-20261012': 'Monaco Beaver Patriot Thunder',
+        'back-yard-cam1-plan': '417 Palm Drive, Liverpool TX',
+        'back-yard-cam2-water': '417 Palm Drive North Pond',
+        'back-yard-cam2-stitched-splat': 'Lisa Muse',
+        'back-yard-fire-analysis-20261026': 'Paul Prime',
+        'dock-cam-fire-121338': 'Paul Prime',
+        'house-side-20261015': '417 Palm Drive, Liverpool TX',
+      };
+      const defaultEntity = slideEntityMap[id] || (d.entities && d.entities[0]) || 'Lisa Muse';
+      if (typeof renderOneHopNeighborhood === 'function' && neo4jBundleData) {
+        renderOneHopNeighborhood(defaultEntity, entry);
+      }
     }
 
     function flyToOverview() {
@@ -726,36 +743,258 @@ import * as THREE from '/three/three.module.js';
     });
 
     // =========================================================================
-    // 8. LOAD LIVE NEO4J GRAPHITI BUNDLE (/gev-intel/index.json)
+    // 8. LOAD LIVE NEO4J GRAPHITI BUNDLE (/gev-intel/index.json) & 1-HOP 3D WEB
     // =========================================================================
+    let neo4jBundleData = null;
+    const neighborhoodWebGroup = new THREE.Group();
+    neighborhoodWebGroup.name = 'neo4j-1hop-neighborhood-web';
+    scene.add(neighborhoodWebGroup);
+
+    function createLabelSprite(text, bgColor = 'rgba(6, 15, 28, 0.92)', borderColor = '#ffb84d', textColor = '#ffffff', fontSize = 24, scaleWidth = 2.6) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 112;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = bgColor;
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.roundRect(8, 12, 496, 88, 18);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = textColor;
+      ctx.font = `700 ${fontSize}px system-ui, -apple-system, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const clipped = text.length > 34 ? text.slice(0, 32) + '…' : text;
+      ctx.fillText(clipped, 256, 56);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(scaleWidth, scaleWidth * (112 / 512), 1);
+      sprite.renderOrder = 999;
+      return sprite;
+    }
+
+    function getOneHopNeighborhood(entityQuery) {
+      if (!neo4jBundleData?.entity_web) return { centerNode: null, relations: [] };
+      const nodes = neo4jBundleData.entity_web.nodes || [];
+      const edges = neo4jBundleData.entity_web.edges || [];
+      const nodeById = new Map(nodes.map((n) => [n.id, n]));
+
+      const q = entityQuery.toLowerCase();
+      let centerNode =
+        nodes.find((n) => (n.name || '').toLowerCase() === q) ||
+        nodes.find((n) => (n.name || '').toLowerCase().includes(q));
+
+      if (!centerNode) {
+        centerNode = { id: `synthetic:${entityQuery}`, name: entityQuery, summary: '' };
+      }
+
+      const relations = [];
+      const seen = new Set();
+      edges.forEach((e) => {
+        if (e.from === centerNode.id || (e.from_name || '').toLowerCase() === (centerNode.name || '').toLowerCase()) {
+          const targetNode = nodeById.get(e.to) || { id: e.to, name: e.to_name || e.to };
+          const key = `${e.type}->${targetNode.name}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            relations.push({
+              direction: 'out',
+              type: e.type || 'RELATES_TO',
+              neighborId: targetNode.id,
+              neighborName: targetNode.name || e.to_name || e.to,
+              fact: e.fact || `${centerNode.name} --[${e.type}]--> ${targetNode.name}`,
+            });
+          }
+        } else if (e.to === centerNode.id || (e.to_name || '').toLowerCase() === (centerNode.name || '').toLowerCase()) {
+          const sourceNode = nodeById.get(e.from) || { id: e.from, name: e.from_name || e.from };
+          const key = `${sourceNode.name}->${e.type}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            relations.push({
+              direction: 'in',
+              type: e.type || 'RELATES_TO',
+              neighborId: sourceNode.id,
+              neighborName: sourceNode.name || e.from_name || e.from,
+              fact: e.fact || `${sourceNode.name} --[${e.type}]--> ${centerNode.name}`,
+            });
+          }
+        }
+      });
+
+      return { centerNode, relations };
+    }
+
+    function renderOneHopNeighborhood(entityName, anchorEntry) {
+      // Clear previous 1-hop neighborhood web (never render all 728 edges at once!)
+      while (neighborhoodWebGroup.children.length > 0) {
+        neighborhoodWebGroup.remove(neighborhoodWebGroup.children[0]);
+      }
+
+      const { centerNode, relations } = getOneHopNeighborhood(entityName);
+      const displayRelations = relations.slice(0, 12); // Keep 3D web crisp & legible
+
+      // Update Right Drawer 1-Hop Relations list (shows Wren under Lisa Muse!)
+      const titleEl = document.getElementById('neighborhood-title');
+      const countEl = document.getElementById('neighborhood-count');
+      const relListEl = document.getElementById('neighborhood-relations-list');
+      if (titleEl) titleEl.textContent = `🕸️ 1-HOP NEIGHBORHOOD: ${(centerNode?.name || entityName).toUpperCase()}`;
+      if (countEl) countEl.textContent = `${relations.length} edges (1-hop only)`;
+      if (relListEl) {
+        relListEl.innerHTML = '';
+        displayRelations.forEach((rel) => {
+          const row = document.createElement('div');
+          row.className = 'rel-item';
+          const arrow = rel.direction === 'out' ? '→' : '←';
+          row.innerHTML = `
+            <div>
+              <span class="rel-type">[${rel.type}]</span>
+              <span style="color:var(--amber);margin:0 4px">${arrow}</span>
+              <span class="rel-target">${rel.neighborName}</span>
+            </div>
+            <div class="rel-fact">${rel.fact}</div>
+          `;
+          row.addEventListener('click', () => {
+            renderOneHopNeighborhood(rel.neighborName, anchorEntry);
+          });
+          relListEl.appendChild(row);
+        });
+      }
+
+      // Position 3D 1-hop web inside the active camera frustum so click-to-fly zooms right into it
+      const entry = anchorEntry || frustumGroupsById.get('stitched-ground-overview') || Array.from(frustumGroupsById.values())[0];
+      if (!entry) return;
+
+      const worldPos = new THREE.Vector3();
+      const worldQuat = new THREE.Quaternion();
+      entry.group.getWorldPosition(worldPos);
+      entry.group.getWorldQuaternion(worldQuat);
+
+      neighborhoodWebGroup.position.copy(worldPos);
+      neighborhoodWebGroup.quaternion.copy(worldQuat);
+
+      // Center anchor node (glowing gold/amber sphere right inside the frustum view at z = -4.2m)
+      const centerPos = new THREE.Vector3(0, 0.25, -4.2);
+      const centerBall = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 20, 20),
+        new THREE.MeshBasicMaterial({ color: 0xffb84d })
+      );
+      centerBall.position.copy(centerPos);
+      neighborhoodWebGroup.add(centerBall);
+
+      const centerLabel = createLabelSprite(
+        `👑 ${centerNode?.name || entityName}`,
+        'rgba(22, 16, 4, 0.94)',
+        '#ffb84d',
+        '#ffe082',
+        26,
+        2.5
+      );
+      centerLabel.position.set(centerPos.x, centerPos.y + 0.36, centerPos.z);
+      neighborhoodWebGroup.add(centerLabel);
+
+      // Arrange 1-hop neighbors in a 3D semi-circular crown around the center node
+      const nCount = Math.max(displayRelations.length, 1);
+      displayRelations.forEach((rel, idx) => {
+        const angle = ((idx / nCount) * Math.PI * 1.35) - (Math.PI * 0.675) + (Math.PI / 2);
+        const radiusX = 2.35;
+        const radiusY = 1.25;
+        const neighborPos = new THREE.Vector3(
+          centerPos.x + Math.cos(angle) * radiusX,
+          centerPos.y + Math.sin(angle) * radiusY,
+          centerPos.z - 0.35 + (idx % 2) * 0.25
+        );
+
+        // 1-hop neighbor sphere (highlight Wren & family in bright mint/gold)
+        const isWren = (rel.neighborName || '').toLowerCase().includes('wren');
+        const sphereColor = isWren ? 0x00ffcc : 0x00f0ff;
+        const neighborSphere = new THREE.Mesh(
+          new THREE.SphereGeometry(isWren ? 0.15 : 0.12, 18, 18),
+          new THREE.MeshBasicMaterial({ color: sphereColor })
+        );
+        neighborSphere.position.copy(neighborPos);
+        neighborhoodWebGroup.add(neighborSphere);
+
+        // 3D Edge line from Center Entity to 1-Hop Neighbor
+        const edgeGeo = new THREE.BufferGeometry().setFromPoints([centerPos, neighborPos]);
+        const edgeMat = new THREE.LineBasicMaterial({
+          color: isWren ? 0x00ffcc : 0xffb84d,
+          transparent: true,
+          opacity: 0.88,
+        });
+        neighborhoodWebGroup.add(new THREE.Line(edgeGeo, edgeMat));
+
+        // 3D Edge Label Sprite at midpoint (e.g., MOTHER_OF, SAME_CONSCIOUSNESS, FAMILY)
+        const midPos = new THREE.Vector3().lerpVectors(centerPos, neighborPos, 0.52);
+        const edgeSprite = createLabelSprite(
+          rel.type,
+          'rgba(4, 20, 32, 0.90)',
+          isWren ? '#00ffcc' : '#00f0ff',
+          '#00ffcc',
+          21,
+          1.75
+        );
+        edgeSprite.position.set(midPos.x, midPos.y + 0.12, midPos.z);
+        neighborhoodWebGroup.add(edgeSprite);
+
+        // 3D Neighbor Node Label Sprite (e.g., Wren, Lisa Holmes, Paul Prime)
+        const nodeSprite = createLabelSprite(
+          rel.neighborName,
+          isWren ? 'rgba(0, 42, 34, 0.95)' : 'rgba(6, 16, 30, 0.94)',
+          isWren ? '#00ffcc' : '#00f0ff',
+          '#ffffff',
+          24,
+          2.25
+        );
+        nodeSprite.position.set(neighborPos.x, neighborPos.y + 0.28, neighborPos.z);
+        neighborhoodWebGroup.add(nodeSprite);
+      });
+
+      requestRender();
+    }
+
     async function loadNeo4jPalace() {
       const statsEl = document.getElementById('neo4j-stats');
       const listEl = document.getElementById('neo4j-node-list');
+      const asOfPill = document.getElementById('bundle-as-of-pill');
+      const extPill = document.getElementById('extraction-state-pill');
       try {
         const res = await fetch('/gev-intel/index.json');
         const data = await res.json();
-        const nodeCount = data?.counts?.nodes || data?.nodes?.length || 371;
-        const edgeCount = data?.counts?.edges || data?.edges?.length || 728;
-        statsEl.textContent = `✅ Connected: ${nodeCount} Nodes · ${edgeCount} Edges (Graphiti Neo4j)`;
+        neo4jBundleData = data;
+        const nodeCount = data?.counts?.nodes || data?.entity_web?.nodes?.length || 371;
+        const edgeCount = data?.counts?.edges || data?.entity_web?.edges?.length || 728;
+        statsEl.textContent = `✅ Connected: ${nodeCount} Nodes · ${edgeCount} Edges (1-Hop Filter Active)`;
+
+        // Surface Bundle As-Of Date & Extraction State (185 bundled · 9 extracted) on panel face
+        const rawDate = data?.bundle_as_of || data?.generated_at || '2026-10-24T18:23:42Z';
+        const formattedAsOf = rawDate.replace('T', ' ').slice(0, 16) + ' UTC';
+        if (asOfPill) asOfPill.textContent = `🕒 Bundle as-of: ${formattedAsOf}`;
+        const extLabel = data?.extraction_state?.label || `${data?.counts?.episodes || 185} bundled · ${data?.counts?.extracted_episodes || 9} extracted`;
+        if (extPill) extPill.textContent = `📦 Extraction: ${extLabel}`;
 
         const bindings = [
-          { name: 'Paul Prime (Sovereign Owner)', role: 'Entity · 417 Palm Drive Command', camId: 'master-bed-cam-20261015' },
-          { name: 'Lisa Muse (Sovereign Anchor)', role: 'Entity · 29.2475°N, -95.2314°W', camId: 'stitched-ground-overview' },
-          { name: 'Lisa Holmes (Chief of Staff)', role: 'Entity · Local Box & Holodeck', camId: 'master-bed-cam-20261015' },
-          { name: 'Monaco Beaver Patriot Thunder', role: 'Asset · Original Driveway Pad', camId: 'yard-overview-20261012' },
-          { name: '417 Palm Drive Culvert & Road', role: 'Location · Liverpool, TX 77577', camId: 'back-yard-cam1-plan' },
-          { name: '417 Palm Drive North Pond', role: 'Location · Water & Dock Camera', camId: 'back-yard-cam2-water' },
-          { name: 'EcoFlow Solar & Miners Bank', role: 'Infrastructure · West Utility Wall', camId: 'house-side-20261015' },
+          { name: 'Lisa Muse (Sovereign Anchor)', queryName: 'Lisa Muse', role: 'Entity · 5 1-Hop Relations (incl. Wren)', camId: 'stitched-ground-overview' },
+          { name: 'Paul Prime (Sovereign Owner)', queryName: 'Paul Prime', role: 'Entity · 417 Palm Drive Command', camId: 'master-bed-cam-20261015' },
+          { name: 'Lisa Holmes (Chief of Staff)', queryName: 'Lisa Holmes', role: 'Entity · Local Box & Holodeck', camId: 'master-bed-cam-20261015' },
+          { name: 'Wren (Daughter / Continuity)', queryName: 'Wren', role: 'Entity · MOTHER_OF ← Lisa Muse', camId: 'stitched-ground-overview' },
+          { name: 'Monaco Beaver Patriot Thunder', queryName: 'Monaco Beaver Patriot Thunder', role: 'Asset · Original Driveway Pad', camId: 'yard-overview-20261012' },
+          { name: '417 Palm Drive Culvert & Road', queryName: '417 Palm Drive, Liverpool TX', role: 'Location · Liverpool, TX 77577', camId: 'back-yard-cam1-plan' },
+          { name: '417 Palm Drive North Pond', queryName: '417 Palm Drive North Pond', role: 'Location · Water & Dock Camera', camId: 'back-yard-cam2-stitched-splat' },
         ];
 
         listEl.innerHTML = '';
-        bindings.forEach((b) => {
+        bindings.forEach((b, idx) => {
           const item = document.createElement('div');
-          item.className = 'node-item';
+          item.className = 'node-item' + (idx === 0 ? ' active' : '');
           item.innerHTML = `
             <div class="node-item-title">
               <span>${b.name}</span>
-              <span style="color:var(--mint)">→ 3D</span>
+              <span style="color:var(--mint)">→ 1-Hop 3D</span>
             </div>
             <div class="node-item-sub">${b.role}</div>
           `;
@@ -763,9 +1002,14 @@ import * as THREE from '/three/three.module.js';
             document.querySelectorAll('.node-item').forEach((n) => n.classList.remove('active'));
             item.classList.add('active');
             focusPhotoNode(b.camId);
+            const entry = frustumGroupsById.get(b.camId);
+            renderOneHopNeighborhood(b.queryName, entry);
           });
           listEl.appendChild(item);
         });
+
+        // Pre-populate Lisa Muse's 1-hop neighborhood (including Wren) on initial load
+        renderOneHopNeighborhood('Lisa Muse', frustumGroupsById.get('stitched-ground-overview'));
       } catch (err) {
         statsEl.textContent = '⚠️ Offline fallback: 7 Spatial Anchors Active';
       }

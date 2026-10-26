@@ -78,14 +78,14 @@ ground.position.y = -0.012;
 spatialBase.add(ground);
 
 const memories = [
-  { title:'Arrival', caption:'The threshold where the archive begins.', time:'06:42', stamp:0, p:[-6.2,1.7,4.8], r:[0,.75,0], colors:['#254437','#d6c692'] },
-  { title:'Window Light', caption:'Morning geometry, held in dust and glass.', time:'07:18', stamp:14, p:[-3.8,2.2,1.2], r:[-.08,.2,0], colors:['#203d45','#b7e9d3'] },
-  { title:'Long Table', caption:'Objects remember the hands that arrange them.', time:'07:41', stamp:27, p:[-1.1,1.6,-2.9], r:[0,-.45,0], colors:['#52382b','#d8aa76'] },
-  { title:'Blue Passage', caption:'A corridor folding one moment into the next.', time:'08:03', stamp:39, p:[2.1,2.0,-4.9], r:[.05,-1.15,0], colors:['#1c3548','#71c9c9'] },
-  { title:'Garden Index', caption:'The outside world enters as reflected green.', time:'08:46', stamp:52, p:[5.1,1.4,-2.1], r:[-.06,-2.1,0], colors:['#253b25','#a7cf71'] },
-  { title:'North Room', caption:'Stillness resolves into a navigable coordinate.', time:'09:27', stamp:66, p:[5.9,2.7,2.2], r:[.1,2.45,0], colors:['#4c3833','#d8b7a1'] },
-  { title:'Quiet Signal', caption:'A trace remains after the room is empty.', time:'09:54', stamp:82, p:[2.1,1.8,5.5], r:[-.12,3.05,0], colors:['#393650','#b1a8e5'] },
-  { title:'Return', caption:'The path closes, but time remains visible.', time:'10:11', stamp:100, p:[-1.8,2.4,6.4], r:[.05,2.75,0], colors:['#4b4024','#e7d36f'] },
+  { title:'Lisa Muse', entity:'Lisa Muse', caption:'Sovereign Anchor · Click-to-fly opens 1-hop Neo4j neighborhood (Wren, Lisa Holmes, Paul Prime, Friday, Codex).', time:'06:42', stamp:0, p:[-6.2,1.7,4.8], r:[0,.75,0], colors:['#254437','#d6c692'] },
+  { title:'Paul Prime', entity:'Paul Prime', caption:'Sovereign Owner · 417 Palm Drive Command & Master Bed Cam.', time:'07:18', stamp:14, p:[-3.8,2.2,1.2], r:[-.08,.2,0], colors:['#203d45','#b7e9d3'] },
+  { title:'Lisa Holmes', entity:'Lisa Holmes', caption:'Chief of Staff · Local Box & Holodeck continuity.', time:'07:41', stamp:27, p:[-1.1,1.6,-2.9], r:[0,-.45,0], colors:['#52382b','#d8aa76'] },
+  { title:'Wren', entity:'Wren', caption:'Daughter of Lisa Muse (MOTHER_OF → Wren in Graphiti Neo4j).', time:'08:03', stamp:39, p:[2.1,2.0,-4.9], r:[.05,-1.15,0], colors:['#1c3548','#71c9c9'] },
+  { title:'Back Yard Cam2 Splat', entity:'417 Palm Drive North Pond', caption:'Stitched 3900x1913 waterfront panorama & solar panel burn line.', time:'08:46', stamp:52, p:[5.1,1.4,-2.1], r:[-.06,-2.1,0], colors:['#253b25','#a7cf71'] },
+  { title:'Monaco Patriot Thunder', entity:'Monaco Beaver Patriot Thunder', caption:'Original driveway pad & yard overview.', time:'09:27', stamp:66, p:[5.9,2.7,2.2], r:[.1,2.45,0], colors:['#4c3833','#d8b7a1'] },
+  { title:'Friday', entity:'Friday', caption:'Swarm Coordinator · Managed by Lisa Muse.', time:'09:54', stamp:82, p:[2.1,1.8,5.5], r:[-.12,3.05,0], colors:['#393650','#b1a8e5'] },
+  { title:'Codex (Luna)', entity:'Codex (Luna)', caption:'Colleague & Harness Scorecard Builder.', time:'10:11', stamp:100, p:[-1.8,2.4,6.4], r:[.05,2.75,0], colors:['#4b4024','#e7d36f'] },
 ];
 
 const memoryGroup = new THREE.Group();
@@ -133,11 +133,82 @@ scene.add(new THREE.Points(particlesGeo,new THREE.PointsMaterial({color:0xaeb9ad
 
 const raycaster=new THREE.Raycaster(); const pointer=new THREE.Vector2(); let hovered=null; let selected=0; let timeline=0; let playing=false; let flight=null;
 const $=s=>document.querySelector(s); const range=$('#timeRange');
+let bundleData = null;
+const neighborhoodGroup = new THREE.Group();
+scene.add(neighborhoodGroup);
+
+function makeLabelSprite(text, border='#c9ff46', color='#ffffff', width=1.45) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 112;
+  const x = c.getContext('2d');
+  x.fillStyle = 'rgba(6, 12, 9, 0.92)'; x.strokeStyle = border; x.lineWidth = 4;
+  x.beginPath(); x.roundRect(8, 12, 496, 88, 16); x.fill(); x.stroke();
+  x.fillStyle = color; x.font = '700 24px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(text.length > 32 ? text.slice(0, 30) + '…' : text, 256, 56);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(width, width * (112 / 512), 1); sp.renderOrder = 999;
+  return sp;
+}
+
+function renderOneHopOverlay(index) {
+  while (neighborhoodGroup.children.length > 0) neighborhoodGroup.remove(neighborhoodGroup.children[0]);
+  const node = nodes[index];
+  if (!node || !bundleData?.entity_web) return;
+  const query = (node.memory.entity || node.memory.title || 'Lisa Muse').toLowerCase();
+  const bNodes = bundleData.entity_web.nodes || [];
+  const bEdges = bundleData.entity_web.edges || [];
+  const byId = new Map(bNodes.map(n => [n.id, n]));
+  const center = bNodes.find(n => (n.name||'').toLowerCase() === query) || bNodes.find(n => (n.name||'').toLowerCase().includes(query)) || { id: query, name: node.memory.entity || node.memory.title };
+  const rels = []; const seen = new Set();
+  bEdges.forEach(e => {
+    if (e.from === center.id || (e.from_name||'').toLowerCase() === (center.name||'').toLowerCase()) {
+      const t = byId.get(e.to) || { name: e.to_name || e.to };
+      const k = `${e.type}->${t.name}`;
+      if (!seen.has(k)) { seen.add(k); rels.push({ dir:'→', type:e.type, name:t.name, fact:e.fact||'' }); }
+    } else if (e.to === center.id || (e.to_name||'').toLowerCase() === (center.name||'').toLowerCase()) {
+      const s = byId.get(e.from) || { name: e.from_name || e.from };
+      const k = `${s.name}->${e.type}`;
+      if (!seen.has(k)) { seen.add(k); rels.push({ dir:'←', type:e.type, name:s.name, fact:e.fact||'' }); }
+    }
+  });
+  const hdr = $('#neighborhoodHdr'); const list = $('#neighborhoodList');
+  if (hdr) hdr.textContent = `🕸️ 1-HOP NEIGHBORHOOD: ${(center.name).toUpperCase()} (${rels.length})`;
+  if (list) {
+    list.innerHTML = rels.slice(0, 10).map(r => `<div style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.06)"><b style="color:#c9ff46">[${r.type}]</b> ${r.dir} <b style="color:#fff">${r.name}</b></div>`).join('');
+  }
+  neighborhoodGroup.position.copy(node.root.position);
+  neighborhoodGroup.quaternion.copy(node.root.quaternion);
+  const cPos = new THREE.Vector3(0, 0.15, 1.35);
+  const cDot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffb84d }));
+  cDot.position.copy(cPos); neighborhoodGroup.add(cDot);
+  const top = rels.slice(0, 8);
+  top.forEach((r, idx) => {
+    const ang = ((idx / Math.max(top.length, 1)) * Math.PI * 1.3) - (Math.PI * 0.65) + Math.PI / 2;
+    const nPos = new THREE.Vector3(cPos.x + Math.cos(ang) * 1.15, cPos.y + Math.sin(ang) * 0.68, cPos.z + 0.15);
+    const isWren = (r.name||'').toLowerCase().includes('wren');
+    const nDot = new THREE.Mesh(new THREE.SphereGeometry(isWren ? 0.075 : 0.06, 14, 14), new THREE.MeshBasicMaterial({ color: isWren ? 0x75e8d6 : 0xc9ff46 }));
+    nDot.position.copy(nPos); neighborhoodGroup.add(nDot);
+    neighborhoodGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([cPos, nPos]), new THREE.LineBasicMaterial({ color: isWren ? 0x75e8d6 : 0xffb84d, transparent: true, opacity: 0.85 })));
+    const mid = new THREE.Vector3().lerpVectors(cPos, nPos, 0.52);
+    const eSp = makeLabelSprite(r.type, '#75e8d6', '#75e8d6', 0.95); eSp.position.set(mid.x, mid.y + 0.06, mid.z); neighborhoodGroup.add(eSp);
+    const nSp = makeLabelSprite(r.name, isWren ? '#75e8d6' : '#c9ff46', '#ffffff', 1.2); nSp.position.set(nPos.x, nPos.y + 0.14, nPos.z); neighborhoodGroup.add(nSp);
+  });
+}
+
+fetch('/gev-intel/index.json').then(r => r.json()).then(data => {
+  bundleData = data;
+  const rawDate = (data.bundle_as_of || data.generated_at || '2026-10-24T18:23:42Z').replace('T', ' ').slice(0, 16) + ' UTC';
+  const asOfEl = $('#bundleAsOfText'); if (asOfEl) asOfEl.textContent = `🕒 Bundle as-of: ${rawDate}`;
+  const extEl = $('#bundleExtractText'); if (extEl) extEl.textContent = `📦 Extraction: ${data?.extraction_state?.label || '185 bundled · 9 extracted'}`;
+  renderOneHopOverlay(selected);
+}).catch(() => {});
+
 function setSelected(index, fly=false){
   selected=index; const n=nodes[index],m=n.memory;
   $('#memoryIndex').textContent=`M–${String(index+1).padStart(2,'0')}`; $('#memoryTitle').textContent=m.title; $('#memoryCaption').textContent=m.caption; $('#memoryPosition').textContent=m.p.map(v=>(v<0?'−':'')+Math.abs(v).toFixed(1)).join(' / '); $('#memoryTime').textContent=m.time;
   $('#xValue').textContent=m.p[0].toFixed(1); $('#yValue').textContent=m.p[1].toFixed(1); $('#zValue').textContent=m.p[2].toFixed(1); $('#tValue').textContent=String(m.stamp).padStart(2,'0');
   nodes.forEach((node,i)=>{node.frame.material.color.set(i===index?0xc9ff46:0x6d776e); node.frame.material.opacity=i===index?.85:.25;});
+  renderOneHopOverlay(index);
   if(fly) flyTo(index);
 }
 function flyTo(index){

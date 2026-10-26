@@ -33,15 +33,23 @@
       </aside>
 
       <section class="inspector glass" aria-live="polite">
-        <p class="eyebrow">SELECTED MEMORY</p>
+        <p class="eyebrow">SELECTED MEMORY · NEO4J 1-HOP</p>
         <div class="index" id="memoryIndex">M–01</div>
-        <h2 id="memoryTitle">Arrival</h2>
-        <p id="memoryCaption">The threshold where the archive begins.</p>
+        <h2 id="memoryTitle">Lisa Muse — Sovereign Anchor</h2>
+        <p id="memoryCaption">Click any pin or slide to fly to (x,y,z,t) and open the 1-hop Neo4j neighborhood web.</p>
         <dl>
           <div><dt>POSITION</dt><dd id="memoryPosition">−6.2 / 1.7 / 4.8</dd></div>
           <div><dt>CAPTURE</dt><dd id="memoryTime">06:42</dd></div>
         </dl>
-        <button id="enterMemory"><span>Enter viewpoint</span><b aria-hidden="true">↗</b></button>
+        <div id="bundleMetaBox" style="margin:8px 0;padding:6px 8px;border-radius:6px;background:rgba(201,255,70,0.08);border:1px solid rgba(201,255,70,0.3);font-size:11px;line-height:1.45;color:#d6e5d8">
+          <div id="bundleAsOfText">🕒 Bundle as-of: 2026-10-24 18:23 UTC</div>
+          <div id="bundleExtractText" style="color:#c9ff46;font-weight:700">📦 Extraction: 185 bundled · 9 extracted</div>
+        </div>
+        <div id="neighborhoodDrawer" style="margin:8px 0;padding:7px 8px;border-radius:6px;background:rgba(6,10,8,0.85);border:1px solid rgba(117,232,214,0.35);max-height:145px;overflow-y:auto;font-size:11px">
+          <div id="neighborhoodHdr" style="color:#75e8d6;font-weight:700;margin-bottom:4px;font-size:10px;letter-spacing:0.5px">🕸️ 1-HOP NEIGHBORHOOD: LISA MUSE</div>
+          <div id="neighborhoodList"></div>
+        </div>
+        <button id="enterMemory"><span>Enter viewpoint &amp; 1-hop web</span><b aria-hidden="true">↗</b></button>
       </section>
 
       <section class="timeline glass" aria-label="Memory timeline">
