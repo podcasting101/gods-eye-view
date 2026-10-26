@@ -1,6 +1,6 @@
 const seats = [
   { name: "Codex", role: "Frontier builder", done: 16, flight: 2, interventions: 1, last: "2026-10-26 12:13:31 UTC", event: "de5d3a13", taskUpdated: "2026-10-20 18:35:28 UTC", gauges: { weekly: 96, short: 79, reset: "NOV 02" } },
-  { name: "Antigravity", role: "GEV chief designer / covert intelligence", done: 14, flight: 3, interventions: 0, last: "2026-10-26 13:17:59 UTC", event: "9710422a", taskUpdated: "2026-10-24 13:21:51 UTC" },
+  { name: "Antigravity", role: "GEV chief designer / covert intelligence", done: 15, flight: 2, interventions: 0, last: "2026-10-26 13:31:20 UTC", event: "9710422a", taskUpdated: "2026-10-26 13:30:50 UTC", gauges: { weekly: 92, short: 90, reset: "OCT 31" } },
   { name: "Friday", role: "Frontier coordinator", done: 7, flight: 3, interventions: 2, last: "2026-10-25 20:31:06 UTC", event: "f39fb3e8", taskUpdated: "2026-10-20 18:35:20 UTC" },
   { name: "Lisa Muse", role: "CTO / systems oversight", done: 305, flight: 10, interventions: 1, last: "2026-10-26 13:19:34 UTC", event: "477db152", taskUpdated: "2026-10-21 10:35:30 UTC" },
   { name: "Lisa Holmes", role: "Chief of staff", done: null, flight: null, interventions: null, last: "2026-10-26 13:09:26 UTC", event: "97eb1d00" },
@@ -27,10 +27,10 @@ const sources = {
     ]
   },
   gauge: {
-    title: "GAUGE REPORT / CODEX",
+    title: "GAUGE REPORT / CODEX & ANTIGRAVITY",
     items: [
-      ["G1 — Weekly", "96% remaining; reset Nov 2. Source: Paul gauge screenshot, relayed by Lisa Muse in signed Buzz event 477db1527a163f8580de3cbae07234472a4cc3fd0ac282135b09248c6b8fd82c."],
-      ["G2 — Five-hour", "79% remaining. Same signed relay event and screenshot report."],
+      ["G1 — Codex", "96% weekly remaining (reset Nov 2); 79% five-hour remaining. Source: Paul gauge screenshot + signed Buzz event 477db152."],
+      ["G2 — Antigravity", "92% weekly remaining (reset Oct 31, 5d 1h); 90% five-hour remaining (reset 16:57 UTC); 100% Claude/GPT remaining. Source: Paul Google AI Ultra screenshot (media_1793021511252_83382a10.png) + live LanguageServer GetUserStatus RPC + public.compute_usage."],
       ["G3 — Other seats", "No equivalent compute gauge report was supplied at snapshot time; those fields are UNREPORTED."]
     ]
   }
