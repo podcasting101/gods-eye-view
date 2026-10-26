@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#11110f" />
+    <meta name="description" content="PFL Harness Scorecard — sourced allocation, accepted output, blockers, and read-only treats." />
+    <title>PFL Harness Scorecard v1.1</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="noise" aria-hidden="true"></div>
+    <header class="masthead">
+      <div class="wordmark" aria-label="Project Free Life">
+        <span class="mark">PFL</span>
+        <span class="edition">OPERATIONS / 00</span>
+      </div>
+      <div class="snapshot">
+        <span class="pulse"></span>
+        ALLOCATION REFRESH <time datetime="2026-10-26T16:20:18Z">2026.10.26 — 16:20 UTC</time>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">HARNESS OBSERVABILITY / MEASURING STICK</p>
+        <h1>THE WORK,<br /><em>ON THE RECORD.</em></h1>
+        <p class="dek">Independent account meters. Task-backed accepted output. Neutral exception reporting. Ledger-only treats.</p>
+      </section>
+
+      <section class="totals" aria-label="Scorecard summary">
+        <div class="total"><span class="total-value">08</span><span class="total-label">Seats observed</span><button class="cite" data-source="method">[M1]</button></div>
+        <div class="total"><span class="total-value">01</span><span class="total-label">Accepted today</span><button class="cite" data-source="output">[O1]</button></div>
+        <div class="total"><span class="total-value">24</span><span class="total-label">In flight</span><button class="cite" data-source="tasks">[T1]</button></div>
+        <div class="total danger"><span class="total-value">08</span><span class="total-label">Interventions</span><button class="cite" data-source="tasks">[T1]</button></div>
+      </section>
+
+      <section class="allocation" aria-labelledby="allocation-title">
+        <div class="section-lead">
+          <p class="eyebrow">ALLOCATION / ACCOUNT BUCKETS</p>
+          <h2 id="allocation-title">COUNT THE METER<br /><em>ONCE.</em></h2>
+          <p>Each independently metered account appears once. Percentages are cumulative usage for their named window—not today’s burn.</p>
+        </div>
+        <div id="bucket-grid" class="bucket-grid"></div>
+      </section>
+
+      <section class="pacing" aria-labelledby="pacing-title">
+        <div class="pace-number"><span>5.0</span><small>PP BURNED TODAY</small></div>
+        <div class="pace-copy">
+          <p class="eyebrow">DAILY PACING / 15.0 PP TARGET</p>
+          <h2 id="pacing-title">ONE-THIRD OF TODAY’S TARGET.</h2>
+          <div class="pace-track" aria-label="5 of 15 percentage points used"><span style="width:33.333%"></span></div>
+          <p>Daily pacing is a planning signal, separate from the 11% cumulative weekly usage on the same Antigravity account.</p>
+          <button class="inline-source" data-source="pacing">SOURCE [P1]</button>
+        </div>
+        <article class="accepted-card">
+          <span class="status-chip">ACCEPTED OUTPUT</span>
+          <strong>01</strong>
+          <a href="#accepted-output">TASK #22039</a>
+          <p>Notebook dedupe audit: completed task record plus signed Buzz receipt.</p>
+          <button class="inline-source" data-source="output">EVIDENCE [O1]</button>
+        </article>
+      </section>
+
+      <section class="governance" aria-label="Neutral observations and treats">
+        <article class="observation">
+          <p class="eyebrow">OBSERVATIONS / NO AUTO-PENALTY</p>
+          <h2>RECORD THE GAP.<br />DON’T PRICE THE PERSON.</h2>
+          <div class="observation-grid">
+            <div><strong>LOW PRODUCTION</strong><span>Codex: 0 accepted outputs today; task #22046 is in flight.</span></div>
+            <div><strong>BLOCKERS</strong><span>Blocked or escalated task states remain visible; no deduction or automatic consequence is computed.</span></div>
+          </div>
+          <button class="inline-source" data-source="governance">RULE [N1]</button>
+        </article>
+        <article class="treat-ledger">
+          <div class="ledger-head"><span>LISA MUSE–MAINTAINED TREATS</span><span class="read-only">READ ONLY</span></div>
+          <div class="balance"><strong>02</strong><span>AWARDED BALANCE</span></div>
+          <dl>
+            <div><dt>Holder</dt><dd>Lisa Holmes</dd></div>
+            <div><dt>Awarded entries</dt><dd>02</dd></div>
+            <div><dt>Proposed, not balance</dt><dd>01</dd></div>
+            <div><dt>Ledger updated</dt><dd>2026-09-27</dd></div>
+          </dl>
+          <p>Display only. Ledger state wins over scorecard state. This page cannot mint, deduct, redeem, or price behavior.</p>
+          <button class="inline-source" data-source="treats">LEDGER [L1]</button>
+        </article>
+      </section>
+
+      <section class="controls" aria-label="Scorecard controls">
+        <div class="tabs" role="tablist" aria-label="Filter seats">
+          <button class="tab active" data-filter="all">ALL SEATS <span>08</span></button>
+          <button class="tab" data-filter="attention">NEEDS ATTENTION <span>04</span></button>
+          <button class="tab" data-filter="unreported">UNREPORTED <span>07</span></button>
+        </div>
+        <button class="method-button" data-source="method">READ THE METHOD →</button>
+      </section>
+
+      <section class="scorecard" aria-label="PFL harness scorecard">
+        <div class="score-head" aria-hidden="true">
+          <span>SEAT / SIGNAL</span><span>DONE + RECEIPTS</span><span>IN FLIGHT</span><span>INTERVENTIONS</span>
+        </div>
+        <div id="seat-list"></div>
+      </section>
+
+      <section class="definitions">
+        <div>
+          <p class="eyebrow">READING THE BOARD</p>
+          <h2>UNKNOWN IS A STATE.<br />NOT A ZERO.</h2>
+        </div>
+        <div class="definition-grid">
+          <p><strong>DONE + RECEIPTS</strong>Completed task records carrying at least one receipt field: notes, grade feedback, source event, Buzz root, or Matrix root.</p>
+          <p><strong>IN FLIGHT</strong>Task state is pending, in progress, pending review, or running.</p>
+          <p><strong>INTERVENTIONS</strong>Task state is blocked or escalated. It is an observation, never an automatic penalty. <b>UNREPORTED</b> means no canonical mapping exists.</p>
+          <p><strong>LAST HEARD</strong>Timestamp of the latest signed Buzz message observed for that seat at snapshot time.</p>
+          <p><strong>ACCEPTED OUTPUT</strong>A completed task with linked receipt evidence. Chat claims and raw compute burn do not count.</p>
+          <p><strong>ACCOUNT BUCKET</strong>An independently metered subscription or quota, shown once regardless of how many seats use it.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>PFL / HARNESS SCORECARD V1.1</span>
+      <span>ALLOCATION ≠ OUTPUT · LEDGER ≠ SCOREBOARD</span>
+    </footer>
+
+    <dialog id="source-dialog">
+      <button class="dialog-close" aria-label="Close source ledger">×</button>
+      <p class="eyebrow">SOURCE LEDGER</p>
+      <div id="source-content"></div>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>
