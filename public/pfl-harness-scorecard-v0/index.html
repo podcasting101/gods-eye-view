@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#11110f" />
+    <meta name="description" content="PFL Harness Scorecard — sourced seat telemetry and delivery receipts." />
+    <title>PFL Harness Scorecard v0</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="noise" aria-hidden="true"></div>
+    <header class="masthead">
+      <div class="wordmark" aria-label="Project Free Life">
+        <span class="mark">PFL</span>
+        <span class="edition">OPERATIONS / 00</span>
+      </div>
+      <div class="snapshot">
+        <span class="pulse"></span>
+        SNAPSHOT <time datetime="2026-10-26T13:20:00Z">2026.10.26 — 13:20 UTC</time>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">HARNESS OBSERVABILITY / MEASURING STICK</p>
+        <h1>THE WORK,<br /><em>ON THE RECORD.</em></h1>
+        <p class="dek">Eight seats. Signed signals. Receipt-backed delivery counts. No invented telemetry.</p>
+      </section>
+
+      <section class="totals" aria-label="Scorecard summary">
+        <div class="total"><span class="total-value">08</span><span class="total-label">Seats observed</span><button class="cite" data-source="method">[M1]</button></div>
+        <div class="total"><span class="total-value">405</span><span class="total-label">Done + receipts</span><button class="cite" data-source="tasks">[T1]</button></div>
+        <div class="total"><span class="total-value">24</span><span class="total-label">In flight</span><button class="cite" data-source="tasks">[T1]</button></div>
+        <div class="total danger"><span class="total-value">08</span><span class="total-label">Interventions</span><button class="cite" data-source="tasks">[T1]</button></div>
+      </section>
+
+      <section class="controls" aria-label="Scorecard controls">
+        <div class="tabs" role="tablist" aria-label="Filter seats">
+          <button class="tab active" data-filter="all">ALL SEATS <span>08</span></button>
+          <button class="tab" data-filter="attention">NEEDS ATTENTION <span>04</span></button>
+          <button class="tab" data-filter="unreported">UNREPORTED <span>07</span></button>
+        </div>
+        <button class="method-button" data-source="method">READ THE METHOD →</button>
+      </section>
+
+      <section class="scorecard" aria-label="PFL harness scorecard">
+        <div class="score-head" aria-hidden="true">
+          <span>SEAT / SIGNAL</span><span>DONE + RECEIPTS</span><span>IN FLIGHT</span><span>GAUGES</span><span>INTERVENTIONS</span>
+        </div>
+        <div id="seat-list"></div>
+      </section>
+
+      <section class="definitions">
+        <div>
+          <p class="eyebrow">READING THE BOARD</p>
+          <h2>UNKNOWN IS A STATE.<br />NOT A ZERO.</h2>
+        </div>
+        <div class="definition-grid">
+          <p><strong>DONE + RECEIPTS</strong>Completed task records carrying at least one receipt field: notes, grade feedback, source event, Buzz root, or Matrix root.</p>
+          <p><strong>IN FLIGHT</strong>Task state is pending, in progress, pending review, or running.</p>
+          <p><strong>INTERVENTIONS</strong>Task state is blocked or escalated. Zero means the ledger reports zero; <b>UNREPORTED</b> means no canonical mapping exists.</p>
+          <p><strong>LAST HEARD</strong>Timestamp of the latest signed Buzz message observed for that seat at snapshot time.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>PFL / HARNESS SCORECARD V0</span>
+      <span>FIGURES FROZEN AT SNAPSHOT — SOURCE LEDGER BELOW</span>
+    </footer>
+
+    <dialog id="source-dialog">
+      <button class="dialog-close" aria-label="Close source ledger">×</button>
+      <p class="eyebrow">SOURCE LEDGER</p>
+      <div id="source-content"></div>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>

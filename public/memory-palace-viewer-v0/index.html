@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#060807" />
+    <meta name="description" content="A temporal WebGL memory palace: move through camera poses and scrub across time." />
+    <title>Memory Palace — Temporal Viewer</title>
+    <link rel="preconnect" href="https://esm.sh" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://esm.sh/three@0.180.0",
+          "three/addons/": "https://esm.sh/three@0.180.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="app">
+      <canvas id="scene" aria-label="Interactive temporal memory map"></canvas>
+
+      <header class="topbar glass">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <p class="eyebrow">SPATIOTEMPORAL ARCHIVE / 01</p>
+            <h1>Memory Palace</h1>
+          </div>
+        </div>
+        <div class="status"><span></span> scene indexed</div>
+      </header>
+
+      <aside class="legend glass" aria-label="Viewer legend">
+        <p class="eyebrow">FIELD KEY</p>
+        <div><i class="line current"></i><span>active memory</span></div>
+        <div><i class="line future"></i><span>future trace</span></div>
+        <div><i class="line path"></i><span>camera path</span></div>
+        <p class="hint">Drag to orbit · scroll to zoom<br />Select a frame to enter it</p>
+      </aside>
+
+      <section class="inspector glass" aria-live="polite">
+        <p class="eyebrow">SELECTED MEMORY</p>
+        <div class="index" id="memoryIndex">M–01</div>
+        <h2 id="memoryTitle">Arrival</h2>
+        <p id="memoryCaption">The threshold where the archive begins.</p>
+        <dl>
+          <div><dt>POSITION</dt><dd id="memoryPosition">−6.2 / 1.7 / 4.8</dd></div>
+          <div><dt>CAPTURE</dt><dd id="memoryTime">06:42</dd></div>
+        </dl>
+        <button id="enterMemory"><span>Enter viewpoint</span><b aria-hidden="true">↗</b></button>
+      </section>
+
+      <section class="timeline glass" aria-label="Memory timeline">
+        <div class="timeline-head">
+          <div>
+            <p class="eyebrow">TEMPORAL POSITION</p>
+            <strong id="dateLabel">26 OCT 2026 · 06:42</strong>
+          </div>
+          <div class="coordinates"><span>x</span> <b id="xValue">−6.2</b> <span>y</span> <b id="yValue">1.7</b> <span>z</span> <b id="zValue">4.8</b> <span>t</span> <b id="tValue">00</b></div>
+        </div>
+        <div class="range-wrap">
+          <input id="timeRange" type="range" min="0" max="100" step="0.1" value="0" aria-label="Scrub through captured time" />
+          <div class="ticks" aria-hidden="true"><span>06:42</span><span>07:18</span><span>08:03</span><span>09:27</span><span>10:11</span></div>
+        </div>
+        <div class="transport">
+          <button id="playButton" aria-label="Play timeline"><span id="playIcon">▶</span></button>
+          <p><b id="visibleCount">1</b> / 08 memories resolved</p>
+          <button class="reset" id="resetView">Reset field</button>
+        </div>
+      </section>
+
+      <div class="reticle" aria-hidden="true"><span></span></div>
+      <div class="loading" id="loading"><span></span><p>Resolving memory field</p></div>
+      <div class="noise" aria-hidden="true"></div>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
