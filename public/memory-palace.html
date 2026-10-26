@@ -337,6 +337,7 @@
       <button class="hud-btn" id="btn-autotour" title="Step chronologically through every posed 3D camera frustum">▶️ 4D Time Tour</button>
       <button class="hud-btn" id="btn-frustums" title="Toggle 3D cyan camera pyramid wireframes">📐 Frustums: ON</button>
       <button class="hud-btn" id="btn-optics" title="Cycle Normal / Night Vision NVG / Thermal FLIR shader">🔭 Optics: NORMAL</button>
+      <a class="hud-btn" href="/codex-v0/index.html" title="Open Codex's Memory Palace v0 (commit 174cd64) locally without the 401 gate">🧪 Codex v0 (Local)</a>
       <a class="hud-btn" href="/" title="Return to main Cesium God's Eye View globe">🌍 Cesium Globe</a>
     </div>
   </header>
@@ -360,6 +361,16 @@
     </div>
 
     <div class="section-hdr" style="margin-top:6px">
+      <span>⏱️ 4D TEMPORAL SCRUBBER (x, y, z, t)</span>
+      <span id="time-scrub-val" style="color:var(--mint)">t = 100% (6/6)</span>
+    </div>
+    <div class="slider-row">
+      <span>Oct 12</span>
+      <input type="range" id="time-scrub-slider" min="0" max="100" step="1" value="100" />
+      <span>Oct 26</span>
+    </div>
+
+    <div class="section-hdr" style="margin-top:8px">
       <span>🧅 4D ONION-SKIN (SEE-THRU BLEND)</span>
       <span id="opacity-val">88%</span>
     </div>

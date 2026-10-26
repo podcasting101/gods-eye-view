@@ -295,7 +295,20 @@ import * as THREE from '/three/three.module.js';
       frustumGroupsById.set(photoData.id, { group: frustumGroup, mesh: photoMesh, wireframe, photoData, pos, quat });
     }
 
-    POSED_PHOTOS_DATASET.forEach(addPosedPhotoNode);
+    POSED_PHOTOS_DATASET.forEach((d, idx) => {
+      d.stamp = Math.round((idx / Math.max(1, POSED_PHOTOS_DATASET.length - 1)) * 100);
+      addPosedPhotoNode(d);
+    });
+
+    // 4D Camera Trajectory Spline (Catmull-Rom curve connecting posed camera stations)
+    const trajectoryPoints = POSED_PHOTOS_DATASET.map((d) => new THREE.Vector3(...d.position));
+    const trajectoryCurve = new THREE.CatmullRomCurve3(trajectoryPoints, false, 'centripetal');
+    const trajectoryLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(trajectoryCurve.getPoints(160)),
+      new THREE.LineDashedMaterial({ color: 0x00ffcc, dashSize: 0.55, gapSize: 0.3, transparent: true, opacity: 0.55 })
+    );
+    trajectoryLine.computeLineDistances();
+    scene.add(trajectoryLine);
 
     // =========================================================================
     // 5. ORBIT / DRAG NAVIGATION + RAYCASTING (WITH [0] & DRAG-GUARD FIXES)
@@ -609,6 +622,42 @@ import * as THREE from '/three/three.module.js';
       if (mode === 'FLIR') document.body.classList.add('mode-flir');
       opticsBtn.textContent = `🔭 Optics: ${mode}`;
     });
+
+    // 4D Temporal Scrubber (x, y, z, t)
+    const timeScrubSlider = document.getElementById('time-scrub-slider');
+    const timeScrubVal = document.getElementById('time-scrub-val');
+    if (timeScrubSlider) {
+      timeScrubSlider.addEventListener('input', () => {
+        const t = Number(timeScrubSlider.value);
+        const baseOpacity = Number(opacitySlider.value) / 100;
+        let resolvedCount = 0;
+        let latestId = POSED_PHOTOS_DATASET[0].id;
+        frustumGroupsById.forEach((entry, id) => {
+          const stamp = entry.photoData.stamp ?? 0;
+          const delta = t - stamp;
+          const isResolved = delta >= -2;
+          entry.group.visible = delta >= -25;
+          const alpha = THREE.MathUtils.clamp((delta + 25) / 25, 0.15, 1.0);
+          entry.group.scale.setScalar(0.84 + 0.16 * alpha);
+          entry.mesh.material.opacity = isResolved ? baseOpacity : baseOpacity * 0.22;
+          entry.wireframe.material.opacity = isResolved ? 0.85 : 0.22;
+          if (isResolved) {
+            resolvedCount++;
+            latestId = id;
+          }
+        });
+        if (timeScrubVal) {
+          timeScrubVal.textContent = `t = ${t}% (${resolvedCount}/${POSED_PHOTOS_DATASET.length})`;
+        }
+        const activeEntry = frustumGroupsById.get(latestId);
+        if (activeEntry) {
+          const d = activeEntry.photoData;
+          document.getElementById('tele-date').textContent = d.timestamp.split(' ')[0];
+          document.getElementById('tele-xyz').textContent = `[${d.position.map((n) => n.toFixed(1)).join(', ')}]`;
+        }
+        requestRender();
+      });
+    }
 
     // Onion-Skin See-Thru Opacity Slider
     const opacitySlider = document.getElementById('opacity-slider');
