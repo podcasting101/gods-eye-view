@@ -407,11 +407,48 @@
       <button class="hud-btn" id="btn-autotour" title="Step chronologically through every posed 3D camera frustum">▶️ 4D Time Tour</button>
       <button class="hud-btn" id="btn-frustums" title="Toggle 3D cyan camera pyramid wireframes">📐 Frustums: ON</button>
       <button class="hud-btn" id="btn-optics" title="Cycle Normal / Night Vision NVG / Thermal FLIR shader">🔭 Optics: NORMAL</button>
+      <button class="hud-btn" id="btn-fire-modal" style="border-color:rgba(255,140,66,0.75);color:#ffb84d;background:rgba(255,100,30,0.16)" title="Watch the Oct 25 Yard Fire 'Legs-Only' Video Cut & inspect the 3900x1913 Back Yard Cam2 Waterfront Splat">🔥 Yard Fire &amp; Legs Cut</button>
       <a class="hud-btn" href="/codex-v0/index.html" title="Open Codex's Memory Palace v0 (commit 174cd64) locally without the 401 gate">🧪 Codex v0</a>
       <a class="hud-btn" href="/pfl-harness-scorecard-v0/index.html" title="Open Codex's PFL Harness Scorecard v0 (commit 7ee677ed) locally without the 401 gate">📊 Scorecard v0</a>
       <a class="hud-btn" href="/" title="Return to main Cesium God's Eye View globe">🌍 Cesium Globe</a>
     </div>
   </header>
+
+  <!-- Yard Fire & Waterfront Splat Modal -->
+  <div id="fire-video-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(4,9,16,0.86);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:20px">
+    <div style="max-width:980px;width:100%;max-height:90vh;overflow-y:auto;background:rgba(8,18,32,0.96);border:1px solid rgba(255,184,77,0.55);border-radius:14px;padding:18px 20px;box-shadow:0 18px 48px rgba(0,0,0,0.85);color:#e6f4ff">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid rgba(255,184,77,0.25);padding-bottom:10px">
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#ffb84d;letter-spacing:0.4px">🔥 OCT 25 YARD FIRE — "LEGS-ONLY" PATROL CUT &amp; BACK YARD CAM2 STITCHED SPLAT</div>
+          <div style="font-size:11.5px;color:#8cb4d2;margin-top:2px">Boathouse Dock Cam (Pan V4) + Back Yard Cam2 · Tree-Aligned 3900×1913 Waterfront Panorama (12:12–23:44 CDT)</div>
+        </div>
+        <button id="btn-close-fire-modal" class="hud-btn" style="border-color:rgba(255,184,77,0.5);color:#ffb84d">✕ Close</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:14px;align-items:start">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#00ffcc;margin-bottom:6px;text-transform:uppercase">🎬 Composite Video: 8 Legs-Only Patrol Clips + Solar Panel Fire (31.5s)</div>
+          <video id="fire-modal-video" controls preload="metadata" style="width:100%;border-radius:10px;border:1px solid rgba(0,240,255,0.35);background:#000" src="/yard-frames/yard-fire-legs-cut-2026-10-25.mp4"></video>
+          <div style="font-size:11px;color:#8cb4d2;margin-top:6px;line-height:1.4">
+            Extracted from 94 Wyze Cloud events on 2026-10-25: 6 Dock Cam clips framed strictly when Paul's legs walk across the lower dock frame + 2 Back Yard Cam2 fire clips (12:14 &amp; 12:17 CDT) + rotated post-fire damage view (23:44 CDT).
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#ffb84d;margin-bottom:4px;text-transform:uppercase">🌊 Stitched 3900×1913 Waterfront Splat (Tree-Registered)</div>
+            <a href="/yard-frames/back-yard-cam2-stitched-2026-10-26.png" target="_blank" rel="noopener">
+              <img src="/yard-frames/back-yard-cam2-stitched-2026-10-26.png" alt="Back Yard Cam2 Stitched Waterfront Splat" style="width:100%;border-radius:8px;border:1px solid rgba(255,184,77,0.45)" />
+            </a>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#00f0ff;margin-bottom:4px;text-transform:uppercase">📐 Annotated Fire &amp; Rotation Analysis Overlay</div>
+            <a href="/yard-frames/back-yard-cam2-fire-analysis-2026-10-26.png" target="_blank" rel="noopener">
+              <img src="/yard-frames/back-yard-cam2-fire-analysis-2026-10-26.png" alt="Back Yard Cam2 Annotated Fire Analysis" style="width:100%;border-radius:8px;border:1px solid rgba(0,240,255,0.35)" />
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Left Inspector: Pose Telemetry & See-Thru Onion Skinning -->
   <aside class="left-inspector">

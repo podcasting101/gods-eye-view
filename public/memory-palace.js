@@ -1016,6 +1016,26 @@ import * as THREE from '/three/three.module.js';
     }
     loadNeo4jPalace();
 
+    // Yard Fire & Stitched Waterfront Splat Modal Controls
+    const fireModal = document.getElementById('fire-video-modal');
+    const fireVideo = document.getElementById('fire-modal-video');
+    document.getElementById('btn-fire-modal')?.addEventListener('click', () => {
+      if (fireModal) {
+        fireModal.style.display = 'flex';
+        focusPhotoNode('back-yard-cam2-stitched-splat');
+      }
+    });
+    document.getElementById('btn-close-fire-modal')?.addEventListener('click', () => {
+      if (fireModal) fireModal.style.display = 'none';
+      if (fireVideo && !fireVideo.paused) fireVideo.pause();
+    });
+    fireModal?.addEventListener('click', (e) => {
+      if (e.target === fireModal) {
+        fireModal.style.display = 'none';
+        if (fireVideo && !fireVideo.paused) fireVideo.pause();
+      }
+    });
+
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();

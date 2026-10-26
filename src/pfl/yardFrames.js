@@ -172,6 +172,7 @@ const CALIBRATED_HOUSE_SURVEY = {
     rollDeg: 0,
     flat: false,
     texRot: 0,
+    stitchedWaterPano: true,
   },
   'bed-station-20261012': {
     // Inside the center of the yellow house roof footprint, laid flat facing sky
@@ -356,7 +357,11 @@ export function computeCorners(p) {
   const w =
     p.stitchedPano && p.flat
       ? 58.82 * (dist / 16.7) * wScale
-      : 2 * dist * Math.tan(toRad((p.fovHDeg || DEFAULT_FOV_H_DEG) / 2)) * wScale;
+      : 2 *
+        dist *
+        Math.tan(toRad((p.fovHDeg || DEFAULT_FOV_H_DEG) / 2)) *
+        wScale *
+        (p.stitchedWaterPano ? 1.42 : 1);
   const h =
     p.stitchedPano && p.flat
       ? 70.54 * (dist / 16.7)
@@ -448,9 +453,11 @@ function buildFrameEntity(viewer, def, params) {
   const imgUrl =
     def.id === 'yard-overview-20261012' && params.stitchedPano
       ? '/yard-frames/front-yard-stitched-2026-10-12.png'
-      : def.image;
+      : def.id === 'back-yard-cam2-water' && params.stitchedWaterPano
+        ? '/yard-frames/back-yard-cam2-stitched-2026-10-26.png'
+        : def.image;
   const matProps = { image: imgUrl };
-  if (opacity < 0.99 || params.stitchedPano) {
+  if (opacity < 0.99 || params.stitchedPano || params.stitchedWaterPano) {
     matProps.color = Cesium.Color.WHITE.withAlpha(opacity);
     matProps.transparent = true;
   }
@@ -1045,6 +1052,26 @@ function buildPanel(viewer) {
   setTimeout(syncStitchBtn, 0);
   panel.appendChild(stitchBtn);
 
+  const waterStitchBtn = makeButton('🌊 Waterfront Stitch (Cam2): ON', 'gev-wide gev-preset');
+  waterStitchBtn.style.cssText = 'width:100%;min-height:26px;margin-bottom:6px;font-size:11px';
+  const syncWaterStitchBtn = () => {
+    const wc = frameState.get('back-yard-cam2-water')?.params;
+    const isOn = Boolean(wc?.stitchedWaterPano);
+    waterStitchBtn.textContent = isOn
+      ? '🌊 Waterfront Stitch (Cam2): ON'
+      : '🌊 Waterfront Stitch (Cam2): OFF';
+  };
+  waterStitchBtn.addEventListener('click', () => {
+    const wc = frameState.get('back-yard-cam2-water');
+    if (!wc) return;
+    wc.params.stitchedWaterPano = !wc.params.stitchedWaterPano;
+    rebuildFrame(viewer, 'back-yard-cam2-water');
+    saveLayout();
+    syncWaterStitchBtn();
+  });
+  setTimeout(syncWaterStitchBtn, 0);
+  panel.appendChild(waterStitchBtn);
+
   const name = document.createElement('div');
   name.className = 'gev-frame-name';
   name.dataset.role = 'frame-name';
@@ -1296,7 +1323,14 @@ function setArrange(viewer, on) {
 
 function installArrangeToggle(viewer) {
   if (typeof document === 'undefined') return;
-  for (const id of ['gev-arrange-toggle', 'gev-arrange-dock-btn', 'gev-arrange-panel', 'gev-memory-palace-btn']) {
+  for (const id of [
+    'gev-arrange-toggle',
+    'gev-arrange-dock-btn',
+    'gev-arrange-panel',
+    'gev-memory-palace-btn',
+    'gev-fire-video-btn',
+    'gev-fire-video-modal',
+  ]) {
     document.getElementById(id)?.remove();
   }
   const oldCss = document.getElementById('gev-arrange-css');
@@ -1333,6 +1367,68 @@ function installArrangeToggle(viewer) {
       'color:#00ffcc;background:rgba(0,255,204,.14);border:1px solid rgba(0,255,204,.55);' +
       'border-radius:10px;cursor:pointer;text-align:center;text-decoration:none';
     dockBtn.insertAdjacentElement('afterend', mpBtn);
+
+    const fireBtn = makeButton('🔥 YARD FIRE & LEGS VIDEO');
+    fireBtn.id = 'gev-fire-video-btn';
+    fireBtn.style.cssText =
+      'width:100%;min-height:34px;margin:4px 0;padding:7px 10px;' +
+      "font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;letter-spacing:.08em;" +
+      'color:#ffb84d;background:rgba(255,100,30,.18);border:1px solid rgba(255,140,66,.65);' +
+      'border-radius:10px;cursor:pointer;text-align:center';
+    mpBtn.insertAdjacentElement('afterend', fireBtn);
+
+    const fireModal = document.createElement('div');
+    fireModal.id = 'gev-fire-video-modal';
+    fireModal.style.cssText =
+      'display:none;position:fixed;inset:0;z-index:10002;background:rgba(4,9,16,0.86);' +
+      'backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:20px';
+    fireModal.innerHTML = `
+      <div style="max-width:960px;width:100%;max-height:90vh;overflow-y:auto;background:rgba(8,18,32,0.96);border:1px solid rgba(255,184,77,0.55);border-radius:14px;padding:18px 20px;box-shadow:0 18px 48px rgba(0,0,0,0.85);color:#e6f4ff;font-family:'Inter',sans-serif">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid rgba(255,184,77,0.25);padding-bottom:10px">
+          <div>
+            <div style="font-size:15px;font-weight:800;color:#ffb84d">🔥 OCT 25 YARD FIRE — "LEGS-ONLY" PATROL CUT &amp; BACK YARD CAM2 STITCHED SPLAT</div>
+            <div style="font-size:11.5px;color:#8cb4d2;margin-top:2px">Boathouse Dock Cam (Pan V4) + Back Yard Cam2 · Tree-Aligned 3900×1913 Waterfront Panorama (12:12–23:44 CDT)</div>
+          </div>
+          <button type="button" id="gev-close-fire-modal" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,184,77,0.5);background:rgba(255,184,77,0.14);color:#ffb84d;font-weight:700;cursor:pointer">✕ Close</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:14px;align-items:start">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#00ffcc;margin-bottom:6px;text-transform:uppercase">🎬 Composite Video: 8 Legs-Only Patrol Clips + Solar Panel Fire (31.5s)</div>
+            <video id="gev-fire-modal-video" controls preload="metadata" style="width:100%;border-radius:10px;border:1px solid rgba(0,240,255,0.35);background:#000" src="/yard-frames/yard-fire-legs-cut-2026-10-25.mp4"></video>
+            <div style="font-size:11px;color:#8cb4d2;margin-top:6px;line-height:1.4">
+              Extracted from 94 Wyze Cloud events on 2026-10-25: 6 Dock Cam clips framed strictly when Paul's legs walk across the lower dock frame + 2 Back Yard Cam2 fire clips (12:14 &amp; 12:17 CDT) + rotated post-fire damage view (23:44 CDT).
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#ffb84d;margin-bottom:4px;text-transform:uppercase">🌊 Stitched 3900×1913 Waterfront Splat (Tree-Registered)</div>
+              <a href="/yard-frames/back-yard-cam2-stitched-2026-10-26.png" target="_blank" rel="noopener">
+                <img src="/yard-frames/back-yard-cam2-stitched-2026-10-26.png" alt="Back Yard Cam2 Stitched Waterfront Splat" style="width:100%;border-radius:8px;border:1px solid rgba(255,184,77,0.45)" />
+              </a>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#00f0ff;margin-bottom:4px;text-transform:uppercase">📐 Annotated Fire &amp; Rotation Analysis Overlay</div>
+              <a href="/yard-frames/back-yard-cam2-fire-analysis-2026-10-26.png" target="_blank" rel="noopener">
+                <img src="/yard-frames/back-yard-cam2-fire-analysis-2026-10-26.png" alt="Back Yard Cam2 Annotated Fire Analysis" style="width:100%;border-radius:8px;border:1px solid rgba(0,240,255,0.35)" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(fireModal);
+    const closeFireModal = () => {
+      fireModal.style.display = 'none';
+      const v = document.getElementById('gev-fire-modal-video');
+      if (v && !v.paused) v.pause();
+    };
+    fireBtn.addEventListener('click', () => {
+      fireModal.style.display = 'flex';
+    });
+    fireModal.querySelector('#gev-close-fire-modal')?.addEventListener('click', closeFireModal);
+    fireModal.addEventListener('click', (e) => {
+      if (e.target === fireModal) closeFireModal();
+    });
   }
 
   const panel = buildPanel(viewer);
