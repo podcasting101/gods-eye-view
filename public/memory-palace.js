@@ -987,25 +987,52 @@ import * as THREE from '/three/three.module.js';
           { name: '417 Palm Drive North Pond', queryName: '417 Palm Drive North Pond', role: 'Location · Water & Dock Camera', camId: 'back-yard-cam2-stitched-splat' },
         ];
 
-        listEl.innerHTML = '';
-        bindings.forEach((b, idx) => {
-          const item = document.createElement('div');
-          item.className = 'node-item' + (idx === 0 ? ' active' : '');
-          item.innerHTML = `
-            <div class="node-item-title">
-              <span>${b.name}</span>
-              <span style="color:var(--mint)">→ 1-Hop 3D</span>
-            </div>
-            <div class="node-item-sub">${b.role}</div>
-          `;
-          item.addEventListener('click', () => {
-            document.querySelectorAll('.node-item').forEach((n) => n.classList.remove('active'));
-            item.classList.add('active');
-            focusPhotoNode(b.camId);
-            const entry = frustumGroupsById.get(b.camId);
-            renderOneHopNeighborhood(b.queryName, entry);
+        const renderEntityList = (filterText = '') => {
+          const q = (filterText || '').trim().toLowerCase();
+          listEl.innerHTML = '';
+          let itemsToRender = bindings.filter(
+            (b) => !q || b.name.toLowerCase().includes(q) || b.role.toLowerCase().includes(q)
+          );
+          if (q && data?.entity_web?.nodes) {
+            const seen = new Set(itemsToRender.map((x) => x.queryName.toLowerCase()));
+            for (const n of data.entity_web.nodes) {
+              const nm = n.name || '';
+              if (!seen.has(nm.toLowerCase()) && (nm.toLowerCase().includes(q) || (n.summary || '').toLowerCase().includes(q))) {
+                seen.add(nm.toLowerCase());
+                itemsToRender.push({
+                  name: nm,
+                  queryName: nm,
+                  role: `Neo4j Entity · ${(n.labels || ['Entity']).join(', ')}`,
+                  camId: selectedFrustum?.data?.id || 'stitched-ground-overview',
+                });
+                if (itemsToRender.length >= 40) break;
+              }
+            }
+          }
+          itemsToRender.forEach((b, idx) => {
+            const item = document.createElement('div');
+            item.className = 'node-item' + (idx === 0 && !q ? ' active' : '');
+            item.innerHTML = `
+              <div class="node-item-title">
+                <span>${b.name}</span>
+                <span style="color:var(--mint)">→ 1-Hop 3D</span>
+              </div>
+              <div class="node-item-sub">${b.role}</div>
+            `;
+            item.addEventListener('click', () => {
+              document.querySelectorAll('.node-item').forEach((n) => n.classList.remove('active'));
+              item.classList.add('active');
+              focusPhotoNode(b.camId);
+              const entry = frustumGroupsById.get(b.camId);
+              renderOneHopNeighborhood(b.queryName, entry);
+            });
+            listEl.appendChild(item);
           });
-          listEl.appendChild(item);
+        };
+
+        renderEntityList('');
+        document.getElementById('neo4j-search-input')?.addEventListener('input', (e) => {
+          renderEntityList(e.target.value);
         });
 
         // Pre-populate Lisa Muse's 1-hop neighborhood (including Wren) on initial load
@@ -1015,6 +1042,25 @@ import * as THREE from '/three/three.module.js';
       }
     }
     loadNeo4jPalace();
+
+    // Full-Screen Graph Deck Toggle ("Full screen — work the graph properly", Esc to return)
+    const graphDrawer = document.getElementById('right-graph-drawer');
+    const fsGraphBtn = document.getElementById('btn-fullscreen-graph');
+    const setGraphFullscreen = (on) => {
+      if (!graphDrawer || !fsGraphBtn) return;
+      graphDrawer.classList.toggle('fullscreen-deck', on);
+      fsGraphBtn.textContent = on
+        ? '✕ Exit full screen (Esc)'
+        : '⛶ Full screen — work the graph';
+    };
+    fsGraphBtn?.addEventListener('click', () => {
+      setGraphFullscreen(!graphDrawer?.classList.contains('fullscreen-deck'));
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && graphDrawer?.classList.contains('fullscreen-deck')) {
+        setGraphFullscreen(false);
+      }
+    });
 
     // Yard Fire & Stitched Waterfront Splat Modal Controls
     const fireModal = document.getElementById('fire-video-modal');

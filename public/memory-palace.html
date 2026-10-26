@@ -217,6 +217,28 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+      transition: all 0.2s ease;
+    }
+    .right-graph.fullscreen-deck {
+      top: 74px;
+      right: 16px;
+      left: 356px;
+      width: auto;
+      bottom: 94px;
+      max-height: none;
+      z-index: 60;
+      background: rgba(5, 14, 26, 0.94);
+      border-color: var(--mint);
+    }
+    .right-graph.fullscreen-deck .node-list {
+      max-height: 46vh !important;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 8px;
+    }
+    .right-graph.fullscreen-deck .neighborhood-drawer {
+      max-height: 36vh;
+      flex: 1;
     }
     .graph-stats {
       font-size: 11px;
@@ -503,10 +525,10 @@
   </aside>
 
   <!-- Right Drawer: Live Neo4j Knowledge Graph Bindings -->
-  <aside class="right-graph">
+  <aside class="right-graph" id="right-graph-drawer">
     <div class="section-hdr">
       <span>🧠 NEO4J SPATIAL GRAPH PALACE</span>
-      <span style="color:var(--mint);font-size:10px">LIVE</span>
+      <button type="button" id="btn-fullscreen-graph" class="hud-btn" style="padding:3px 8px;font-size:10px;border-color:rgba(0,255,204,0.55);color:var(--mint)" title="Expand Neo4j Graph Deck (Esc to return)">⛶ Full screen — work the graph</button>
     </div>
     <div class="graph-stats" id="neo4j-stats">
       Loading Neo4j Graphiti bundle (/gev-intel/index.json)…
@@ -515,6 +537,7 @@
       <span class="meta-pill" id="bundle-as-of-pill">🕒 Bundle as-of: 2026-10-24 18:23 UTC</span>
       <span class="meta-pill mint" id="extraction-state-pill">📦 Extraction: 185 bundled · 9 extracted</span>
     </div>
+    <input type="search" id="neo4j-search-input" placeholder="🔍 Search 371 Neo4j entities (e.g. Lisa Muse, Wren, Paul, Stargate)…" style="width:100%;padding:6px 10px;border-radius:7px;border:1px solid rgba(0,240,255,0.35);background:rgba(4,12,22,0.85);color:#fff;font-size:11px;outline:none" />
     <div style="font-size:10.5px;color:var(--muted)">
       Click any entity or memory anchor below to fly to its 3D camera frustum &amp; open its 1-hop Neo4j neighborhood:
     </div>
