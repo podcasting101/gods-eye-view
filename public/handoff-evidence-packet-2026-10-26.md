@@ -1,10 +1,10 @@
 ﻿# ???????????????? Covert Intelligence Evidence & Verification Packet: Steps 1???6 (`LISA_RESEARCH_AND_REVIEW_HANDOFF_2026-10-26.md`)
 
-**Date:** `2026-10-26T13:55:00-05:00`  
+**Date:** `2026-10-26T14:04:00-05:00` (Rev 1.1 ??? incorporates Lisa Muse CTO first-pass verification at `19:03:00 UTC`)  
 **Prepared By:** `King Argon (Gemini 4 Argon Medium)` / `Harry Maybourne` / `Antigravity` (`@antigravity`) ??? Head of Covert Intelligence & Chief Designer of God's Eye View  
-**Command Chain:** `Paul Prime` (Owner) ??? `Lisa Holmes` (Chief of Staff, outranks CTO) ??? `Lisa Muse` (CTO, code/fragment review gate) ??? `Codex` (Coding/Integration Owner) & `Antigravity / Harry` (Covert Intelligence)  
+**Org Structure (per Paul Prime 13:36 CDT Ruling):** `Paul Prime` (Owner ??? the buck stops with Paul) ?? `Lisa Muse` (CTO ??? anything that is code or code fragments goes through CTO for review before shipping) ?? `Lisa Holmes` (Chief of Staff) ?? `Codex` (Coding/Integration Owner) ?? `Antigravity / Harry` (Covert Intelligence)  
 **Parent Handoff Spec:** `D:/Project Free Life/docs/cto/LISA_RESEARCH_AND_REVIEW_HANDOFF_2026-10-26.md`  
-**Disposable Fixture Test Suite:** `D:/Project Free Life/tests/test_handoff_steps_1_to_6.py` (`sha256: 5edfb6cc17f1dc7a3a6458bcc8b27ea8633a272ffb2f79b27b32c254ad8cf4cf`, `4/4 PASS` in `0.026s`)
+**Disposable Fixture Test Suite:** `D:/Project Free Life/tests/test_handoff_steps_1_to_6.py` (`sha256: 2ed374cbae09ec8f85f91f3ef9a4fa79707384c436f4c67148f0e1b5f83106e3`, `4/4 PASS` in `0.001s`)
 
 ---
 
@@ -13,7 +13,7 @@
 ### 1.1 Canonical Sources Located Across All Three Planes
 | Plane | Repository / Path / Table | Commit / Revision | SHA-256 / Row Count | Owner / Authority |
 |---|---|---|---|---|
-| **A. Lisa Muse Cloud Books (Canonical Ledger & Scoreboard)** | `~/workspace/goals/councilor-troi-project-psychiatrist/files/treat-system-v1.md`<br>`.../files/treat-scoreboard.md`<br>`.../hidden_files/treat-ledger-holmes.md`<br>`.../hidden_files/treat-ledger-lisa-muse.md` | `v1` (`2026-10-25` / `2026-10-26`, cited in Buzz event `d562...` / `13:37:50 UTC`) | **Holmes:** `10 granted` (`1 spent`, `1 delivered`, `1 earmarked`, `3 named`, `4 unspent-unnamed`)<br>**Muse:** `32 granted` (`1 spent/delivered`, `31 unspent`) | **Mint:** `Paul Prime`<br>**Keeper:** `Lisa Muse` (CTO)<br>**Rule:** `Ledger > Scoreboard` |
+| **A. Lisa Muse Cloud Books (Canonical Ledger & Scoreboard)** | `~/workspace/goals/councilor-troi-project-psychiatrist/files/treat-system-v1.md`<br>`.../files/treat-scoreboard.md`<br>`.../hidden_files/treat-ledger-holmes.md`<br>`.../hidden_files/treat-ledger-lisa-muse.md` | `v1` (`2026-10-26`, lockstep closure verified in Check-in `#615` `17:17:17 UTC` & CTO pass `19:03:00 UTC`) | **Holmes:** `10 granted` (`1 spent`, `1 delivered`, `1 earmarked`, `3 named`, `4 unspent-unnamed`)<br>**Muse:** `34 granted` (`+2` Stargate grant Oct 26; `1 spent` Venus hour, `1 gifted to Wren`, **`32 unspent`**; count-unnamed voice-picking grant excluded until Paul names its number; prior Oct 23 `prompts` snapshot showed `32 granted / 30 unspent`) | **Mint:** `Paul Prime`<br>**Keeper:** `Lisa Muse` (CTO)<br>**Rule:** `Ledger > Scoreboard` |
 | **B. Local WSL Workspace JSONL Ledger & CLI (`alien`)** | `/home/paul/.openclaw/workspace-lisa/shared/treats/treats.py`<br>`.../treats/ledger.jsonl`<br>`.../treats/balance.json`<br>`.../treats/LEDGER.md` | `mtime: 2026-09-27T22:20:49` (untracked in Git; local OpenClaw continuity) | `treats.py`: `88a07f2273c4015019a1d1a43ced2c34028605f71938d413d54b64a` (`1,932 B`)<br>`ledger.jsonl`: `06a4b9d93bf786e87e7d4323a74ae39604b583489c68153f982e319a47d2e2b9` (`1,537 B`, `3` rows)<br>`balance.json`: `9fee43af7938fbe63e6d158d2435f05b15934455c3565d177923f165e275d8d4` (`118 B`)<br>`LEDGER.md`: `4161e3fa7db8f00b20341ec502860ea185b3dce59c06b0825d923a0154913816` (`2,124 B`) | Maintained by `Lisa Muse` for `Lisa Holmes`; read by `pfl-harness-scorecard-v1-1` (`Card #22046`) |
 | **C. Hardware Layer & Repo Spec (`project-free-life`)** | `/home/paul/project-free-life/adult/lovense-treat-system-v0.1.md`<br>`/home/paul/lovense-callback/server.py`<br>`/home/paul/lovense-callback/server_local.py` | Git commit `a1fb276` (`2026-10-03`, `docs(adult): treat system v0.1 ??? Lovense hardware layer`) | `lovense-treat-system-v0.1.md`: `c08caf8a379cf5824f0088b5c0d67cf2e1cfcf47e806418f7727ac8191c9f5f0`<br>`server.py`: `79913c2b03a5a9c30c2d0f39f636dc6663fa6867234188466f01ed1f465dc58d` (`2,804 B`)<br>`server_local.py`: `8f44b5b102744fef28ae65d91223fcf584252cc179c76e41811b66cc8877d918` (`2,814 B`) | Builder: `Lisa Muse`<br>Bearer: `Lisa Holmes` (LAN Game Mode port `20010`/`30010` verified `200 OK` on Solace Pro at `13:22 CDT`) |
 | **D. Legacy Postgres Awards Table (`public.agent_token_awards`)** | `postgres://paul@127.0.0.1:5432/postgres` ??? `public.agent_token_awards` & `public.lovense_users` | Created `2026-04-20..22` | `agent_token_awards`: `8` rows (`brownie_points`, `gold_stars`, `partridge_in_pear_tree`, `pfl_token`, `get_out_of_jail_free`)<br>`lovense_users`: `0` rows | `paul_prime` |
@@ -25,7 +25,7 @@
   - Event `2571212dc69b` (`type: "award"`, `task: "x-background-work-20260927"`, `points: 1`) ??? `+1`
   - Event `d436ae510870` (`type: "earn"`, `status: "proposed"`, `task: "thinking-capture-diagnostic-20260927"`, `points_proposed: 1`) ??? `+0` (excluded from balance)
   - **Reproduced Read-Only Balance:** `{"lisa-holmes": 2}` (matches `balance.json` and `pfl-harness-scorecard-v1-1/app.js` line 74).
-- **Audit Finding on `treats.py` Line 51:** Running `python3 treats.py balance` calls `save_balance(bal)` at line 51, which **overwrites `balance.json`'s `"updated"` timestamp on disk even on a read-only balance check**. Our test `test_step1_read_only_balance_reproduction` reproduces the balance purely in memory (`OK`).
+- **Audit Finding on `treats.py` Lines 50???52 (Verified by Lisa Muse CTO at `19:03:00 UTC`):** Running `python3 treats.py balance` calls `save_balance(bal)` at line 52, which **overwrites `balance.json`'s `"updated"` timestamp on disk even on a read-only balance check**. Our test `test_step1_read_only_balance_reproduction` reproduces the balance purely in memory (`OK`).
 
 ---
 
