@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PFL 4D Spatial Memory Palace — 417 Palm Drive & Neo4j Intelligence</title>
+  <style>
+    :root {
+      --bg: #070b12;
+      --panel: rgba(10, 16, 28, 0.88);
+      --border: rgba(0, 240, 255, 0.32);
+      --cyan: #00f0ff;
+      --mint: #00ffcc;
+      --amber: #ffb84d;
+      --text: #e6f4ff;
+      --muted: #8aa4bc;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', 'Segoe UI', system-ui, monospace;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      user-select: none;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+    /* Post-processing optics modes (Normal / Night Vision NVG / Thermal FLIR) */
+    body.mode-nvg #canvas-container canvas {
+      filter: sepia(100%) hue-rotate(75deg) saturate(320%) contrast(125%) brightness(1.08);
+    }
+    body.mode-flir #canvas-container canvas {
+      filter: invert(100%) hue-rotate(190deg) saturate(280%) contrast(145%);
+    }
+
+    /* Top HUD Bar */
+    .top-hud {
+      position: fixed;
+      top: 14px;
+      left: 16px;
+      right: 16px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+    }
+    .hud-card {
+      pointer-events: auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 16px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--cyan);
+      text-transform: uppercase;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .hud-btn {
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid rgba(0, 240, 255, 0.45);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hud-btn:hover, .hud-btn.active {
+      background: rgba(0, 255, 204, 0.22);
+      border-color: var(--mint);
+      color: #fff;
+      box-shadow: 0 0 14px rgba(0, 255, 204, 0.3);
+    }
+
+    /* Spatial 3D Floating Tag (screen-projected over hovered/selected frustum) */
+    #spatial-tag {
+      position: fixed;
+      z-index: 15;
+      pointer-events: none;
+      background: rgba(6, 12, 22, 0.94);
+      border: 1px solid var(--mint);
+      border-radius: 10px;
+      padding: 10px 14px;
+      min-width: 250px;
+      max-width: 320px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75), 0 0 18px rgba(0, 255, 204, 0.22);
+      transform: translate(-50%, -115%);
+      display: none;
+    }
+    #spatial-tag .tag-kicker {
+      font-size: 10px;
+      color: var(--mint);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    #spatial-tag .tag-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+    #spatial-tag .tag-meta {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    #spatial-tag .tag-entities {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .entity-pill {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 99px;
+      background: rgba(0, 240, 255, 0.16);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      color: var(--cyan);
+    }
+
+    /* Left Inspector: Active Camera & See-Thru Onion-Skin Control */
+    .left-inspector {
+      position: fixed;
+      top: 84px;
+      left: 16px;
+      width: 320px;
+      z-index: 10;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+    }
+    .section-hdr {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .pose-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 10px;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .pose-grid strong { color: #fff; }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--muted);
+      margin: 8px 0;
+    }
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--mint);
+      cursor: pointer;
+    }
+
+    /* Right Drawer: Neo4j Spatial Memory Graph (371 Nodes / 728 Edges) */
+    .right-graph {
+      position: fixed;
+      top: 84px;
+      right: 16px;
+      width: 340px;
+      max-height: calc(100vh - 185px);
+      z-index: 10;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .graph-stats {
+      font-size: 11px;
+      color: var(--amber);
+      background: rgba(255, 184, 77, 0.1);
+      border: 1px solid rgba(255, 184, 77, 0.35);
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+    .node-list {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-right: 4px;
+      max-height: 360px;
+    }
+    .node-item {
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .node-item:hover, .node-item.active {
+      background: rgba(0, 255, 204, 0.15);
+      border-color: var(--mint);
+    }
+    .node-item-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+    }
+    .node-item-sub {
+      font-size: 10.5px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    /* Bottom 4D Timeline & Camera Frustum Selector Rail */
+    .bottom-rail {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      z-index: 10;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 16px;
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow-x: auto;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+    }
+    .cam-card {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .cam-card:hover, .cam-card.active {
+      background: rgba(0, 255, 204, 0.18);
+      border-color: var(--mint);
+      transform: translateY(-2px);
+    }
+    .cam-thumb {
+      width: 48px;
+      height: 34px;
+      border-radius: 5px;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+    .cam-info-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .cam-info-time {
+      font-size: 10px;
+      color: var(--mint);
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <!-- Screen-Projected 3D Spatial Metadata Tag -->
+  <div id="spatial-tag">
+    <div class="tag-kicker" id="tag-kicker">3D POSED CAMERA FRUSTUM</div>
+    <div class="tag-title" id="tag-title">Wyze Cam V4 — Front Yard</div>
+    <div class="tag-meta" id="tag-meta"></div>
+    <div class="tag-entities" id="tag-entities"></div>
+  </div>
+
+  <!-- Top Tactical Bar -->
+  <header class="top-hud">
+    <div class="hud-card">
+      <div>
+        <div class="brand-title">🏛️ PFL 4D Spatial Memory Palace</div>
+        <div class="brand-sub">417 Palm Drive, Liverpool TX · Three.js Frustum Projector + Raycaster + On-Demand Governor</div>
+      </div>
+    </div>
+
+    <div class="hud-card">
+      <button class="hud-btn active" id="btn-overview" title="Fly out to 3rd-person God's Eye overview">🛰️ 3rd-Person Overview</button>
+      <button class="hud-btn" id="btn-autotour" title="Step chronologically through every posed 3D camera frustum">▶️ 4D Time Tour</button>
+      <button class="hud-btn" id="btn-frustums" title="Toggle 3D cyan camera pyramid wireframes">📐 Frustums: ON</button>
+      <button class="hud-btn" id="btn-optics" title="Cycle Normal / Night Vision NVG / Thermal FLIR shader">🔭 Optics: NORMAL</button>
+      <a class="hud-btn" href="/" title="Return to main Cesium God's Eye View globe">🌍 Cesium Globe</a>
+    </div>
+  </header>
+
+  <!-- Left Inspector: Pose Telemetry & See-Thru Onion Skinning -->
+  <aside class="left-inspector">
+    <div class="section-hdr">
+      <span>🎯 ACTIVE FRUSTUM TELEMETRY</span>
+      <span id="render-state-chip" style="color:var(--mint);font-size:10px">IDLE 0% GPU</span>
+    </div>
+    <div id="active-cam-name" style="font-size:13px;font-weight:700;color:#fff;margin-bottom:8px">
+      God's Eye Overview (All 6 Cameras)
+    </div>
+    <div class="pose-grid">
+      <div>LAT: <strong id="tele-lat">29.2473° N</strong></div>
+      <div>LON: <strong id="tele-lon">-95.2315° W</strong></div>
+      <div>FOV: <strong id="tele-fov">103° Wide</strong></div>
+      <div>DATE: <strong id="tele-date">2026-10-12</strong></div>
+      <div>POS: <strong id="tele-xyz">[0.0, 28.0, 32.0]</strong></div>
+      <div>QUAT: <strong id="tele-quat">[0, 0, 0, 1]</strong></div>
+    </div>
+
+    <div class="section-hdr" style="margin-top:6px">
+      <span>🧅 4D ONION-SKIN (SEE-THRU BLEND)</span>
+      <span id="opacity-val">88%</span>
+    </div>
+    <div class="slider-row">
+      <span>3D World</span>
+      <input type="range" id="opacity-slider" min="10" max="100" value="88" />
+      <span>2D Photo</span>
+    </div>
+
+    <div class="section-hdr" style="margin-top:10px">
+      <span>📏 FRUSTUM DEPTH PYRAMID</span>
+      <span id="depth-val">8.5m</span>
+    </div>
+    <div class="slider-row">
+      <span>Near</span>
+      <input type="range" id="depth-slider" min="3" max="18" step="0.5" value="8.5" />
+      <span>Far</span>
+    </div>
+    <div style="font-size:10.5px;color:var(--muted);line-height:1.45;margin-top:8px">
+      💡 <strong>Click any 3D photo frustum</strong> in the scene (or a card below) to slerp the camera directly into that photographer's exact historical perspective. Drag to orbit; scroll to zoom.
+    </div>
+  </aside>
+
+  <!-- Right Drawer: Live Neo4j Knowledge Graph Bindings -->
+  <aside class="right-graph">
+    <div class="section-hdr">
+      <span>🧠 NEO4J SPATIAL GRAPH PALACE</span>
+      <span style="color:var(--mint);font-size:10px">LIVE</span>
+    </div>
+    <div class="graph-stats" id="neo4j-stats">
+      Loading Neo4j Graphiti bundle (/gev-intel/index.json)…
+    </div>
+    <div style="font-size:10.5px;color:var(--muted)">
+      Click any entity or memory anchor below to fly to its 3D camera frustum:
+    </div>
+    <div class="node-list" id="neo4j-node-list"></div>
+  </aside>
+
+  <!-- Bottom 4D Camera Roll / Frustum Timeline -->
+  <nav class="bottom-rail" id="camera-rail"></nav>
+
+  <script type="module" src="/memory-palace.js"></script>
+</body>
+</html>

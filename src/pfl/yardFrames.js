@@ -1296,7 +1296,7 @@ function setArrange(viewer, on) {
 
 function installArrangeToggle(viewer) {
   if (typeof document === 'undefined') return;
-  for (const id of ['gev-arrange-toggle', 'gev-arrange-dock-btn', 'gev-arrange-panel']) {
+  for (const id of ['gev-arrange-toggle', 'gev-arrange-dock-btn', 'gev-arrange-panel', 'gev-memory-palace-btn']) {
     document.getElementById(id)?.remove();
   }
   const oldCss = document.getElementById('gev-arrange-css');
@@ -1322,6 +1322,17 @@ function installArrangeToggle(viewer) {
       'color:#00d4ff;background:rgba(0,212,255,.14);border:1px solid rgba(0,212,255,.55);' +
       'border-radius:10px;cursor:pointer;text-align:center';
     locationBar.insertAdjacentElement('afterend', dockBtn);
+    const mpBtn = document.createElement('a');
+    mpBtn.id = 'gev-memory-palace-btn';
+    mpBtn.href = '/memory-palace.html';
+    // i18n-ignore: private PFL operator surface is intentionally English.
+    mpBtn.textContent = '🏛️ 3D MEMORY PALACE';
+    mpBtn.style.cssText =
+      'display:block;width:100%;min-height:34px;margin:4px 0;padding:7px 10px;' +
+      "font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;letter-spacing:.10em;" +
+      'color:#00ffcc;background:rgba(0,255,204,.14);border:1px solid rgba(0,255,204,.55);' +
+      'border-radius:10px;cursor:pointer;text-align:center;text-decoration:none';
+    dockBtn.insertAdjacentElement('afterend', mpBtn);
   }
 
   const panel = buildPanel(viewer);
