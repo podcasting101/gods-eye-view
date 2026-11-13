@@ -636,14 +636,22 @@ export async function loadBrazoriaCadPlugin({
     const owner = String(attrs.py_owner_name || '').replace(/\s+/g, ' ').trim();
     const acNum = Number(attrs.legal_acreage || 0);
     const ac = acNum > 0 ? `${acNum.toFixed(acNum < 10 ? 2 : 1)}ac` : '';
-    const valNum = Number(attrs.appraised_val || 0);
-    const val = valNum > 0 ? `$${valNum.toLocaleString()}` : '';
+    const rawGisVal = Number(attrs.appraised_val || 0);
+    const valNum = pid === '595430' ? 22032 : rawGisVal;
+    const val =
+      pid === '595430'
+        ? '$22,032 (Tr 6+7A Capped · $53,990 Mkt)'
+        : valNum > 0
+          ? `$${valNum.toLocaleString()}`
+          : '';
     const isExempt = owner.includes('UNITED STATES') || owner.includes('BRAZORIA COUNTY');
     const estTax = isExempt
       ? '$0 (Exempt)'
-      : valNum > 0
-        ? `~$${Math.round(valNum * 0.0188).toLocaleString()}/yr`
-        : '';
+      : pid === '595430'
+        ? '~$414/yr (Tr 6+7A combined)'
+        : valNum > 0
+          ? `~$${Math.round(valNum * 0.0188).toLocaleString()}/yr`
+          : '';
     const situs = String(attrs.SITUS || attrs.OLD_BCAD_GIS_SITUS || '')
       .replace(/\s+/g, ' ')
       .trim();
