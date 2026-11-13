@@ -6,6 +6,7 @@ import {
   STORED_GROUND_HEIGHT_M,
 } from './placedObjects.js';
 import { loadYardFrames } from './yardFrames.js';
+import { loadBrazoriaCadPlugin } from './brazoriaCadPlugin.js';
 
 export const SOVEREIGN_ANCHOR = Object.freeze({
   id: 'lisa-muse-sovereign-anchor',
@@ -81,10 +82,12 @@ export async function loadPflStation({ viewer, cesiumToken, signal }) {
   let anchor = null;
   let placed = null;
   let frames = null;
+  let cad = null;
   let destroyed = false;
   const destroy = () => {
     if (destroyed) return;
     destroyed = true;
+    cad?.destroy?.();
     frames?.destroy?.();
     placed?.destroy?.();
     if (anchor) viewer.entities.remove(anchor);
@@ -111,9 +114,15 @@ export async function loadPflStation({ viewer, cesiumToken, signal }) {
       rethrowAbort(signal, error);
       console.warn('[PFL Station] yard frames unavailable:', error);
     }
+    try {
+      cad = await loadBrazoriaCadPlugin({ viewer, signal });
+    } catch (error) {
+      rethrowAbort(signal, error);
+      console.warn('[PFL Station] Brazoria CAD overlay unavailable:', error);
+    }
     signal?.throwIfAborted();
     governorRequestRender('pfl-station-load');
-    return { anchor, placed, frames, destroy };
+    return { anchor, placed, frames, cad, destroy };
   } catch (error) {
     destroy();
     throw error;
