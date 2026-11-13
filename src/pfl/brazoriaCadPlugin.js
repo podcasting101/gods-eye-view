@@ -194,6 +194,8 @@ async function syncBirdPondObjects({ viewer, fetchImpl, signal, entities, isDest
     const imgSrc = typeof base.image === 'function' ? base.image() : base.image;
     if (!imgSrc) continue;
 
+    const isCutout =
+      typeof base.image === 'function' || /\.png(\?|$)/i.test(String(imgSrc));
     const seg = computeWallSegment(lat, lon, w, heading);
     entities.push(
       viewer.entities.add({
@@ -211,7 +213,7 @@ async function syncBirdPondObjects({ viewer, fetchImpl, signal, entities, isDest
           minimumHeights: [baseAlt, baseAlt],
           material: new Cesium.ImageMaterialProperty({
             image: imgSrc,
-            transparent: true,
+            transparent: isCutout || opacity < 0.995,
             color: Cesium.Color.WHITE.withAlpha(opacity),
           }),
         },
