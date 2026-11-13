@@ -25,8 +25,265 @@ export const BCAD_PARCELS_QUERY_URL =
   '&outFields=PID,NAME,py_owner_name,legal_acreage,appraised_val,SITUS,DOCUMENT,legal_desc' +
   '&outSR=4326&f=json';
 
-export const BIRDPOND_LAYOUT_URL =
-  'https://elitespyworlds.com/birdpond/save_layout.php';
+export const BIRDPOND_BASE_URL = 'https://elitespyworlds.com/birdpond';
+export const BIRDPOND_LAYOUT_URL = `${BIRDPOND_BASE_URL}/save_layout.php`;
+
+// Surveyed WGS84 ellipsoid fallback for Sweeny / Bird Pond (~9m NAVD88 - ~26.5m geoid)
+const BIRDPOND_FALLBACK_GROUND_M = -17.5;
+
+function makeSignCanvas(bgHex, borderHex, title, subtitle) {
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 256;
+  const ctx = c.getContext('2d');
+  if (!ctx) return null;
+  ctx.fillStyle = '#5c4033';
+  ctx.fillRect(68, 150, 22, 106);
+  ctx.fillRect(422, 150, 22, 106);
+  ctx.fillStyle = bgHex;
+  ctx.fillRect(24, 18, 464, 152);
+  ctx.strokeStyle = borderHex;
+  ctx.lineWidth = 8;
+  ctx.strokeRect(30, 24, 452, 140);
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.font = '800 42px "Segoe UI", Arial, sans-serif';
+  ctx.fillText(title, 256, 84, 424);
+  if (subtitle) {
+    ctx.fillStyle = borderHex;
+    ctx.font = '700 26px "Segoe UI", Arial, sans-serif';
+    ctx.fillText(subtitle, 256, 134, 424);
+  }
+  return c;
+}
+
+function computeWallSegment(lat, lon, widthM, headingDeg) {
+  const halfW = widthM * 0.5;
+  const az = ((Number(headingDeg) || 0) * Math.PI) / 180.0;
+  // Wall normal faces headingDeg; wall span runs perpendicular (headingDeg + 90°)
+  const spanRad = az + Math.PI * 0.5;
+  const dN = Math.cos(spanRad) * halfW;
+  const dE = Math.sin(spanRad) * halfW;
+  const mLat = 111320.0;
+  const mLon = 111320.0 * Math.cos((lat * Math.PI) / 180.0);
+  return {
+    lon1: lon - dE / mLon,
+    lat1: lat - dN / mLat,
+    lon2: lon + dE / mLon,
+    lat2: lat + dN / mLat,
+  };
+}
+
+async function resolveGroundElevation(viewer, lon, lat) {
+  try {
+    const tp = viewer?.terrainProvider;
+    if (tp && typeof Cesium.sampleTerrainMostDetailed === 'function' && tp.availability) {
+      const [pt] = await Cesium.sampleTerrainMostDetailed(tp, [
+        Cesium.Cartographic.fromDegrees(lon, lat),
+      ]);
+      if (pt && Number.isFinite(pt.height)) return pt.height;
+    }
+  } catch {
+    // Fall back to globe height or surveyed constant
+  }
+  const h = viewer?.scene?.globe?.getHeight?.(Cesium.Cartographic.fromDegrees(lon, lat));
+  return Number.isFinite(h) ? h : BIRDPOND_FALLBACK_GROUND_M;
+}
+
+async function syncBirdPondObjects({ viewer, fetchImpl, signal, entities, isDestroyed }) {
+  const res = await fetchImpl(`${BIRDPOND_LAYOUT_URL}?_t=${Date.now()}`, { signal });
+  if (!res?.ok) return;
+  const layout = await res.json();
+  if (!layout || isDestroyed()) return;
+
+  const groundM = await resolveGroundElevation(viewer, -95.804794, 29.139116);
+  if (isDestroyed()) return;
+
+  const defaultWalls = [
+    {
+      id: 'tract6_gate_wall',
+      name: 'Gate Street Photo (2024)',
+      image: `${BIRDPOND_BASE_URL}/photos/gate_2024.jpg`,
+      lat: 29.13911615582293,
+      lon: -95.80479376352282,
+      width: 13.92696,
+      height: 9.226611,
+      heading: 107.0,
+    },
+    {
+      id: 'lisa_at_gate_photo',
+      name: 'Lisa Muse — at the Gate',
+      image: `${BIRDPOND_BASE_URL}/photos/agent.jpg`,
+      lat: 29.1391111,
+      lon: -95.804848,
+      width: 1.5,
+      height: 2.0,
+      heading: 2.0,
+    },
+    {
+      id: 'pepper_way_mailbox',
+      name: 'Pepper Way Mailbox (2724 FM 524)',
+      image: () => makeSignCanvas('#1e293b', '#f8fafc', '2724 FM 524', 'PEPPER WAY'),
+      lat: 29.139104,
+      lon: -95.804431,
+      width: 0.95,
+      height: 1.25,
+      heading: 122.0,
+    },
+    {
+      id: 'pepper_way_sign',
+      name: 'Pepper Way Entrance Sign',
+      image: () => makeSignCanvas('#14532d', '#fde047', 'PEPPER WAY', 'PRIVATE SOVEREIGN RD'),
+      lat: 29.13903,
+      lon: -95.80458,
+      width: 3.6,
+      height: 1.7,
+      heading: 122.0,
+    },
+    {
+      id: 'for_sale_billboard',
+      name: 'FOR SALE Billboard',
+      image: () => makeSignCanvas('#7f1d1d', '#fef08a', 'FOR SALE', 'FM 524 FRONTAGE'),
+      lat: 29.13884,
+      lon: -95.8055,
+      width: 5.2,
+      height: 2.5,
+      heading: 102.0,
+    },
+    {
+      id: 'tract7_title_board',
+      name: 'Tract 7 Title Breakdown',
+      image: `${BIRDPOND_BASE_URL}/photos/tract7-pie.png`,
+      lat: 29.139093,
+      lon: -95.804716,
+      width: 2.8,
+      height: 2.8,
+      heading: 122.0,
+    },
+    {
+      id: 'proposed_dance_bayou_bridge',
+      name: 'Proposed Dance Bayou Bridge',
+      image: `${BIRDPOND_BASE_URL}/photos/bridge-proposed.png`,
+      lat: 29.1354,
+      lon: -95.8042,
+      width: 12.0,
+      height: 6.8,
+      heading: 0.0,
+    },
+  ];
+
+  const gw = layout.gate_wall || {};
+  const objs = layout.objects || {};
+
+  for (const base of defaultWalls) {
+    const ov = base.id === 'tract6_gate_wall' ? gw : objs[base.id] || {};
+    const lat = typeof ov.lat === 'number' ? ov.lat : base.lat;
+    const lon = typeof ov.lon === 'number' ? ov.lon : base.lon;
+    const heading = typeof ov.heading === 'number' ? ov.heading : base.heading;
+    const scale =
+      base.id === 'tract6_gate_wall' && typeof ov.width === 'number' && ov.width > 0
+        ? ov.width / base.width
+        : typeof ov.scale === 'number' && ov.scale > 0
+          ? ov.scale
+          : 1.0;
+    const opacity = typeof ov.opacity === 'number' ? ov.opacity : 1.0;
+    const baseAlt = groundM + (typeof ov.baseAlt === 'number' ? ov.baseAlt : 0);
+    const w = base.width * scale;
+    const h = base.height * scale;
+    const imgSrc = typeof base.image === 'function' ? base.image() : base.image;
+    if (!imgSrc) continue;
+
+    const seg = computeWallSegment(lat, lon, w, heading);
+    entities.push(
+      viewer.entities.add({
+        id: `birdpond_${base.id}`,
+        name: `Bird Pond · ${base.name}`,
+        wall: {
+          positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+            seg.lon1,
+            seg.lat1,
+            baseAlt + h,
+            seg.lon2,
+            seg.lat2,
+            baseAlt + h,
+          ]),
+          minimumHeights: [baseAlt, baseAlt],
+          material: new Cesium.ImageMaterialProperty({
+            image: imgSrc,
+            transparent: true,
+            color: Cesium.Color.WHITE.withAlpha(opacity),
+          }),
+        },
+      }),
+    );
+  }
+
+  for (const p of Array.isArray(layout.pins) ? layout.pins : []) {
+    if (!p?.id || p.type !== 'photo' || !p.imageUrl) continue;
+    const ov = objs[p.id] || {};
+    const lat = Number(ov.lat ?? p.lat ?? 29.139116);
+    const lon = Number(ov.lon ?? p.lon ?? -95.804794);
+    const heading = Number(ov.heading ?? p.heading ?? 107.0);
+    const scale = Number(ov.scale ?? p.scale ?? 1.0) || 1.0;
+    const opacity = Number(ov.opacity ?? p.opacity ?? 1.0);
+    const w = (Number(p.width) || 2.4) * scale;
+    const h = (Number(p.height) || 1.8) * scale;
+    const baseAlt = groundM + (Number(ov.baseAlt ?? p.baseAlt) || 0);
+    const url = p.imageUrl.startsWith('http')
+      ? p.imageUrl
+      : `${BIRDPOND_BASE_URL}/${p.imageUrl.replace(/^\/+/, '')}`;
+    const seg = computeWallSegment(lat, lon, w, heading);
+    entities.push(
+      viewer.entities.add({
+        id: `birdpond_pin_${p.id}`,
+        name: `Bird Pond · ${p.title || 'Uploaded Photo'}`,
+        wall: {
+          positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+            seg.lon1,
+            seg.lat1,
+            baseAlt + h,
+            seg.lon2,
+            seg.lat2,
+            baseAlt + h,
+          ]),
+          minimumHeights: [baseAlt, baseAlt],
+          material: new Cesium.ImageMaterialProperty({
+            image: url,
+            transparent: true,
+            color: Cesium.Color.WHITE.withAlpha(opacity),
+          }),
+        },
+      }),
+    );
+  }
+
+  const busOv = objs.paul_beaver_coach || {};
+  const busLat = typeof busOv.lat === 'number' ? busOv.lat : 29.14176;
+  const busLon = typeof busOv.lon === 'number' ? busOv.lon : -95.801859;
+  const busHeading = typeof busOv.heading === 'number' ? busOv.heading : 45.0;
+  const busScale = typeof busOv.scale === 'number' && busOv.scale > 0 ? busOv.scale : 1.0;
+  const busOpacity = typeof busOv.opacity === 'number' ? busOv.opacity : 1.0;
+  const busPos = Cesium.Cartesian3.fromDegrees(busLon, busLat, groundM + 1.8);
+  entities.push(
+    viewer.entities.add({
+      id: 'birdpond_paul_beaver_coach',
+      name: "Bird Pond · Paul's Beaver Monaco Coach",
+      position: busPos,
+      orientation: Cesium.Transforms.headingPitchRollQuaternion(
+        busPos,
+        new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(busHeading), 0, 0),
+      ),
+      model: {
+        uri: `${BIRDPOND_BASE_URL}/models/monaco_beaver_coach.glb`,
+        scale: busScale,
+        color: Cesium.Color.WHITE.withAlpha(busOpacity),
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
+    }),
+  );
+  governorRequestRender('pfl-birdpond-objects-sync');
+}
 
 export const HERO_BLOCK48_TRACTS = Object.freeze(
   new Set(['1', '2', '3', '4', '5', '6', '7', '7A']),
@@ -563,6 +820,19 @@ export async function loadBrazoriaCadPlugin({
     removePreRender = () => {
       viewer.scene?.preRender?.removeEventListener?.(onPreRender);
     };
+  }
+
+  try {
+    await syncBirdPondObjects({
+      viewer,
+      fetchImpl,
+      signal,
+      entities,
+      isDestroyed: () => destroyed,
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') throw err;
+    console.warn('[PFL BirdPond] Live 3D object sync skipped:', err);
   }
 
   governorRequestRender('pfl-bcad-load');
