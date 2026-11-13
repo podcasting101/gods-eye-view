@@ -22,7 +22,7 @@ export const BCAD_PARCELS_QUERY_URL =
   'https://arcgis-web.brazoriacountytx.gov/arcgis/rest/services/general/Parcels/MapServer/1/query' +
   '?geometry=-95.814,29.132,-95.794,29.148&geometryType=esriGeometryEnvelope&inSR=4326' +
   '&spatialRel=esriSpatialRelIntersects' +
-  '&outFields=PID,NAME,py_owner_name,legal_acreage,appraised_val,SITUS,DOCUMENT,legal_desc' +
+  '&outFields=PID,geo_id,NAME,py_owner_name,legal_acreage,appraised_val,SITUS,OLD_BCAD_GIS_SITUS,DOCUMENT,legal_desc' +
   '&outSR=4326&f=json';
 
 export const BIRDPOND_BASE_URL = 'https://elitespyworlds.com/birdpond';
@@ -531,6 +531,58 @@ function renderMicroTextCanvas(line1, line2, accentHex = '#fde047', isHero = fal
   return { canvas, cssW, cssH };
 }
 
+function renderDossierBoxCanvas(lines, accentHex = '#fde047', isHero = false) {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const dpr = 2;
+  const padX = 8;
+  const padY = 6;
+  const lineGap = 2.5;
+  const specs = lines.map((txt, idx) => {
+    const isFirst = idx === 0;
+    const isLink = idx === lines.length - 1 && txt.includes('↗');
+    const px = isFirst ? 10.5 : isLink ? 9.0 : 9.5;
+    const font = `${isFirst ? 800 : isLink ? 700 : 600} ${px}px "Segoe UI", system-ui, Arial, sans-serif`;
+    const color = isFirst ? accentHex : isLink ? '#38bdf8' : '#f1f5f9';
+    return { txt, px, font, color };
+  });
+
+  let maxW = 0;
+  let totalH = padY * 2 - lineGap;
+  for (const sp of specs) {
+    ctx.font = sp.font;
+    const w = ctx.measureText(sp.txt).width;
+    if (w > maxW) maxW = w;
+    totalH += sp.px + lineGap;
+  }
+  const cssW = Math.ceil(maxW + padX * 2);
+  const cssH = Math.ceil(totalH + 2);
+
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  ctx.scale(dpr, dpr);
+
+  ctx.fillStyle = 'rgba(7, 13, 26, 0.92)';
+  ctx.fillRect(1, 1, cssW - 2, cssH - 2);
+  ctx.strokeStyle = isHero ? '#fde047' : '#38bdf8';
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(1, 1, cssW - 2, cssH - 2);
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  let curY = padY;
+  for (const sp of specs) {
+    ctx.font = sp.font;
+    ctx.fillStyle = sp.color;
+    ctx.fillText(sp.txt, padX, curY);
+    curY += sp.px + lineGap;
+  }
+  return { canvas, cssW, cssH };
+}
+
 export async function loadBrazoriaCadPlugin({
   viewer,
   signal,
@@ -574,6 +626,7 @@ export async function loadBrazoriaCadPlugin({
     const attrs = f.attributes || {};
     const pidNum = Number(attrs.PID || 0);
     const pid = pidNum > 0 ? String(pidNum) : '';
+    const geoId = String(attrs.geo_id || '').trim();
     const tractName = String(attrs.NAME || '').trim().toUpperCase();
     if (!pid && !tractName) continue;
 
@@ -583,19 +636,37 @@ export async function loadBrazoriaCadPlugin({
     const owner = String(attrs.py_owner_name || '').replace(/\s+/g, ' ').trim();
     const acNum = Number(attrs.legal_acreage || 0);
     const ac = acNum > 0 ? `${acNum.toFixed(acNum < 10 ? 2 : 1)}ac` : '';
-    const val = attrs.appraised_val ? `$${Number(attrs.appraised_val).toLocaleString()}` : '';
-    const situs = String(attrs.SITUS || '').replace(/\s+/g, ' ').trim();
+    const valNum = Number(attrs.appraised_val || 0);
+    const val = valNum > 0 ? `$${valNum.toLocaleString()}` : '';
+    const isExempt = owner.includes('UNITED STATES') || owner.includes('BRAZORIA COUNTY');
+    const estTax = isExempt
+      ? '$0 (Exempt)'
+      : valNum > 0
+        ? `~$${Math.round(valNum * 0.0188).toLocaleString()}/yr`
+        : '';
+    const situs = String(attrs.SITUS || attrs.OLD_BCAD_GIS_SITUS || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const bcadUrl = pid
+      ? `https://esearch.brazoriacad.org/Property/View/${encodeURIComponent(pid)}`
+      : 'https://esearch.brazoriacad.org/';
+    const taxOfficeUrl = 'https://actweb.acttax.com/act_webdev/brazoria/index.jsp';
 
     const descHtml = `
       <div style="font-family:system-ui,sans-serif;padding:10px;color:#e2e8f0;background:#0f172a;border-radius:8px;font-size:12px">
         <div style="font-weight:700;color:#fde047;font-size:14px;margin-bottom:4px">
           ${tractName ? `Tract ${tractName}` : `Parcel ${pid}`}${isBlock48 ? ' · Block 48' : ''}
         </div>
-        <div><strong>PID:</strong> ${pid || 'N/A'}</div>
+        <div><strong>PID:</strong> ${pid || 'N/A'}${geoId ? ` · <strong>Geo:</strong> ${geoId}` : ''}</div>
         <div><strong>Owner:</strong> ${owner || 'Unlisted'}</div>
         ${ac ? `<div><strong>Legal Acreage:</strong> ${ac}</div>` : ''}
         ${val ? `<div><strong>Appraised Value:</strong> ${val}</div>` : ''}
+        ${estTax ? `<div><strong>Est. Annual Tax:</strong> ${estTax}</div>` : ''}
         ${situs ? `<div><strong>Situs:</strong> ${situs}</div>` : ''}
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:5px">
+          <a href="${bcadUrl}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;font-weight:700">🏛️ Official Brazoria CAD Property Page (PID ${pid || 'Search'}) ↗</a>
+          <a href="${taxOfficeUrl}" target="_blank" rel="noopener noreferrer" style="color:#4ade80;font-weight:700">💳 Brazoria County Tax Office (Tax Due / Pay) ↗</a>
+        </div>
       </div>`;
 
     for (const ring of rings) {
@@ -633,6 +704,7 @@ export async function loadBrazoriaCadPlugin({
       let detailLine1 = tagText;
       let detailLine2 = '';
       let accent = '#bae6fd';
+      const shortOwner = formatConciseOwner(owner);
       if (isHero) {
         accent = '#fde047';
         if (tractName === '7') {
@@ -640,25 +712,38 @@ export async function loadBrazoriaCadPlugin({
           detailLine2 = 'Ava 50% · Pepper · Kee';
         } else if (tractName === '6' || tractName === '7A') {
           detailLine1 = `Tr ${tractName} · 2.17ac`;
-          detailLine2 = 'Paul Bracewell';
+          detailLine2 = `Paul Bracewell${val ? ` · ${val}` : ''}`;
         } else {
           detailLine1 = `Tr ${tractName}${ac ? ` · ${ac}` : ''}`;
-          detailLine2 = formatConciseOwner(owner);
+          detailLine2 = `${shortOwner}${val ? ` · ${val}` : ''}`;
         }
       } else if (isBlock48) {
         accent = '#fef08a';
-        detailLine1 = tractName ? `Tr ${tractName}` : `PID ${pid}`;
-        detailLine2 = formatConciseOwner(owner) || ac;
+        detailLine1 = `${tractName ? `Tr ${tractName}` : `PID ${pid}`}${ac ? ` · ${ac}` : ''}`;
+        detailLine2 = `${shortOwner}${val ? ` · ${val}` : ''}`;
       } else {
-        detailLine1 = tractName ? `Tr ${tractName}` : ac || `PID ${pid}`;
-        detailLine2 = formatConciseOwner(owner);
+        detailLine1 = `${tractName ? `Tr ${tractName}` : `PID ${pid}`}${ac ? ` · ${ac}` : ''}`;
+        detailLine2 = `${shortOwner}${val ? ` · ${val}` : ''}`;
       }
+
+      const ownerClip = owner.length > 34 ? `${owner.slice(0, 33)}…` : owner || 'Unlisted';
+      const dossierSprite = renderDossierBoxCanvas(
+        [
+          `🏛️ ${(tractName ? `TRACT ${tractName}` : `PID ${pid}`)}${isBlock48 ? ' (BLK 48)' : ''}${ac ? ` · ${ac.toUpperCase()}` : ''}`,
+          `Owner: ${ownerClip}`,
+          `${val ? `Appraised: ${val}` : 'Appraised: Unlisted'}${estTax ? ` · Est Tax ${estTax}` : ''}`,
+          `PID: ${pid || 'N/A'}${geoId ? ` · Geo: ${geoId}` : ''}`,
+          '🔗 Click → Official Brazoria County CAD & Tax ↗',
+        ],
+        accent,
+        isHero,
+      );
 
       const tagSprite = renderMicroTextCanvas(tagText, '', accent, isHero);
       const detailSprite = renderMicroTextCanvas(detailLine1, detailLine2, accent, isHero);
       if (!tagSprite || !detailSprite) continue;
 
-      const posWC = Cesium.Cartesian3.fromDegrees(ctr.lon, ctr.lat, 1.8);
+      const posWC = Cesium.Cartesian3.fromDegrees(ctr.lon, ctr.lat, 2.2);
       const isRoadStrip = isHero && (tractName === '6' || tractName === '7A');
       const ent = viewer.entities.add({
         name: `BCAD ${tagText}`,
@@ -671,7 +756,7 @@ export async function loadBrazoriaCadPlugin({
           height: tagSprite.cssH,
           verticalOrigin: Cesium.VerticalOrigin.CENTER,
           horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-          disableDepthTestDistance: 1800,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
       });
       entities.push(ent);
@@ -690,7 +775,8 @@ export async function loadBrazoriaCadPlugin({
         dirClearanceM: ctr.dirClearanceM,
         tagSprite,
         detailSprite,
-        mode: 0, // 0=hidden, 1=tag, 2=detail
+        dossierSprite,
+        mode: 0, // 0=hidden, 1=tag, 2=detail, 4=dossierBox
       });
     }
   }
@@ -708,7 +794,15 @@ export async function loadBrazoriaCadPlugin({
       const pitchDeg = Cesium.Math.toDegrees(pitch);
       const heading = cam?.heading ?? 0.0;
 
-      if (alt < 42.0 || alt > 3200.0 || pitchDeg > -20.0) {
+      const camLatDeg = carto ? Cesium.Math.toDegrees(carto.latitude) : 29.139116;
+      const camLonDeg = carto ? Cesium.Math.toDegrees(carto.longitude) : -95.804794;
+      const distToGateM = Math.hypot(
+        (camLatDeg - 29.139116) * 111320.0,
+        (camLonDeg - -95.804794) * 111320.0 * Math.cos((29.139116 * Math.PI) / 180.0),
+      );
+      const onStreetGateStage = distToGateM < 42.0 && alt < 20.0;
+
+      if (onStreetGateStage || alt < 3.5 || alt > 3200.0 || pitchDeg > -7.0) {
         for (let i = 0; i < labelRecords.length; i++) {
           if (labelRecords[i].ent.show) labelRecords[i].ent.show = false;
         }
@@ -719,7 +813,7 @@ export async function loadBrazoriaCadPlugin({
       const canvasH = viewer.canvas?.clientHeight || 800;
       const fovy = cam?.frustum?.fovy || 1.0472;
       const focalPx = canvasH / (2.0 * Math.tan(fovy * 0.5));
-      const sinPitch = Math.max(0.12, -Math.sin(pitch));
+      const sinPitch = Math.max(0.16, -Math.sin(pitch));
       const camPos = cam.positionWC;
       const occupied = [];
       const padX = 10;
@@ -743,7 +837,7 @@ export async function loadBrazoriaCadPlugin({
         const ent = rec.ent;
         const dist = Cesium.Cartesian3.distance(camPos, rec.posWC);
         const maxDist = rec.isHero ? 2600.0 : rec.isBlock48 ? 1400.0 : 900.0;
-        if (dist > maxDist || dist < 20.0) {
+        if (dist > maxDist || dist < 3.5) {
           if (ent.show) ent.show = false;
           continue;
         }
@@ -760,61 +854,61 @@ export async function loadBrazoriaCadPlugin({
 
         const chordRightM = sampleChordMeters(rec.dirClearanceM, heading + Math.PI * 0.5);
         const chordFwdM = sampleChordMeters(rec.dirClearanceM, heading);
-        let availW = (chordRightM / dist) * focalPx * 0.76;
-        let availH = ((chordFwdM * sinPitch) / dist) * focalPx * 0.76;
+        let availW = (chordRightM / dist) * focalPx * 0.84;
+        let availH = ((chordFwdM * sinPitch) / dist) * focalPx * 0.84;
 
         if (rec.isRoadStrip) {
           const alongPx = (Math.max(chordRightM, chordFwdM) / dist) * focalPx;
-          availW = Math.max(availW, Math.min(48, alongPx * 0.28));
-          availH = Math.max(availH, 16);
+          availW = Math.max(availW, Math.min(alt <= 65.0 ? 250 : 64, alongPx * (alt <= 65.0 ? 0.72 : 0.3)));
+          availH = Math.max(availH, alt <= 65.0 ? 115 : 22);
         }
-
-        const detW = rec.detailSprite.cssW;
-        const detH = rec.detailSprite.cssH;
-        const tagW = rec.tagSprite.cssW;
-        const tagH = rec.tagSprite.cssH;
 
         let chosenMode = 0;
-        let drawW = 0;
-        let drawH = 0;
+        let chosenSpr = null;
 
         if (
+          alt <= 58.0 &&
+          rec.dossierSprite &&
+          availW >= rec.dossierSprite.cssW * 0.92 &&
+          availH >= rec.dossierSprite.cssH * 0.85 &&
+          !collides(win.x, win.y, rec.dossierSprite.cssW, rec.dossierSprite.cssH)
+        ) {
+          chosenMode = 4;
+          chosenSpr = rec.dossierSprite;
+        } else if (
           !rec.isRoadStrip &&
-          availW >= detW * 1.15 &&
-          availH >= detH * 1.15 &&
-          !collides(win.x, win.y, detW, detH)
+          availW >= rec.detailSprite.cssW * 1.12 &&
+          availH >= rec.detailSprite.cssH * 1.12 &&
+          !collides(win.x, win.y, rec.detailSprite.cssW, rec.detailSprite.cssH)
         ) {
           chosenMode = 2;
-          drawW = detW;
-          drawH = detH;
+          chosenSpr = rec.detailSprite;
         } else if (
-          availW >= tagW * (rec.isHero ? 0.85 : 1.05) &&
-          availH >= tagH * (rec.isHero ? 0.85 : 1.05) &&
-          !collides(win.x, win.y, tagW, tagH)
+          availW >= rec.tagSprite.cssW * (rec.isHero ? 0.82 : 1.02) &&
+          availH >= rec.tagSprite.cssH * (rec.isHero ? 0.82 : 1.02) &&
+          !collides(win.x, win.y, rec.tagSprite.cssW, rec.tagSprite.cssH)
         ) {
           chosenMode = 1;
-          drawW = tagW;
-          drawH = tagH;
+          chosenSpr = rec.tagSprite;
         }
 
-        if (chosenMode === 0) {
+        if (chosenMode === 0 || !chosenSpr) {
           if (ent.show) ent.show = false;
           continue;
         }
 
         if (rec.mode !== chosenMode) {
           rec.mode = chosenMode;
-          const spr = chosenMode === 2 ? rec.detailSprite : rec.tagSprite;
-          ent.billboard.image = spr.canvas;
-          ent.billboard.width = spr.cssW;
-          ent.billboard.height = spr.cssH;
+          ent.billboard.image = chosenSpr.canvas;
+          ent.billboard.width = chosenSpr.cssW;
+          ent.billboard.height = chosenSpr.cssH;
         }
         if (!ent.show) ent.show = true;
         occupied.push([
-          win.x - drawW * 0.5,
-          win.y - drawH * 0.5,
-          win.x + drawW * 0.5,
-          win.y + drawH * 0.5,
+          win.x - chosenSpr.cssW * 0.5,
+          win.y - chosenSpr.cssH * 0.5,
+          win.x + chosenSpr.cssW * 0.5,
+          win.y + chosenSpr.cssH * 0.5,
         ]);
       }
     };
