@@ -1,5 +1,14 @@
 import * as Cesium from 'cesium';
 import { governorRequestRender } from '../renderGovernor.js';
+import {
+  REAL_ESTATE_SERVICE_CONFIG,
+  BIRDPOND_BASE_URL as CONFIG_BIRDPOND_BASE_URL,
+  BIRDPOND_LAYOUT_URL as CONFIG_BIRDPOND_LAYOUT_URL,
+  HERO_BLOCK48_TRACTS as CONFIG_HERO_BLOCK48_TRACTS,
+  resolveAppraisedValue,
+  calculateEstimatedTax,
+  getBcadUrls,
+} from './realEstateConfig.js';
 
 /**
  * Standardized PFL Cadastral & Spatial Layout Plugin for God's Eye View.
@@ -18,18 +27,14 @@ import { governorRequestRender } from '../renderGovernor.js';
  *    can ever occur at any zoom, tilt, or landing vantage.
  */
 
-export const BCAD_PARCELS_QUERY_URL =
-  'https://arcgis-web.brazoriacountytx.gov/arcgis/rest/services/general/Parcels/MapServer/1/query' +
-  '?geometry=-95.814,29.132,-95.794,29.148&geometryType=esriGeometryEnvelope&inSR=4326' +
-  '&spatialRel=esriSpatialRelIntersects' +
-  '&outFields=PID,geo_id,NAME,py_owner_name,legal_acreage,appraised_val,SITUS,OLD_BCAD_GIS_SITUS,DOCUMENT,legal_desc' +
-  '&outSR=4326&f=json';
-
-export const BIRDPOND_BASE_URL = 'https://elitespyworlds.com/birdpond';
-export const BIRDPOND_LAYOUT_URL = `${BIRDPOND_BASE_URL}/save_layout.php`;
+export const BCAD_PARCELS_QUERY_URL = REAL_ESTATE_SERVICE_CONFIG.queryUrl;
+export const BIRDPOND_BASE_URL = CONFIG_BIRDPOND_BASE_URL;
+export const BIRDPOND_LAYOUT_URL = CONFIG_BIRDPOND_LAYOUT_URL;
+export const HERO_BLOCK48_TRACTS = CONFIG_HERO_BLOCK48_TRACTS;
 
 // Surveyed WGS84 ellipsoid fallback for Sweeny / Bird Pond (~9m NAVD88 - ~26.5m geoid)
-const BIRDPOND_FALLBACK_GROUND_M = -17.5;
+const BIRDPOND_FALLBACK_GROUND_M =
+  REAL_ESTATE_SERVICE_CONFIG.surveyedDatums.birdPondFallbackGroundM;
 
 function makeSignCanvas(bgHex, borderHex, title, subtitle) {
   if (typeof document === 'undefined') return null;
@@ -287,10 +292,6 @@ async function syncBirdPondObjects({ viewer, fetchImpl, signal, entities, isDest
   governorRequestRender('pfl-birdpond-objects-sync');
 }
 
-export const HERO_BLOCK48_TRACTS = Object.freeze(
-  new Set(['1', '2', '3', '4', '5', '6', '7', '7A']),
-);
-
 const HERO_PRIORITY = Object.freeze({
   '7': 100,
   '7A': 96,
@@ -343,15 +344,26 @@ function raySegmentHitMeters(ox, oy, dx, dy, x1, y1, x2, y2) {
   return Infinity;
 }
 
-export function computeVisualBoxCenter(ring) {
-  if (!ring || ring.length < 3) {
+export function computeVisualBoxCenter(inputRing) {
+  if (!inputRing || inputRing.length < 3) {
     return {
       lon: -95.8048,
       lat: 29.1391,
+      centerLon: -95.8048,
+      centerLat: 29.1391,
+      widthDeg: 0,
+      heightDeg: 0,
       areaSqM: 400,
       innerRadiusM: 10,
       dirClearanceM: new Float32Array(16).fill(10),
     };
+  }
+  let ring = inputRing;
+  if (
+    ring[0][0] !== ring[ring.length - 1][0] ||
+    ring[0][1] !== ring[ring.length - 1][1]
+  ) {
+    ring = [...ring, ring[0]];
   }
   let minX = Infinity;
   let maxX = -Infinity;
@@ -453,7 +465,17 @@ export function computeVisualBoxCenter(ring) {
       : innerRadiusM;
   }
 
-  return { lon: bestLon, lat: bestLat, areaSqM, innerRadiusM, dirClearanceM };
+  return {
+    lon: bestLon,
+    lat: bestLat,
+    centerLon: bestLon,
+    centerLat: bestLat,
+    widthDeg: maxX - minX,
+    heightDeg: maxY - minY,
+    areaSqM,
+    innerRadiusM,
+    dirClearanceM,
+  };
 }
 
 function sampleChordMeters(dirClearanceM, azimuthRad) {
@@ -636,29 +658,12 @@ export async function loadBrazoriaCadPlugin({
     const owner = String(attrs.py_owner_name || '').replace(/\s+/g, ' ').trim();
     const acNum = Number(attrs.legal_acreage || 0);
     const ac = acNum > 0 ? `${acNum.toFixed(acNum < 10 ? 2 : 1)}ac` : '';
-    const rawGisVal = Number(attrs.appraised_val || 0);
-    const valNum = pid === '595430' ? 22032 : rawGisVal;
-    const val =
-      pid === '595430'
-        ? '$22,032 (Tr 6+7A Capped · $53,990 Mkt)'
-        : valNum > 0
-          ? `$${valNum.toLocaleString()}`
-          : '';
-    const isExempt = owner.includes('UNITED STATES') || owner.includes('BRAZORIA COUNTY');
-    const estTax = isExempt
-      ? '$0 (Exempt)'
-      : pid === '595430'
-        ? '~$414/yr (Tr 6+7A combined)'
-        : valNum > 0
-          ? `~$${Math.round(valNum * 0.0188).toLocaleString()}/yr`
-          : '';
+    const { valNum, displayVal: val } = resolveAppraisedValue(pid, attrs.appraised_val);
+    const estTax = calculateEstimatedTax(valNum, owner, pid);
     const situs = String(attrs.SITUS || attrs.OLD_BCAD_GIS_SITUS || '')
       .replace(/\s+/g, ' ')
       .trim();
-    const bcadUrl = pid
-      ? `https://esearch.brazoriacad.org/Property/View/${encodeURIComponent(pid)}`
-      : 'https://esearch.brazoriacad.org/';
-    const taxOfficeUrl = 'https://actweb.acttax.com/act_webdev/brazoria/index.jsp';
+    const { bcadUrl, taxOfficeUrl } = getBcadUrls(pid);
 
     const descHtml = `
       <div style="font-family:system-ui,sans-serif;padding:10px;color:#e2e8f0;background:#0f172a;border-radius:8px;font-size:12px">
