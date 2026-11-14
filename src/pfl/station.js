@@ -7,6 +7,9 @@ import {
 } from './placedObjects.js';
 import { loadYardFrames } from './yardFrames.js';
 import { loadBrazoriaCadPlugin } from './brazoriaCadPlugin.js';
+import { loadNeo4jPersonalLayer } from './neo4jPersonalLayer.js';
+import { loadStarshipEventTheater } from './starshipEventTheater.js';
+import { loadPolymarketPlugin } from './polymarketPlugin.js';
 
 export const SOVEREIGN_ANCHOR = Object.freeze({
   id: 'lisa-muse-sovereign-anchor',
@@ -71,22 +74,32 @@ function addSovereignAnchor(viewer) {
 
 function rethrowAbort(signal, error) {
   signal?.throwIfAborted();
-  if (error?.name === 'AbortError') throw error;
+  if (error?.name === 'AbortError') throw errOrAbort(error);
+}
+
+function errOrAbort(error) {
+  return error;
 }
 
 /**
  * Load the private Liverpool station additions without making them a startup
  * dependency. Each surface may fail independently; abort still tears down.
  */
-export async function loadPflStation({ viewer, cesiumToken, signal }) {
+export async function loadPflStation({ viewer, cesiumToken, signal, enablePolymarket = true }) {
   let anchor = null;
   let placed = null;
   let frames = null;
   let cad = null;
+  let neo4j = null;
+  let starship = null;
+  let polymarket = null;
   let destroyed = false;
   const destroy = () => {
     if (destroyed) return;
     destroyed = true;
+    polymarket?.destroy?.();
+    starship?.destroy?.();
+    neo4j?.destroy?.();
     cad?.destroy?.();
     frames?.destroy?.();
     placed?.destroy?.();
@@ -120,9 +133,29 @@ export async function loadPflStation({ viewer, cesiumToken, signal }) {
       rethrowAbort(signal, error);
       console.warn('[PFL Station] Brazoria CAD overlay unavailable:', error);
     }
+    try {
+      neo4j = await loadNeo4jPersonalLayer({ viewer, signal });
+    } catch (error) {
+      rethrowAbort(signal, error);
+      console.warn('[PFL Station] Neo4j 3D layer unavailable:', error);
+    }
+    try {
+      starship = loadStarshipEventTheater({ viewer, neo4jLayer: neo4j });
+    } catch (error) {
+      rethrowAbort(signal, error);
+      console.warn('[PFL Station] Starship Flight 15 theater unavailable:', error);
+    }
+    if (enablePolymarket !== false) {
+      try {
+        polymarket = await loadPolymarketPlugin({ viewer, signal });
+      } catch (error) {
+        rethrowAbort(signal, error);
+        console.warn('[PFL Station] Polymarket radar overlay unavailable:', error);
+      }
+    }
     signal?.throwIfAborted();
     governorRequestRender('pfl-station-load');
-    return { anchor, placed, frames, cad, destroy };
+    return { anchor, placed, frames, cad, neo4j, starship, polymarket, destroy };
   } catch (error) {
     destroy();
     throw error;
