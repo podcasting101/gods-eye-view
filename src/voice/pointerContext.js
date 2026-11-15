@@ -269,6 +269,7 @@ export function createPointerTracker({
   let held = null;
   let active = null;
   let destroyed = false;
+  let buttonsDown = false;
   const listeners = new AbortController();
 
   function size() {
@@ -292,11 +293,17 @@ export function createPointerTracker({
     dwellTimer = null;
   }
 
-  function moveTo(px, py) {
+  function moveTo(px, py, { suppressDwell = false } = {}) {
     inside = true;
     x = px;
     y = py;
     lastMoveAt = now();
+    if (suppressDwell) {
+      anchor = null;
+      dwell = null;
+      cancelDwell();
+      return;
+    }
     if (anchor && Math.hypot(px - anchor.x, py - anchor.y) < POINTER_DWELL_PX)
       return;
     anchor = { x: px, y: py };
@@ -304,14 +311,33 @@ export function createPointerTracker({
     cancelDwell();
     dwellTimer = setTimer(() => {
       dwellTimer = null;
-      if (destroyed || !inside || !anchor) return;
+      if (destroyed || !inside || !anchor || buttonsDown) return;
       dwell = { x, y, at: now(), camera: cameraKey(), pick: safePick(x, y) };
     }, POINTER_DWELL_MS);
   }
 
   function onMove(event) {
+    if (typeof event?.buttons === 'number') {
+      buttonsDown = event.buttons !== 0;
+    }
     const rect = element.getBoundingClientRect?.() || { left: 0, top: 0 };
-    moveTo(event.clientX - rect.left, event.clientY - rect.top);
+    moveTo(event.clientX - rect.left, event.clientY - rect.top, {
+      suppressDwell: buttonsDown,
+    });
+  }
+
+  function onDown(event) {
+    buttonsDown =
+      typeof event?.buttons === 'number' ? event.buttons !== 0 : true;
+    const rect = element.getBoundingClientRect?.() || { left: 0, top: 0 };
+    moveTo(event.clientX - rect.left, event.clientY - rect.top, {
+      suppressDwell: true,
+    });
+  }
+
+  function onUp(event) {
+    buttonsDown =
+      typeof event?.buttons === 'number' ? event.buttons !== 0 : false;
   }
 
   function onLeave() {
@@ -324,8 +350,13 @@ export function createPointerTracker({
   if (element?.addEventListener) {
     const options = { passive: true, signal: listeners.signal };
     element.addEventListener('pointermove', onMove, options);
-    element.addEventListener('pointerdown', onMove, options);
+    element.addEventListener('pointerdown', onDown, options);
     element.addEventListener('pointerleave', onLeave, options);
+    if (typeof window !== 'undefined' && window?.addEventListener) {
+      window.addEventListener('pointerup', onUp, options);
+      window.addEventListener('pointercancel', onUp, options);
+      window.addEventListener('blur', onUp, options);
+    }
   }
 
   /** Is the pointer a referent right now? */
