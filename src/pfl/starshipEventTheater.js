@@ -1901,7 +1901,7 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
           top: 66px;
           left: 0;
           right: 0;
-          z-index: 950;
+          z-index: 9650;
           font-family: "Inter", system-ui, -apple-system, sans-serif;
           color: #f8fafc;
           pointer-events: none;
@@ -1998,7 +1998,7 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
           position: fixed;
           top: 112px;
           right: 14px;
-          z-index: 955;
+          z-index: 9660;
           pointer-events: auto;
           width: min(350px, calc(100vw - 28px));
           max-height: calc(100vh - 196px);
@@ -2670,13 +2670,26 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
     });
 
     hudRoot.querySelector('[data-pfl-open-kalshi]')?.addEventListener('click', () => {
-      window.open('/kalshi-paper.html', '_blank', 'noopener');
+      const box = document.getElementById('pfl-win-kalshi-arena');
+      if (box) {
+        box.style.display = 'flex';
+        box.classList.remove('pfl-minimized');
+        const minBtn = box.querySelector('[data-act="min"]');
+        if (minBtn) minBtn.textContent = '—';
+        box.style.zIndex = '9680';
+      } else {
+        window.location.href = '/kalshi-paper.html';
+      }
     });
     hudRoot.querySelector('[data-pfl-open-holodeck]')?.addEventListener('click', () => {
       window.open('http://127.0.0.1:8766', '_blank', 'noopener');
     });
     hudRoot.querySelector('[data-pfl-edit-photos]')?.addEventListener('click', () => {
-      (document.getElementById('gev-dock-arrange-btn') || document.querySelector('[data-arrange-yard-toggle]'))?.click();
+      if (typeof window.__pflToggleArrangeYard === 'function') {
+        window.__pflToggleArrangeYard();
+      } else {
+        (document.getElementById('gev-arrange-toggle') || document.getElementById('gev-arrange-dock-btn'))?.click();
+      }
     });
 
     neo4jBtn?.addEventListener('click', () => {

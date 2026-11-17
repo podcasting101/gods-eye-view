@@ -1,5 +1,6 @@
 import { createApplicationScene, loadDefaultRenderer } from '../app/scene.js';
 import { createApplicationRequestServices } from '../services/requests.js';
+import { cesiumViewerOf } from '../render/cesium/viewers.js';
 import { loadPflStation } from '../pfl/station.js';
 
 /** The default renderer plugin, loading from the first call (`app/scene.js`). */
@@ -11,8 +12,9 @@ export async function createStandaloneScene(options) {
     requestServices: createApplicationRequestServices(),
     ...options,
   });
+  const rawViewer = cesiumViewerOf(scene.renderer) || scene.viewer;
   const station = await loadPflStation({
-    viewer: scene.viewer,
+    viewer: rawViewer,
     cesiumToken: options.cesiumToken,
     signal: options.signal,
   });

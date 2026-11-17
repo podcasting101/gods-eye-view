@@ -227,22 +227,34 @@ export function loadPflWindowFramework({ viewer }) {
     const extraRow = document.createElement('div');
     extraRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(56,189,248,0.22);';
     extraRow.innerHTML = `
-      <button type="button" class="pfl-f15-btn" id="pfl-btn-kalshi-inline" style="border-color:#22c55e;color:#4ade80;font-weight:700">📈 Kalshi Paper Arena (Toggle Panel)</button>
-      <button type="button" class="pfl-f15-btn" id="pfl-btn-kalshi-tab" style="border-color:#38bdf8;color:#38bdf8">↗ Full TradingView Tab</button>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-kalshi-inline" style="border-color:#22c55e;color:#4ade80;font-weight:700">📈 Kalshi Paper Arena (Show / Hide)</button>
+      <a href="/kalshi-paper.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-kalshi-tab" style="border-color:#38bdf8;color:#38bdf8;text-decoration:none;display:inline-flex;align-items:center">↗ Full TradingView &amp; Kalshi Tab</a>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-arrange">🖼️ Arrange Yard Photos</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-fire">🔥 Yard Fire &amp; Legs</button>
-      <button type="button" class="pfl-f15-btn" id="pfl-btn-palace">🏛️ 3D Memory Palace</button>
-      <button type="button" class="pfl-f15-btn" id="pfl-btn-birdpond-ext">🌿 EliteSpyWorlds Bird Pond ↗</button>
+      <a href="/memory-palace.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-palace" style="text-decoration:none;display:inline-flex;align-items:center">🏛️ 3D Memory Palace ↗</a>
+      <a href="https://elitespyworlds.com/birdpond/adventure.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-birdpond-ext" style="text-decoration:none;display:inline-flex;align-items:center">🌿 EliteSpyWorlds Bird Pond ↗</a>
     `;
     cmdWin.body.appendChild(extraRow);
 
-    extraRow.querySelector('#pfl-btn-kalshi-tab')?.addEventListener('click', () => window.open('/kalshi-paper.html', '_blank'));
-    extraRow.querySelector('#pfl-btn-arrange')?.addEventListener('click', () => (document.getElementById('gev-arrange-toggle') || document.getElementById('gev-arrange-dock-btn'))?.click());
-    extraRow.querySelector('#pfl-btn-fire')?.addEventListener('click', () => document.getElementById('gev-fire-video-btn')?.click());
-    extraRow.querySelector('#pfl-btn-palace')?.addEventListener('click', () => window.open('/memory-palace.html', '_blank'));
-    extraRow.querySelector('#pfl-btn-birdpond-ext')?.addEventListener('click', () => window.open('https://elitespyworlds.com/birdpond/adventure.html', '_blank'));
+    extraRow.querySelector('#pfl-btn-arrange')?.addEventListener('click', (ev) => {
+      const on = typeof window.__pflToggleArrangeYard === 'function'
+        ? window.__pflToggleArrangeYard()
+        : ((document.getElementById('gev-arrange-toggle')?.click()), true);
+      ev.currentTarget.classList.toggle('active', Boolean(on));
+    });
+    extraRow.querySelector('#pfl-btn-fire')?.addEventListener('click', () => {
+      if (typeof window.__pflOpenFireModal === 'function') window.__pflOpenFireModal();
+      else document.getElementById('gev-fire-video-btn')?.click();
+    });
     extraRow.querySelector('#pfl-btn-kalshi-inline')?.addEventListener('click', () => {
-      kalshiWin.box.style.display = kalshiWin.box.style.display === 'none' ? 'flex' : 'none';
+      const isHidden = kalshiWin.box.style.display === 'none' || kalshiWin.box.classList.contains('pfl-minimized');
+      kalshiWin.box.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) {
+        kalshiWin.box.classList.remove('pfl-minimized');
+        const minBtn = kalshiWin.box.querySelector('[data-act="min"]');
+        if (minBtn) minBtn.textContent = '—';
+        kalshiWin.box.style.zIndex = '9680';
+      }
     });
   }, 400);
 

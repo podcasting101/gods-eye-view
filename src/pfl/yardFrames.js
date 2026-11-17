@@ -1346,8 +1346,8 @@ function installArrangeToggle(viewer) {
   document.body.appendChild(toggle);
 
   let dockBtn = null;
-  const locationBar = document.getElementById('location-bar');
-  if (locationBar && locationBar.parentElement) {
+  const locationBar = document.getElementById('location-bar') || document.body;
+  if (locationBar) {
     dockBtn = makeButton('✥ ARRANGE YARD PHOTOS');
     dockBtn.id = 'gev-arrange-dock-btn';
     dockBtn.style.cssText =
@@ -1355,7 +1355,7 @@ function installArrangeToggle(viewer) {
       "font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;letter-spacing:.10em;" +
       'color:#00d4ff;background:rgba(0,212,255,.14);border:1px solid rgba(0,212,255,.55);' +
       'border-radius:10px;cursor:pointer;text-align:center';
-    locationBar.insertAdjacentElement('afterend', dockBtn);
+    if (locationBar !== document.body && locationBar.parentElement) locationBar.insertAdjacentElement('afterend', dockBtn); else document.body.appendChild(dockBtn);
     const mpBtn = document.createElement('a');
     mpBtn.id = 'gev-memory-palace-btn';
     mpBtn.href = '/memory-palace.html';
@@ -1422,6 +1422,9 @@ function installArrangeToggle(viewer) {
       const v = document.getElementById('gev-fire-modal-video');
       if (v && !v.paused) v.pause();
     };
+    window.__pflOpenFireModal = () => {
+      fireModal.style.display = 'flex';
+    };
     fireBtn.addEventListener('click', () => {
       fireModal.style.display = 'flex';
     });
@@ -1448,6 +1451,10 @@ function installArrangeToggle(viewer) {
     on: false,
   };
   toggle.addEventListener('click', () => setArrange(viewer, !editor.on));
+  window.__pflToggleArrangeYard = () => {
+    setArrange(viewer, !editor.on);
+    return editor.on;
+  };
   dockBtn?.addEventListener('click', () => setArrange(viewer, !editor.on));
   window.addEventListener('keydown', (e) => {
     if (e.shiftKey && (e.key === 'F' || e.key === 'f')) {
