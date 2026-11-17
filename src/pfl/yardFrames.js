@@ -86,18 +86,18 @@ export const YARD_FRAMES = [
   },
   {
     id: 'bed-station-20261012',
-    image: '/yard-frames/bed-station-2026-10-12.png',
+    image: '/yard-frames/bed-station-solar-2026-11-17.jpg',
     // i18n-ignore: Paul's private camera title is source data.
-    title: 'Beam Pro (Camo) - Paul at his bed station, inside the house',
-    takenAt: '2026-10-12 19:34 CDT',
-    camLat: 29.247695,
-    camLon: -95.2315,
-    camHeightM: 3.5,
-    headingDeg: 0,
+    title: 'Wyze Bed Cam — Solar-Locked (243.95° WSW Sunbeam @ +6.33° El)',
+    takenAt: '2026-11-17 16:49:58 CST',
+    camLat: 29.24758,
+    camLon: -95.23140,
+    camHeightM: 4.15,
+    headingDeg: 185,
     pitchDeg: -5,
-    distanceM: 3.5,
+    distanceM: 2.8,
     fovHDeg: 68,
-    fovVDeg: 37,
+    fovVDeg: 38,
   },
 ];
 
@@ -175,15 +175,16 @@ const CALIBRATED_HOUSE_SURVEY = {
     stitchedWaterPano: true,
   },
   'bed-station-20261012': {
-    // Inside the center of the yellow house roof footprint, laid flat facing sky
-    camLat: 29.24758,
-    camLon: -95.23139,
-    camHeightM: 3.2,
-    headingDeg: 180,
+    // Solar-locked 2026-11-17 16:49:58 CST: Sun @ Az 243.95° WSW, El +6.33° shining in WSW (~248°) bedroom door/blinds (right edge of frame).
+    // In flat ENU, headingDeg=158 aligns +up (headboard) -> 158° SSE, +right (door/blinds) -> 248° WSW (into 244° Sun!), camHeightM=4.15m (stilted 2nd-floor bedroom).
+    camLat: 29.24756,
+    camLon: -95.23142,
+    camHeightM: 4.15,
+    headingDeg: 158,
     pitchDeg: -5,
     distanceM: 2.8,
     fovHDeg: 68,
-    fovVDeg: 37,
+    fovVDeg: 38,
     widthScale: 1.0,
     rollDeg: 0,
     flat: true,
@@ -293,7 +294,7 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedHouseSurveyV11) {
+    if (parsed && !parsed.fixedSolarBedV12) {
       // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (north-lawn trees + bayou dock)
       if (!frames['back-yard-cam2-water']) {
         frames['back-yard-cam2-water'] = { ...CALIBRATED_HOUSE_SURVEY['back-yard-cam2-water'] };
@@ -536,6 +537,7 @@ function saveLayout() {
         fixedHouseSurveyV9: true,
         fixedHouseSurveyV10: true,
         fixedHouseSurveyV11: true,
+        fixedSolarBedV12: true,
         savedAt: new Date().toISOString(),
         frames,
       }),

@@ -1,3 +1,4 @@
+import { pflLocalVaultProxy } from './pflLocalVault.js';
 import path from 'node:path';
 import { kalshiPaperProxy } from './kalshiPaper.js';
 import { openSkyProxy } from './aircraft/opensky.js';
@@ -96,6 +97,7 @@ function localProviderPlugins({
     acartiaProxy(),
     keySetupEndpoint(),
     kalshiPaperProxy(),
+    pflLocalVaultProxy(),
   ];
 }
 

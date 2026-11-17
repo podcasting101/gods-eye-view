@@ -231,7 +231,9 @@ export function loadPflWindowFramework({ viewer }) {
       <a href="/kalshi-paper.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-kalshi-tab" style="border-color:#38bdf8;color:#38bdf8;text-decoration:none;display:inline-flex;align-items:center">↗ Full TradingView &amp; Kalshi Tab</a>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-arrange">🖼️ Arrange Yard Photos</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-fire">🔥 Yard Fire &amp; Legs</button>
-      <a href="/memory-palace.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-palace" style="text-decoration:none;display:inline-flex;align-items:center">🏛️ 3D Memory Palace ↗</a>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-vault-inline" style="border-color:#a855f7;color:#d8b4fe;font-weight:700">🏛️ Local Palace &amp; Wyze Vault</button>
+      <a href="/memory-palace.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-palace" style="text-decoration:none;display:inline-flex;align-items:center">↗ Full Memory Palace</a>
+      <a href="http://127.0.0.1:8093/" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-livewire" style="border-color:#f43f5e;color:#fda4af;text-decoration:none;display:inline-flex;align-items:center">🎥 LiveWire (:8093) ↗</a>
       <a href="https://elitespyworlds.com/birdpond/adventure.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-birdpond-ext" style="text-decoration:none;display:inline-flex;align-items:center">🌿 EliteSpyWorlds Bird Pond ↗</a>
     `;
     cmdWin.body.appendChild(extraRow);
@@ -540,6 +542,94 @@ export function loadPflWindowFramework({ viewer }) {
   });
   refreshInlineKalshi();
   const kalshiPoll = setInterval(refreshInlineKalshi, 20000);
+
+
+  // 4) Movable / Sizable Local Memory Palace, Uploaded Splats & Wyze Camera Vault (starts neatly minimized until clicked!)
+  const vaultWin = createStandardBox({
+    id: 'pfl-win-local-vault',
+    title: '🏛️ LOCAL MEMORY PALACE, UPLOADED SPLATS & WYZE CAMERAS',
+    defaultLeft: Math.max(40, window.innerWidth - 560),
+    defaultTop: 435,
+    defaultWidth: 530,
+  });
+  if (!saved['pfl-win-local-vault']) {
+    vaultWin.box.classList.add('pfl-minimized');
+    const mb = vaultWin.box.querySelector('[data-act="min"]');
+    if (mb) mb.textContent = '▢';
+  }
+  vaultWin.body.innerHTML = `
+    <div style="font-family:'Inter',system-ui,sans-serif;font-size:11.5px;color:#e2e8f0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+        <span style="color:#d8b4fe;font-weight:700" id="pfl-vault-summary">Scanning local server splats &amp; Wyze cameras...</span>
+        <div style="display:flex;gap:4px">
+          <button type="button" class="pfl-std-cbtn" id="pfl-vault-embed-mp">🏛️ Embed Palace Here</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-vault-refresh">↻ Rescan Disk</button>
+        </div>
+      </div>
+      <div id="pfl-vault-iframe-wrap" style="display:none;margin-bottom:8px;border:1px solid rgba(168,85,247,0.5);border-radius:8px;overflow:hidden">
+        <iframe id="pfl-vault-iframe" style="width:100%;height:300px;border:none;background:#050811"></iframe>
+      </div>
+      <div style="font-weight:700;color:#38bdf8;margin-bottom:3px">Uploaded Local 3D Splats &amp; GLB Scenes (Private to This Server):</div>
+      <div id="pfl-vault-splats" style="max-height:145px;overflow:auto;border:1px solid #1e293b;border-radius:6px;padding:4px;font-size:10.5px;margin-bottom:6px">Loading...</div>
+      <div style="font-weight:700;color:#4ade80;margin-bottom:3px">Local Wyze / RTSP Camera Frames &amp; Live Hooks:</div>
+      <div id="pfl-vault-cams" style="max-height:110px;overflow:auto;border:1px solid #1e293b;border-radius:6px;padding:4px;font-size:10.5px">Loading...</div>
+    </div>
+  `;
+
+  async function refreshLocalVault() {
+    try {
+      const r = await fetch('/api/pfl/local-vault');
+      const d = await r.json();
+      if (!d.ok) return;
+      const sumEl = vaultWin.body.querySelector('#pfl-vault-summary');
+      if (sumEl) sumEl.textContent = `● ${d.splatCount} Local 3D Splats/GLBs · ${d.yardFrameCount} Wyze Frames`;
+      const spEl = vaultWin.body.querySelector('#pfl-vault-splats');
+      if (spEl) {
+        spEl.innerHTML = (d.splats || []).map((s) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 2px;border-bottom:1px solid rgba(30,41,59,0.65)">
+            <span><strong>${s.name}</strong> <span style="color:#94a3b8">(${s.sizeMB} MB · ${s.ext.toUpperCase()})</span></span>
+            <a href="${s.holodeckUrl}" target="_blank" rel="noopener" style="color:#d8b4fe;text-decoration:none;font-weight:700">Load 3D ↗</a>
+          </div>
+        `).join('');
+      }
+      const cmEl = vaultWin.body.querySelector('#pfl-vault-cams');
+      if (cmEl) {
+        const camRows = (d.cameras || []).map((c) => `
+          <div style="padding:2px 0;border-bottom:1px solid rgba(30,41,59,0.65)">
+            <strong style="color:#4ade80">🎥 ${c.name || c.id}</strong> · <span style="color:#94a3b8">${c.location || c.role || 'RTSP/Wyze'}</span>
+          </div>
+        `).join('');
+        const frameRows = (d.yardFrames || []).map((f) => `
+          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(30,41,59,0.5)">
+            <span>📷 ${f.name} (${f.sizeMB} MB)</span>
+            <a href="${f.url}" target="_blank" rel="noopener" style="color:#38bdf8;text-decoration:none">View ↗</a>
+          </div>
+        `).join('');
+        cmEl.innerHTML = camRows + frameRows;
+      }
+    } catch {}
+  }
+
+  vaultWin.body.querySelector('#pfl-vault-refresh')?.addEventListener('click', refreshLocalVault);
+  vaultWin.body.querySelector('#pfl-vault-embed-mp')?.addEventListener('click', () => {
+    const wrap = vaultWin.body.querySelector('#pfl-vault-iframe-wrap');
+    const ifr = vaultWin.body.querySelector('#pfl-vault-iframe');
+    if (!wrap || !ifr) return;
+    const opening = wrap.style.display === 'none';
+    wrap.style.display = opening ? 'block' : 'none';
+    if (opening && !ifr.src) ifr.src = '/memory-palace.html';
+  });
+  setTimeout(() => {
+    document.getElementById('pfl-btn-vault-inline')?.addEventListener('click', () => {
+      vaultWin.box.style.display = 'flex';
+      vaultWin.box.classList.remove('pfl-minimized');
+      const mb = vaultWin.box.querySelector('[data-act="min"]');
+      if (mb) mb.textContent = '—';
+      vaultWin.box.style.zIndex = '9690';
+      refreshLocalVault();
+    });
+  }, 450);
+  refreshLocalVault();
 
   return {
     destroy() {
