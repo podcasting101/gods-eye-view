@@ -36,6 +36,30 @@ export { CCTV_FRAME_FETCH_TIMEOUT_MS, fetchCctvImageFromUpstream };
  *
  * @returns {import('vite').Plugin}
  */
+
+const _pflGo2rtcCache = new Map();
+async function fetchPflGo2rtcFrame(cameraId, url) {
+  const now = Date.now();
+  const cached = _pflGo2rtcCache.get(cameraId);
+  if (cached && now - cached.at < 15000) {
+    return { ok: true, body: cached.body, contentType: 'image/jpeg' };
+  }
+  try {
+    const u = new URL(url);
+    if (u.hostname !== '127.0.0.1' && u.hostname !== 'localhost') return null;
+    const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return cached ? { ok: true, body: cached.body, contentType: 'image/jpeg' } : null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length < 100 || buf[0] !== 0xff || buf[1] !== 0xd8) {
+      return cached ? { ok: true, body: cached.body, contentType: 'image/jpeg' } : null;
+    }
+    _pflGo2rtcCache.set(cameraId, { at: now, body: buf });
+    return { ok: true, body: buf, contentType: 'image/jpeg' };
+  } catch {
+    return cached ? { ok: true, body: cached.body, contentType: 'image/jpeg' } : null;
+  }
+}
+
 export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
   const getCctvSources = createCctvCatalog({ sourceRoot });
   /** @type {Map<string,{id:string,status:string,sourceKind:string,label:string,message:string,updatedAt:number}>} */
@@ -660,7 +684,9 @@ export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
                   cameraId,
                   ottawaAuthorizedFrameUrl(upstreamCandidate),
                 )
-              : source?.sourceKind === 'txdot-its'
+              : source?.sourceKind === 'pfl-go2rtc-local'
+                ? await fetchPflGo2rtcFrame(cameraId, upstreamCandidate)
+                : source?.sourceKind === 'txdot-its'
                 ? await fetchTxdotSnapshot(upstreamCandidate)
                 : await fetchCctvImageFromUpstream(upstreamCandidate, {
                     allowMjpeg: source?.sourceKind === 'taiwan-highway-motc',

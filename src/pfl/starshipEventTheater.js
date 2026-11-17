@@ -1834,16 +1834,19 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
   function flyToLiverpoolNode() {
     if (!viewer?.camera) return;
     const lv = STARSHIP_FLIGHT15_EVENT.liverpoolNode;
-    const baseM = resolveLiveSurfaceBaseM(lv.lon, lv.lat, lv.groundM);
+    // Exact hero framing from Paul's 23:30:49Z screenshot (MGRS 15R TN 8316 3755: 29°14'53.88"N, 95°13'52.68"W, ALT 39m, looking SSW 196° across stitched driveway & Palm Dr)
+    const camLat = 29.24830;
+    const camLon = -95.23130;
+    const baseM = resolveLiveSurfaceBaseM(camLon, camLat, lv.groundM);
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(
-        lv.lon,
-        lv.lat - 0.00042,
-        baseM + 34,
+        camLon,
+        camLat,
+        baseM + 39,
       ),
       orientation: {
-        heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-34),
+        heading: Cesium.Math.toRadians(196),
+        pitch: Cesium.Math.toRadians(-21),
         roll: 0,
       },
       duration: 1.6,
