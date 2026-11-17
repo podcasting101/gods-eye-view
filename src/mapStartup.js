@@ -1,5 +1,5 @@
+export { selectMapStartupRoute } from './maps/startupRoute.js';
 export {
   PHOTOREAL_AT_STARTUP,
-  selectMapStartupRoute,
   loadPhotorealisticTileset,
-} from './maps/google3d.js';
+} from './render/cesium/google3d.js';
