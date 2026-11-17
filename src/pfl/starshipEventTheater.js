@@ -1821,18 +1821,29 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
     });
   }
 
+  function resolveLiveSurfaceBaseM(lon, lat, photorealFallbackM) {
+    // When Google 3D Tileset is hidden and the Esri/OSM globe is visible, sample live globe height (0m on ellipsoid, or terrain height).
+    if (viewer?.scene?.globe?.show) {
+      const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
+      return Number.isFinite(gh) ? gh : 0.0;
+    }
+    const sh = viewer?.scene?.sampleHeight?.(Cesium.Cartographic.fromDegrees(lon, lat));
+    return Number.isFinite(sh) ? sh : photorealFallbackM;
+  }
+
   function flyToLiverpoolNode() {
     if (!viewer?.camera) return;
     const lv = STARSHIP_FLIGHT15_EVENT.liverpoolNode;
+    const baseM = resolveLiveSurfaceBaseM(lv.lon, lv.lat, lv.groundM);
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(
         lv.lon,
-        lv.lat - 0.00028,
-        lv.groundM + 16,
+        lv.lat - 0.00042,
+        baseM + 34,
       ),
       orientation: {
         heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-18),
+        pitch: Cesium.Math.toRadians(-34),
         roll: 0,
       },
       duration: 1.6,
@@ -1842,15 +1853,16 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
   function flyToBirdPond() {
     if (!viewer?.camera) return;
     const bp = STARSHIP_FLIGHT15_EVENT.birdPondGate;
+    const baseM = resolveLiveSurfaceBaseM(bp.lon, bp.lat, bp.groundM);
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(
         bp.lon,
-        bp.lat - 0.0003,
-        bp.groundM + 18,
+        bp.lat - 0.00038,
+        baseM + 26,
       ),
       orientation: {
         heading: Cesium.Math.toRadians(21),
-        pitch: Cesium.Math.toRadians(-18),
+        pitch: Cesium.Math.toRadians(-28),
         roll: 0,
       },
       duration: 1.6,

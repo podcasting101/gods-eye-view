@@ -453,7 +453,7 @@ export function loadPflWindowFramework({ viewer }) {
       <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:6px">
         <thead>
           <tr style="color:#94a3b8;border-bottom:1px solid #1e293b;text-align:left">
-            <th style="padding:2px">Seat</th><th>Cash</th><th>Open</th><th>Equity</th><th>Live P&amp;L</th>
+            <th style="padding:2px">Seat</th><th>Cash</th><th>Pos Value</th><th>Equity</th><th>Live P&amp;L</th>
           </tr>
         </thead>
         <tbody id="pfl-inline-lb">
@@ -489,16 +489,55 @@ export function loadPflWindowFramework({ viewer }) {
         .map((row) => {
           const col = row.pnl > 0 ? '#4ade80' : row.pnl < 0 ? '#f87171' : '#94a3b8';
           const sign = row.pnl > 0 ? '+' : '';
-          return `<tr><td><strong>${row.name}</strong></td><td>$${row.cash.toFixed(2)}</td><td>${row.count} ($${row.posVal.toFixed(2)})</td><td><strong>$${row.equity.toFixed(2)}</strong></td><td style="color:${col};font-weight:700">${sign}$${row.pnl.toFixed(2)}</td></tr>`;
+          return `<tr><td><strong>${row.name}</strong></td><td>$${row.cash.toFixed(2)}</td><td style="color:#cbd5e1">$${row.posVal.toFixed(2)} <span style="color:#64748b">(${row.count})</span></td><td><strong>$${row.equity.toFixed(2)}</strong></td><td style="color:${col};font-weight:700">${sign}$${row.pnl.toFixed(2)}</td></tr>`;
         })
         .join('');
       if (trEl) {
-        trEl.innerHTML = (d.trades || [])
-          .map(
-            (t) =>
-              `<div style="padding:2px 0;border-bottom:1px solid rgba(30,41,59,0.6)"><strong>${t.owner.split(' ')[0]}</strong> · <span style="color:${t.side === 'YES' ? '#4ade80' : '#f87171'};font-weight:700">${t.side}×${t.qty}</span> <code>${t.ticker}</code> @${t.entryCents}¢ → mark <strong>${t.markCents}¢</strong> <span style="color:#94a3b8">(${t.thesis})</span></div>`,
-          )
-          .join('');
+        trEl.innerHTML = `<div id="pfl-trade-drill" style="display:none;background:#0b1324;border:1px solid #38bdf8;border-radius:6px;padding:6px;margin-bottom:5px;font-size:10.5px"></div>` +
+          (d.trades || [])
+            .map((t, idx) => {
+              const costD = ((t.qty * t.entryCents) / 100).toFixed(2);
+              const valD = ((t.qty * t.markCents) / 100).toFixed(2);
+              const pnlD = ((t.qty * (t.markCents - t.entryCents)) / 100);
+              const pnlStr = (pnlD >= 0 ? '+' : '') + '$' + pnlD.toFixed(2);
+              const pnlCol = pnlD > 0 ? '#4ade80' : pnlD < 0 ? '#f87171' : '#94a3b8';
+              return `<div class="pfl-trade-row" data-idx="${idx}" style="padding:3px 2px;border-bottom:1px solid rgba(30,41,59,0.6);cursor:pointer" title="Click to drill into position math &amp; Kalshi link">
+                <strong>${t.owner.split(' ')[0]}</strong> · <span style="color:${t.side === 'YES' ? '#4ade80' : '#f87171'};font-weight:700">${t.side}×${t.qty}</span> <code>${t.ticker}</code> @${t.entryCents}¢ → <strong>${t.markCents}¢</strong> (<span style="color:${pnlCol};font-weight:700">${pnlStr}</span> · Val $${valD} on $${costD})
+              </div>`;
+            })
+            .join('');
+        trEl.querySelectorAll('.pfl-trade-row').forEach((row) => {
+          row.addEventListener('click', () => {
+            const t = (d.trades || [])[Number(row.dataset.idx)];
+            const drill = trEl.querySelector('#pfl-trade-drill');
+            if (!t || !drill) return;
+            const costD = ((t.qty * t.entryCents) / 100).toFixed(2);
+            const valD = ((t.qty * t.markCents) / 100).toFixed(2);
+            const maxPay = (t.qty * 1.0).toFixed(2);
+            const pnlD = ((t.qty * (t.markCents - t.entryCents)) / 100);
+            const seriesSlug = t.ticker.split('-')[0].toLowerCase();
+            drill.style.display = 'block';
+            drill.innerHTML = `
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                <strong style="color:#38bdf8">🔍 ${t.owner} — ${t.title || t.ticker}</strong>
+                <button type="button" class="pfl-std-cbtn" id="pfl-close-drill">✕</button>
+              </div>
+              <div><strong>Contract:</strong> <code>${t.ticker}</code> · <strong>Side:</strong> ${t.side} × ${t.qty} contracts (Max Payout $${maxPay})</div>
+              <div><strong>Cost Basis:</strong> $${costD} (@${t.entryCents}¢) · <strong>Current Mark Value:</strong> $${valD} (@${t.markCents}¢) · <strong>Net P&amp;L:</strong> <strong style="color:${pnlD >= 0 ? '#4ade80' : '#f87171'}">${pnlD >= 0 ? '+' : ''}$${pnlD.toFixed(2)}</strong></div>
+              <div style="color:#94a3b8;margin-top:2px"><strong>Thesis:</strong> ${t.thesis}</div>
+              <div style="margin-top:4px;display:flex;gap:8px">
+                <a href="https://kalshi.com/markets/${seriesSlug}" target="_blank" rel="noopener" style="color:#4ade80;font-weight:700">Open Live on Kalshi.com ↗</a>
+                <a href="/kalshi-paper.html" target="_blank" rel="noopener" style="color:#38bdf8;font-weight:700">Open Candlestick Workbench ↗</a>
+              </div>
+            `;
+            drill.querySelector('#pfl-close-drill')?.addEventListener('click', (e) => {
+              e.stopPropagation();
+              drill.style.display = 'none';
+            });
+            kalshiWin.body.querySelector('#pfl-bet-tkr').value = t.ticker;
+            kalshiWin.body.querySelector('#pfl-bet-px').value = String(t.markCents || t.entryCents);
+          });
+        });
       }
       mkEl.innerHTML = (d.markets || [])
         .map(

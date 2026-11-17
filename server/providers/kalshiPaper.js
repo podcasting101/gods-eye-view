@@ -170,6 +170,35 @@ export function kalshiPaperProxy() {
 
         const ledger = ensureLedger();
         const live = await fetchLiveKalshiSummary();
+        // Also fetch exact market status/settlement for any ticker in the ledger that already closed or settled!
+        await Promise.all(
+          ledger.trades.map(async (t) => {
+            if (live.quotesByTicker[t.ticker]) return;
+            try {
+              const mr = await fetch('https://api.elections.kalshi.com/trade-api/v2/markets/' + encodeURIComponent(t.ticker), {
+                headers: { Accept: 'application/json', 'User-Agent': 'PFL-GodsEyeView/1.0' },
+                signal: AbortSignal.timeout(4000),
+              });
+              if (!mr.ok) return;
+              const md = (await mr.json()).market || {};
+              let yesVal = null;
+              if (md.result === 'yes') yesVal = 100;
+              else if (md.result === 'no') yesVal = 0;
+              else if (md.settlement_value_dollars != null) yesVal = Math.round(Number(md.settlement_value_dollars) * 100);
+              else if (md.last_price_dollars != null) yesVal = Math.round(Number(md.last_price_dollars) * 100);
+              if (yesVal !== null) {
+                live.quotesByTicker[t.ticker] = {
+                  yesBid: yesVal,
+                  yesAsk: yesVal,
+                  lastCents: yesVal,
+                  mid: yesVal,
+                  status: md.status || 'closed',
+                  result: md.result || null,
+                };
+              }
+            } catch {}
+          }),
+        );
         const seats = [
           'Paul Prime',
           '@friday (Weather/Macro)',
@@ -184,7 +213,7 @@ export function kalshiPaperProxy() {
         const enrichedTrades = ledger.trades.map((t) => {
           const q = live.quotesByTicker[t.ticker];
           let markCents = t.entryCents;
-          if (q && q.mid > 0) {
+          if (q && typeof q.mid === "number") {
             markCents = t.side === 'YES' ? q.mid : 100 - q.mid;
           }
           if (!stats[t.owner]) stats[t.owner] = { name: t.owner, cash: 100.0, posVal: 0.0, count: 0 };

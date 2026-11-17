@@ -342,11 +342,20 @@ function loadSavedLayout() {
  * Supports optional `widthScale` (horizontal aspect correction) and
  * `rollDeg` (in-plane rotation of the photo around its view axis).
  */
-export function computeCorners(p) {
+export function activeYardDatumM(viewer, lon, lat) {
+  if (viewer?.scene?.globe?.show) {
+    const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
+    return Number.isFinite(gh) ? gh : 0.0;
+  }
+  return STORED_GROUND_HEIGHT_M;
+}
+
+function computeCorners(p, viewer = null) {
+  const baseDatum = activeYardDatumM(viewer, p.camLon, p.camLat);
   const anchor = Cesium.Cartesian3.fromDegrees(
     p.camLon,
     p.camLat,
-    STORED_GROUND_HEIGHT_M + p.camHeightM,
+    baseDatum + p.camHeightM,
   );
   const enu = Cesium.Transforms.eastNorthUpToFixedFrame(anchor);
   const dist = p.distanceM || DEFAULT_DISTANCE_M;
@@ -446,7 +455,7 @@ export function computeCorners(p) {
 
 /** Build (or rebuild) the Cesium entity for one frame. */
 function buildFrameEntity(viewer, def, params) {
-  const { positions, widthM, heightM, distanceM } = computeCorners(params);
+  const { positions, widthM, heightM, distanceM } = computeCorners(params, viewer);
   const entityId = ENTITY_PREFIX + def.id;
   const stale = viewer.entities.getById(entityId);
   if (stale) viewer.entities.remove(stale);
@@ -580,6 +589,14 @@ export function loadYardFrames({ viewer }) {
   }
   viewer.creditDisplay.addStaticCredit(FRAME_CREDIT);
   installArrangeToggle(viewer);
+  if (typeof window !== 'undefined') {
+    const onStack = () => {
+      setTimeout(() => {
+        for (const id of frameState.keys()) rebuildFrame(viewer, id);
+      }, 350);
+    };
+    window.addEventListener('gev:map-stack-changed', onStack);
+  }
   return {
     entities: viewer.entities,
     destroy: () => destroyYardFrames(viewer),
@@ -655,7 +672,7 @@ function drawOutline(viewer) {
   if (!editor || !editor.selectedId) return;
   const st = frameState.get(editor.selectedId);
   if (!st) return;
-  const { positions } = computeCorners(st.params);
+  const { positions } = computeCorners(st.params, viewer);
   const loop = [...positions, positions[0]];
   const stale = viewer.entities.getById(OUTLINE_ID);
   if (stale) viewer.entities.remove(stale);
