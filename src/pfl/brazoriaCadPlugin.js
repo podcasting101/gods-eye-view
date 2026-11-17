@@ -65,9 +65,8 @@ function makeSignCanvas(bgHex, borderHex, title, subtitle) {
 
 function computeWallSegment(lat, lon, widthM, headingDeg) {
   const halfW = widthM * 0.5;
-  const az = ((Number(headingDeg) || 0) * Math.PI) / 180.0;
-  // Wall normal faces headingDeg; wall span runs perpendicular (headingDeg + 90°)
-  const spanRad = az + Math.PI * 0.5;
+  // Match Bird Pond adventure.html computeWallCorners 1:1 (wall span runs along headingDeg)
+  const spanRad = ((Number(headingDeg) || 0) * Math.PI) / 180.0;
   const dN = Math.cos(spanRad) * halfW;
   const dE = Math.sin(spanRad) * halfW;
   const mLat = 111320.0;
@@ -202,8 +201,7 @@ async function syncBirdPondObjects({ viewer, fetchImpl, signal, entities, isDest
     const isCutout =
       typeof base.image === 'function' || /\.png(\?|$)/i.test(String(imgSrc));
     const seg = computeWallSegment(lat, lon, w, heading);
-    entities.push(
-      viewer.entities.add({
+    const wallEnt = viewer.entities.add({
         id: `birdpond_${base.id}`,
         name: `Bird Pond · ${base.name}`,
         wall: {
@@ -222,8 +220,9 @@ async function syncBirdPondObjects({ viewer, fetchImpl, signal, entities, isDest
             color: Cesium.Color.WHITE.withAlpha(opacity),
           }),
         },
-      }),
-    );
+      });
+    wallEnt._pflWallMeta = { lat, lon, width: w, height: h, heading, baseAlt, lift: 0 };
+    entities.push(wallEnt);
   }
 
   for (const p of Array.isArray(layout.pins) ? layout.pins : []) {

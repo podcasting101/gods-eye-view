@@ -1,0 +1,534 @@
+{
+  "card_ref": 22045,
+  "generated_at": "2026-10-28T04:44:05.776684Z",
+  "graphiti_index": {
+    "entity_web_edge_count": 97,
+    "entity_web_node_count": 149,
+    "schema": "gev-neo4j-fusion-v1",
+    "source_path": "/home/paul/gods-eye-view/public/gev-intel/index.json",
+    "spatial_bound_entities": 11,
+    "total_graph_nodes": 374,
+    "total_graph_relationships": 2590
+  },
+  "mode": "SHADOW_READ_ONLY",
+  "node_count": 6,
+  "runtime_consumers": [
+    "/public/memory-palace.html#click-to-task-drawer",
+    "/public/memory-palace.js#initClickToTaskAndSplatEnvelope"
+  ],
+  "sample_shadow_actions": [
+    {
+      "action_type": "stage_shadow_task_update",
+      "actor": "@antigravity",
+      "execution_mode": "SHADOW_NO_DB_WRITE",
+      "linked_task_ids": [
+        22045,
+        22035
+      ],
+      "node_id": "node-gev-fusion-22045",
+      "payload_sha256": "19159c903bd77175899f239925027823e8448add8bc2651e4191db9464a83509",
+      "privacy_zone": "ZONE1_PROPERTY_YARD",
+      "resolved_graphiti_uuids": [
+        "lm-ent-15b7ff906c38dbc0ae47914baddca3b8",
+        "f7465fc3-8cb4-490b-adb4-238c0cc36b5b",
+        "ddc76d6f-8b3d-43a9-ae54-6684084c05cb"
+      ],
+      "schema_version": "gev-click-to-task-v1",
+      "summary": "Verify Card #22045 Neo4j Click-to-Task drawer binding in 4D Memory Palace",
+      "target_url": "http://127.0.0.1:4173/memory-palace.html"
+    },
+    {
+      "action_type": "inspect_local_dwpose_telemetry",
+      "actor": "@antigravity",
+      "execution_mode": "SHADOW_NO_DB_WRITE",
+      "linked_task_ids": [
+        22045
+      ],
+      "node_id": "node-local-bed-station",
+      "payload_sha256": "33c7a2f9f6104c5287c1372db73443b152e7b40fa2e47bd5afd59c513f23623a",
+      "privacy_zone": "LOCAL_LOOPBACK_ONLY",
+      "resolved_graphiti_uuids": [
+        "lm-ent-b45058f5a6d1f9c1b5eace28a0595657",
+        "8fd3cd48-98de-4c64-824b-c1d853a59bc7"
+      ],
+      "schema_version": "gev-click-to-task-v1",
+      "summary": "Verify 127.0.0.1:8093 DWPose full-precision capture stream on local loopback",
+      "target_url": "http://127.0.0.1:8093/status.json"
+    }
+  ],
+  "schema_version": "gev-click-to-task-v1",
+  "spatial_nodes": [
+    {
+      "enu_xyz_m": [
+        0.0,
+        2.5,
+        0.0
+      ],
+      "frustum_ids": [
+        "yard-overview",
+        "back-yard-cam1"
+      ],
+      "graphiti_entity_ids": [
+        "lm-ent-15b7ff906c38dbc0ae47914baddca3b8",
+        "f7465fc3-8cb4-490b-adb4-238c0cc36b5b",
+        "ddc76d6f-8b3d-43a9-ae54-6684084c05cb"
+      ],
+      "label": "4D Memory Palace & Neo4j Command Core (Card #22045)",
+      "linked_tasks": [
+        {
+          "assigned_to": "@antigravity",
+          "status": "completed",
+          "task_id": 22045,
+          "title": "GEV + Neo4j Fusion Design Brief for elitespyworlds.com (Trello yOhampgQ)"
+        },
+        {
+          "assigned_to": "@codex",
+          "status": "pending",
+          "task_id": 22035,
+          "title": "PFL conductor loop: coordinate one verified God\u2019s Eye card per heartbeat"
+        }
+      ],
+      "node_id": "node-gev-fusion-22045",
+      "privacy_zone": "ZONE1_PROPERTY_YARD",
+      "resolved_graphiti_entities": [
+        {
+          "group_id": "lisa-muse-extraction",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:23",
+          "name": "Holodeck",
+          "spatial_ref": {
+            "alt": 4.0,
+            "heading": 198,
+            "landmark": "3D Gaussian Splat Yard & Holodeck Portal",
+            "lat": 29.24734,
+            "lon": -95.23153,
+            "pitch": -25,
+            "range_m": 30.0,
+            "slot_id": "yard-overview-20261012",
+            "splat_uri": "/splat/gaussians-yard/tileset.json",
+            "station": "palm-drive-417"
+          },
+          "uuid": "lm-ent-15b7ff906c38dbc0ae47914baddca3b8"
+        },
+        {
+          "group_id": "",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:127",
+          "name": "PFL Neo4j",
+          "spatial_ref": null,
+          "uuid": "f7465fc3-8cb4-490b-adb4-238c0cc36b5b"
+        },
+        {
+          "group_id": "",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:128",
+          "name": "Graphiti stack",
+          "spatial_ref": null,
+          "uuid": "ddc76d6f-8b3d-43a9-ae54-6684084c05cb"
+        }
+      ],
+      "supported_actions": [
+        "inspect_graphiti_neighbors",
+        "stage_shadow_task_update",
+        "jump_to_frustum"
+      ]
+    },
+    {
+      "enu_xyz_m": [
+        -15.0,
+        3.8,
+        -2.5
+      ],
+      "frustum_ids": [
+        "yard-overview"
+      ],
+      "graphiti_entity_ids": [
+        "lm-ent-6b6f3fa801d29d4b2b742c23e09548d0",
+        "lm-ent-ecacbf8e7633d550c49ec8fff9d6df1c",
+        "lm-ent-51485d24d324fd7e2df14431f97fefc2"
+      ],
+      "label": "West Wall Utility \u2014 EcoFlow DELTA Pro Ultra & Miners Bank",
+      "linked_tasks": [
+        {
+          "assigned_to": "@antigravity",
+          "status": "completed",
+          "task_id": 22045,
+          "title": "GEV + Neo4j Fusion Design Brief for elitespyworlds.com (Trello yOhampgQ)"
+        },
+        {
+          "assigned_to": "@lisa",
+          "status": "completed",
+          "task_id": 1157,
+          "title": "Prime Order: [20260509_052639 segment 200] Quit asking me for the fucking password and doing a shell."
+        }
+      ],
+      "node_id": "node-west-wall-ecoflow",
+      "privacy_zone": "ZONE1_PROPERTY_YARD",
+      "resolved_graphiti_entities": [
+        {
+          "group_id": "lisa-muse-extraction",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:340",
+          "name": "EcoFlow",
+          "spatial_ref": {
+            "alt": 3.0,
+            "heading": 18,
+            "landmark": "Yellow House DELTA Pro Ultra & Smart Home Panel 2",
+            "lat": 29.24734,
+            "lon": -95.23153,
+            "pitch": -35,
+            "range_m": 20.0,
+            "slot_id": "yard-overview-20261012",
+            "station": "palm-drive-417"
+          },
+          "uuid": "lm-ent-6b6f3fa801d29d4b2b742c23e09548d0"
+        },
+        {
+          "group_id": "lisa-muse-extraction",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:350",
+          "name": "Antminer L7",
+          "spatial_ref": {
+            "alt": 2.5,
+            "heading": 18,
+            "landmark": "Cave & House Antminer L7 Scrypt Hash Zone",
+            "lat": 29.247355,
+            "lon": -95.231545,
+            "pitch": -35,
+            "range_m": 18.0,
+            "slot_id": "yard-overview-20261012",
+            "station": "palm-drive-417"
+          },
+          "uuid": "lm-ent-ecacbf8e7633d550c49ec8fff9d6df1c"
+        },
+        {
+          "group_id": "lisa-muse-extraction",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:370",
+          "name": "blue25",
+          "spatial_ref": {
+            "alt": 2.5,
+            "heading": 18,
+            "landmark": "Cave Miner Circuit Smart Plug (blue25)",
+            "lat": 29.247355,
+            "lon": -95.231545,
+            "pitch": -35,
+            "range_m": 18.0,
+            "slot_id": "yard-overview-20261012",
+            "station": "palm-drive-417"
+          },
+          "uuid": "lm-ent-51485d24d324fd7e2df14431f97fefc2"
+        }
+      ],
+      "supported_actions": [
+        "check_cutover_state",
+        "stage_shadow_task_update"
+      ]
+    },
+    {
+      "enu_xyz_m": [
+        14.2,
+        -1.8,
+        -28.5
+      ],
+      "frustum_ids": [
+        "back-yard-cam2",
+        "HL_PAN4"
+      ],
+      "graphiti_entity_ids": [
+        "lm-ent-2943a247106bb282e158a7c4991e01bb",
+        "lm-ent-6ecfcfcdf67b519dddc6be576c81465f"
+      ],
+      "label": "Waterfront Solar Array & East Pond Dock (back-yard-cam2)",
+      "linked_tasks": [
+        {
+          "assigned_to": "@antigravity",
+          "status": "completed",
+          "task_id": 22045,
+          "title": "GEV + Neo4j Fusion Design Brief for elitespyworlds.com (Trello yOhampgQ)"
+        }
+      ],
+      "node_id": "node-waterfront-solar-fire",
+      "privacy_zone": "ZONE1_PROPERTY_YARD",
+      "resolved_graphiti_entities": [
+        {
+          "group_id": "lisa-muse-extraction",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:29",
+          "name": "VEVOR",
+          "spatial_ref": {
+            "alt": 1.5,
+            "heading": 100,
+            "landmark": "East Pond & Inflatable Dock (back-yard-cam2-water)",
+            "lat": 29.247302,
+            "lon": -95.231214,
+            "pitch": -22,
+            "range_m": 24.0,
+            "slot_id": "back-yard-cam2-water",
+            "station": "palm-drive-417"
+          },
+          "uuid": "lm-ent-2943a247106bb282e158a7c4991e01bb"
+        },
+        {
+          "group_id": "lisa-muse-extraction",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:33",
+          "name": "Wyze",
+          "spatial_ref": {
+            "alt": 0.45,
+            "heading": 198,
+            "landmark": "Calibrated Wyze V4 + Cam1 Stitched Ground Quad",
+            "lat": 29.247315,
+            "lon": -95.231524,
+            "pitch": -32,
+            "range_m": 25.0,
+            "slot_id": "yard-overview-20261012",
+            "station": "palm-drive-417",
+            "uv_pin": [
+              0.5,
+              0.58
+            ]
+          },
+          "uuid": "lm-ent-6ecfcfcdf67b519dddc6be576c81465f"
+        }
+      ],
+      "supported_actions": [
+        "scrub_4d_incident_window",
+        "stage_shadow_task_update"
+      ]
+    },
+    {
+      "enu_xyz_m": [
+        -8.4,
+        1.2,
+        12.0
+      ],
+      "frustum_ids": [
+        "yard-overview",
+        "back-yard-cam1"
+      ],
+      "graphiti_entity_ids": [
+        "lm-ent-71da248c6049134707691aa231922056",
+        "lm-ent-5d8ee4b76b8eb84ca1b6c81022b0f19f"
+      ],
+      "label": "Fleet Envelope \u2014 Monaco Beaver RV & 417 Palm Drive Station",
+      "linked_tasks": [
+        {
+          "assigned_to": "@antigravity",
+          "status": "completed",
+          "task_id": 22045,
+          "title": "GEV + Neo4j Fusion Design Brief for elitespyworlds.com (Trello yOhampgQ)"
+        }
+      ],
+      "node_id": "node-fleet-monaco-rv",
+      "privacy_zone": "ZONE1_PROPERTY_YARD",
+      "resolved_graphiti_entities": [
+        {
+          "group_id": "lisa-muse-extraction",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:110",
+          "name": "Beaver",
+          "spatial_ref": {
+            "alt": 1.2,
+            "heading": 198,
+            "landmark": "Monaco Beaver RV + Solar Arch (SW Driveway)",
+            "lat": 29.247245,
+            "lon": -95.231595,
+            "pitch": -28,
+            "range_m": 22.0,
+            "slot_id": "yard-overview-20261012",
+            "station": "palm-drive-417",
+            "uv_pin": [
+              0.35,
+              0.72
+            ]
+          },
+          "uuid": "lm-ent-71da248c6049134707691aa231922056"
+        },
+        {
+          "group_id": "lisa-muse-extraction",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:332",
+          "name": "PaulPrime Home",
+          "spatial_ref": {
+            "alt": 4.0,
+            "heading": 198,
+            "landmark": "417 Palm Drive Station Overview",
+            "lat": 29.24734,
+            "lon": -95.23153,
+            "pitch": -25,
+            "range_m": 32.0,
+            "slot_id": "yard-overview-20261012",
+            "station": "palm-drive-417"
+          },
+          "uuid": "lm-ent-5d8ee4b76b8eb84ca1b6c81022b0f19f"
+        }
+      ],
+      "supported_actions": [
+        "inspect_fleet_checklist",
+        "stage_shadow_task_update"
+      ]
+    },
+    {
+      "enu_xyz_m": [
+        -4.2,
+        2.8,
+        -3.1
+      ],
+      "frustum_ids": [
+        "yard-overview"
+      ],
+      "graphiti_entity_ids": [
+        "5a128851-8aef-4394-9a41-5cc0819a43af",
+        "2878006a-a3a8-4273-a4cd-f69c7f57914c",
+        "7bd69bb0-864f-4635-809e-6dcf196a470e",
+        "eb063f87-7456-45e7-a4eb-d87789ec7c42",
+        "965be257-3904-4d20-a0af-4e58ec6f487c"
+      ],
+      "label": "Swarm Command & Troi Continuity Desk",
+      "linked_tasks": [
+        {
+          "assigned_to": "@lisa-muse",
+          "status": "pending",
+          "task_id": 22054,
+          "title": "SIGN-OFF: DIAGNOSE: deep-sleep dreaming promotion ranks zero candidates on all seats"
+        },
+        {
+          "assigned_to": "@codex",
+          "status": "pending",
+          "task_id": 22035,
+          "title": "PFL conductor loop: coordinate one verified God\u2019s Eye card per heartbeat"
+        },
+        {
+          "assigned_to": "@friday",
+          "status": "pending_review",
+          "task_id": 21128,
+          "title": "DIAGNOSE: deep-sleep dreaming promotion ranks zero candidates on all seats"
+        }
+      ],
+      "node_id": "node-swarm-command-atrium",
+      "privacy_zone": "ZONE1_PROPERTY_YARD",
+      "resolved_graphiti_entities": [
+        {
+          "group_id": "matrix-atrium",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:117",
+          "name": "PFL Atrium",
+          "spatial_ref": null,
+          "uuid": "5a128851-8aef-4394-9a41-5cc0819a43af"
+        },
+        {
+          "group_id": "lisa-muse-self",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:321",
+          "name": "Lisa Holmes",
+          "spatial_ref": {
+            "alt": 3.5,
+            "heading": 198,
+            "landmark": "Lisa Holmes \u2014 Local OpenClaw Seat @ 417 Palm Drive",
+            "lat": 29.24734,
+            "lon": -95.23153,
+            "pitch": -25,
+            "range_m": 28.0,
+            "slot_id": "yard-overview-20261012",
+            "station": "palm-drive-417"
+          },
+          "uuid": "2878006a-a3a8-4273-a4cd-f69c7f57914c"
+        },
+        {
+          "group_id": "lisa-muse-self",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:319",
+          "name": "Lisa Muse",
+          "spatial_ref": {
+            "alt": 2.0,
+            "anchor_id": "lisa-muse-sovereign-anchor",
+            "heading": 180,
+            "landmark": "Lisa Muse \u2014 Sovereign Anchor (417 Palm Drive)",
+            "lat": 29.24752,
+            "lon": -95.23144,
+            "pitch": -15,
+            "range_m": 14.0,
+            "station": "palm-drive-417"
+          },
+          "uuid": "7bd69bb0-864f-4635-809e-6dcf196a470e"
+        },
+        {
+          "group_id": "lisa-muse-self",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:323",
+          "name": "Codex (Luna)",
+          "spatial_ref": null,
+          "uuid": "eb063f87-7456-45e7-a4eb-d87789ec7c42"
+        },
+        {
+          "group_id": "",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:126",
+          "name": "Antigravity",
+          "spatial_ref": null,
+          "uuid": "965be257-3904-4d20-a0af-4e58ec6f487c"
+        }
+      ],
+      "supported_actions": [
+        "inspect_troi_shadow_read",
+        "stage_shadow_task_update"
+      ]
+    },
+    {
+      "enu_xyz_m": [
+        -6.0,
+        1.5,
+        -4.0
+      ],
+      "frustum_ids": [
+        "master-bed-cam-20261015"
+      ],
+      "graphiti_entity_ids": [
+        "lm-ent-b45058f5a6d1f9c1b5eace28a0595657",
+        "8fd3cd48-98de-4c64-824b-c1d853a59bc7"
+      ],
+      "label": "Master Bed Station (127.0.0.1:8093 DWPose + Shadow TREAT)",
+      "linked_tasks": [
+        {
+          "assigned_to": "@antigravity",
+          "status": "completed",
+          "task_id": 22045,
+          "title": "GEV + Neo4j Fusion Design Brief for elitespyworlds.com (Trello yOhampgQ)"
+        }
+      ],
+      "loopback_endpoint": "http://127.0.0.1:8093/status.json",
+      "node_id": "node-local-bed-station",
+      "privacy_zone": "LOCAL_LOOPBACK_ONLY",
+      "resolved_graphiti_entities": [
+        {
+          "group_id": "lisa-muse-extraction",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:43",
+          "name": "Camo",
+          "spatial_ref": null,
+          "uuid": "lm-ent-b45058f5a6d1f9c1b5eace28a0595657"
+        },
+        {
+          "group_id": "lisa-muse-self",
+          "id": "4:4a6ee03b-92d7-4be3-9b85-9a5068c7c55a:320",
+          "name": "Paul Prime",
+          "spatial_ref": {
+            "alt": 5.0,
+            "heading": 198,
+            "landmark": "Paul Prime \u2014 417 Palm Drive Command Center",
+            "lat": 29.24734,
+            "lon": -95.23153,
+            "pitch": -30,
+            "range_m": 35.0,
+            "slot_id": "yard-overview-20261012",
+            "station": "palm-drive-417"
+          },
+          "uuid": "8fd3cd48-98de-4c64-824b-c1d853a59bc7"
+        }
+      ],
+      "supported_actions": [
+        "inspect_local_dwpose_telemetry",
+        "stage_shadow_treat_eval"
+      ]
+    }
+  ],
+  "task_source": {
+    "db_name": "postgres",
+    "db_user": "paul",
+    "live_db_verified": true,
+    "queried_task_ids": [
+      22054,
+      22045,
+      22035,
+      21128,
+      1157
+    ],
+    "returned_row_count": 5,
+    "source": "LIVE_POSTGRES_PUBLIC_TASKS"
+  }
+}

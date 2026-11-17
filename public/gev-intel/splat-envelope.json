@@ -1,0 +1,179 @@
+{
+  "enu_calibration": {
+    "origin_lat": 29.24745,
+    "origin_lon": -95.23148,
+    "stored_ground_height_m": -26.19,
+    "survey_landmark_count": 28,
+    "vertical_parallax_mitigation": "TPS_GROUND_BASE_PINNING_PLUS_3D_SPLAT_ENVELOPE"
+  },
+  "generated_at": "2026-10-29T15:40:16.397498Z",
+  "render_governor_contract": {
+    "active_camera_move_fps_cap": 30,
+    "governor_module": "/src/renderGovernor.js",
+    "idle_gpu_target_pct": 0,
+    "maximum_render_time_change": "Infinity",
+    "registered_splat_budget": 325353,
+    "request_render_mode": true,
+    "splat_frustum_culling": true,
+    "total_splat_budget_cap": 1000000
+  },
+  "schema_version": "gev-splat-envelope-v2",
+  "splat_volumes": [
+    {
+      "asset_uri": "/splat/gaussians-yard/tileset.json",
+      "asset_verification": {
+        "exists_on_disk": true,
+        "sha256": "844de0a943f3ba2d788eb05f0907579d5a164a7b58ee8356caa92a29816461ab",
+        "size_bytes": 6507
+      },
+      "bounding_box_m": {
+        "max": [
+          20.0,
+          12.0,
+          35.0
+        ],
+        "min": [
+          -25.0,
+          -2.0,
+          -15.0
+        ]
+      },
+      "content_codec": "spz_stream",
+      "enu_position_m": [
+        -8.4,
+        0.0,
+        12.0
+      ],
+      "enu_rotation_quat_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "enu_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "format": "3dtiles+spz_glb",
+      "label": "417 Palm Drive Yard Full KD-Tree 3DGS Tileset (244,758 splats, 7 LOD levels)",
+      "local_asset_path": "/home/paul/antigravity_workspace/gev_tracks/splats/tileset.json",
+      "lod_far_m": 110.0,
+      "lod_near_m": 4.0,
+      "max_splat_count": 244758,
+      "privacy_zone": "ZONE1_PROPERTY_YARD",
+      "public_asset_path": "/home/paul/gods-eye-view/public/splat/gaussians-yard/tileset.json",
+      "source_cameras": [
+        "yard-overview",
+        "back-yard-cam1"
+      ],
+      "splat_id": "splat-palm-drive-fleet-envelope",
+      "tps_ground_pin_count": 16,
+      "workspace_mirror_uri": "/gev-intel/splats/tileset.json"
+    },
+    {
+      "asset_uri": "/splat/gaussians-yard/tiles/0/0.glb",
+      "asset_verification": {
+        "exists_on_disk": true,
+        "sha256": "f11ae8a9d59e6743796d9abdf68802f5696954a7c1b5cf4cc3812bd5267f8dcb",
+        "size_bytes": 626776
+      },
+      "bounding_box_m": {
+        "max": [
+          28.0,
+          8.0,
+          -10.0
+        ],
+        "min": [
+          -5.0,
+          -3.5,
+          -42.0
+        ]
+      },
+      "content_codec": "spz_stream",
+      "enu_position_m": [
+        14.2,
+        -1.8,
+        -28.5
+      ],
+      "enu_rotation_quat_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "enu_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "format": "glb+spz_stream",
+      "label": "Waterfront & Boathouse Root LOD-0 SPZ Gaussian Tile (back-yard-cam2 + HL_PAN4)",
+      "local_asset_path": "/home/paul/antigravity_workspace/gev_tracks/splats/waterfront-boathouse-oct26.glb",
+      "lod_far_m": 85.0,
+      "lod_near_m": 5.0,
+      "max_splat_count": 30595,
+      "privacy_zone": "ZONE1_PROPERTY_YARD",
+      "public_asset_path": "/home/paul/gods-eye-view/public/splat/gaussians-yard/tiles/0/0.glb",
+      "source_cameras": [
+        "back-yard-cam2",
+        "HL_PAN4"
+      ],
+      "splat_id": "splat-waterfront-boathouse-oct26",
+      "tps_ground_pin_count": 12,
+      "workspace_mirror_uri": "/gev-intel/splats/waterfront-boathouse-oct26.glb"
+    },
+    {
+      "asset_uri": "/splat/gaussians-yard/tiles/4/15.glb",
+      "asset_verification": {
+        "exists_on_disk": true,
+        "sha256": "c8db86af9e677d231eeacbd51eb387155a1117e713b1ddb1916d9da769fe295d",
+        "size_bytes": 881452
+      },
+      "bounding_box_m": {
+        "max": [
+          -11.0,
+          6.5,
+          2.0
+        ],
+        "min": [
+          -19.0,
+          0.0,
+          -6.0
+        ]
+      },
+      "content_codec": "spz_stream",
+      "enu_position_m": [
+        -15.0,
+        3.8,
+        -2.5
+      ],
+      "enu_rotation_quat_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "enu_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "format": "glb+spz_stream",
+      "label": "West Wall Utility / Dense Leaf Tile 4/15 SPZ Gaussian Anchor",
+      "local_asset_path": "/home/paul/antigravity_workspace/gev_tracks/splats/west-wall-utility.glb",
+      "lod_far_m": 50.0,
+      "lod_near_m": 2.0,
+      "max_splat_count": 50000,
+      "privacy_zone": "ZONE1_PROPERTY_YARD",
+      "public_asset_path": "/home/paul/gods-eye-view/public/splat/gaussians-yard/tiles/4/15.glb",
+      "source_cameras": [
+        "yard-overview"
+      ],
+      "splat_id": "splat-west-wall-utility-bank",
+      "tps_ground_pin_count": 8,
+      "workspace_mirror_uri": "/gev-intel/splats/west-wall-utility.glb"
+    }
+  ],
+  "volume_count": 3
+}

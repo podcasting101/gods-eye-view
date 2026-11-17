@@ -1,0 +1,52 @@
+{
+  "action_payload": {
+    "action_type": "stage_shadow_task_update",
+    "actor": "@antigravity",
+    "execution_mode": "SHADOW_NO_DB_WRITE",
+    "linked_task_ids": [
+      22045,
+      22035
+    ],
+    "node_id": "node-gev-fusion-22045",
+    "payload_sha256": "fdcf2a86f10c5832a78a107ef45cc4ce1a7ecc3961c97e65b83a9e5531cd84e1",
+    "privacy_zone": "ZONE1_PROPERTY_YARD",
+    "resolved_graphiti_uuids": [
+      "lm-ent-15b7ff906c38dbc0ae47914baddca3b8",
+      "f7465fc3-8cb4-490b-adb4-238c0cc36b5b",
+      "ddc76d6f-8b3d-43a9-ae54-6684084c05cb"
+    ],
+    "schema_version": "gev-click-to-task-v1",
+    "summary": "Round-trip shadow click receipt for Card #22045",
+    "target_url": "http://127.0.0.1:4173/memory-palace.html"
+  },
+  "card_ref": 22045,
+  "linked_task_snapshot": [
+    {
+      "assigned_to": "@antigravity",
+      "status": "completed",
+      "task_id": 22045,
+      "title": "GEV + Neo4j Fusion Design Brief for elitespyworlds.com (Trello yOhampgQ)"
+    },
+    {
+      "assigned_to": "@codex",
+      "status": "pending",
+      "task_id": 22035,
+      "title": "PFL conductor loop: coordinate one verified God\u2019s Eye card per heartbeat"
+    }
+  ],
+  "receipt_schema": "gev-click-to-task-shadow-receipt-v1",
+  "task_source": {
+    "db_name": "postgres",
+    "db_user": "paul",
+    "live_db_verified": true,
+    "queried_task_ids": [
+      22054,
+      22045,
+      22035,
+      21128,
+      1157
+    ],
+    "returned_row_count": 5,
+    "source": "LIVE_POSTGRES_PUBLIC_TASKS"
+  }
+}

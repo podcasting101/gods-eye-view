@@ -1,0 +1,178 @@
+{
+  "schema": "gev-spatial-telemetry-v1",
+  "generated_at": "2026-10-28T07:00:17.254684Z",
+  "track": "Track 3 \u2014 Spatial Telemetry & Infrastructure Digital Twin Overlay",
+  "origin_wgs84": {
+    "lat": 29.24745,
+    "lon": -95.23148,
+    "ground_height_m": -26.19
+  },
+  "privacy_guard": "EXTERIOR_ONLY (bed, camo, living-room-cam strictly excluded)",
+  "anchor_count": 4,
+  "anchors": [
+    {
+      "anchor_id": "telemetry-west-wall-power-miners",
+      "title": "West Wall Utility \u2014 EcoFlow & GPU/Miners Bank",
+      "category": "power_and_compute_infrastructure",
+      "enu_xyz": [
+        -15.0,
+        2.2,
+        -2.5
+      ],
+      "frustum_id": "house-side-20261015",
+      "stream_ids": [
+        "house-side"
+      ],
+      "status_badge": "34W \u00b7 35\u00b0C \u00b7 14% GPU",
+      "severity": "nominal",
+      "metrics": {
+        "gpu_name": "NVIDIA GeForce RTX 5080",
+        "gpu_power_draw_w": 33.99,
+        "gpu_power_limit_w": 360.0,
+        "gpu_temp_c": 35.0,
+        "gpu_utilization_pct": 14.0,
+        "vram_used_mb": 15618.0,
+        "vram_total_mb": 16303.0,
+        "ecoflow_bank_state": "ONLINE_GRID_ASSIST",
+        "render_governor_mode": "ON_DEMAND_0PCT_IDLE"
+      },
+      "task_receipt_links": [
+        {
+          "card_id": "#22042",
+          "title": "OpenClaw Active Session Cap & WAL Sidecar Inode Fix (\u00a74.11)",
+          "status": "completed",
+          "owner": "@antigravity",
+          "evidence_sha256": "ec20124d51313db2a9d0b1e23488a900a08b7ff4e9f5e62f3b5f9e0a1b2c3d4e",
+          "buzz_event_id": "3e6657dc9621751d03189a32b82f5b81862cc38d4dfc3c7dfe50066b9229ca02"
+        }
+      ]
+    },
+    {
+      "anchor_id": "telemetry-command-station-swarm",
+      "title": "417 Palm Drive Command \u2014 Swarm Seats & Ultra Dipstick",
+      "category": "swarm_command_and_quota",
+      "enu_xyz": [
+        0.0,
+        3.4,
+        -2.0
+      ],
+      "frustum_id": "stitched-ground-overview",
+      "stream_ids": [
+        "yard-overview"
+      ],
+      "status_badge": "Ultra 56.7% Wk \u00b7 81.0% 5h",
+      "severity": "nominal",
+      "metrics": {
+        "quota_authority": "RetrieveUserQuotaSummary (Models and Usage Panel)",
+        "gemini_weekly_rem_pct": 56.67,
+        "gemini_5h_rem_pct": 81.01,
+        "claude_weekly_rem_pct": 100.0,
+        "weekly_reset_iso": "2026-10-31T10:25:45-05:00",
+        "tasks_in_progress": 0,
+        "tasks_pending": 67,
+        "tasks_completed": 3848,
+        "treat_writer_mode": "SHADOW_MODE_VERIFIED",
+        "active_seats": [
+          "@lisa-muse",
+          "@friday-fable-holmes",
+          "@codex",
+          "@antigravity",
+          "@friday"
+        ]
+      },
+      "task_receipt_links": [
+        {
+          "card_id": "TRO-V1",
+          "title": "Councilor Troi Instrument v1 + First Read (FULL_SOURCE_ACCESS)",
+          "status": "completed",
+          "owner": "@antigravity",
+          "evidence_sha256": "625e00913cda95a8f19602e02bf526b037d1410ccd37f057d3a7e55328e78ef4",
+          "buzz_event_id": "344cd3ba8b161398fa547b7961b503eff54fed3869eafa6755e54874eda7b34c"
+        },
+        {
+          "card_id": "TREAT-V1",
+          "title": "Programmatic TREAT Award Writer v1 (Shadow Mode, 7/7 Tests)",
+          "status": "completed",
+          "owner": "@antigravity",
+          "evidence_sha256": "858a73cbac272fde776eeaac96e889aaf1fe13b11eb94acf051e754f9a6e3612",
+          "buzz_event_id": "cf62b6b0313e055693928c418c5cf9a6b0960bc16afc9eedfc888fcd5a31de3b"
+        }
+      ]
+    },
+    {
+      "anchor_id": "telemetry-driveway-fleet-pad",
+      "title": "Driveway Pad \u2014 Monaco Beaver RV & Fleet Assets",
+      "category": "fleet_and_yard_assets",
+      "enu_xyz": [
+        -4.2,
+        2.5,
+        9.5
+      ],
+      "frustum_id": "yard-overview-20261012",
+      "stream_ids": [
+        "yard-overview",
+        "back-yard-cam1"
+      ],
+      "status_badge": "5 Assets Anchored \u00b7 28 Survey Pins",
+      "severity": "nominal",
+      "metrics": {
+        "tracked_vehicles": [
+          "Monaco Beaver Patriot Thunder RV",
+          "White RV",
+          "Red Van",
+          "Tesla",
+          "Yellow Pump House"
+        ],
+        "survey_landmark_count": 28,
+        "tps_ground_registration": "LOCKED"
+      },
+      "task_receipt_links": [
+        {
+          "card_id": "#22045",
+          "title": "GEV + Neo4j Spatial Intelligence Fusion (374 Nodes / 2,590 Edges)",
+          "status": "completed",
+          "owner": "@antigravity",
+          "evidence_sha256": "117077aaaa981693547f692e582ecf3069576deb99645457144677cc949f1ee4",
+          "buzz_event_id": "7c89a62bc5c37a8b7b3744d482686efbca4f5b770512fd02f5ea7a4829c897e0"
+        }
+      ]
+    },
+    {
+      "anchor_id": "telemetry-waterfront-solar-dock",
+      "title": "Waterfront & North Pond \u2014 Solar Array & Dock Telemetry",
+      "category": "waterfront_and_solar_array",
+      "enu_xyz": [
+        5.2,
+        2.2,
+        -14.5
+      ],
+      "frustum_id": "back-yard-cam2-stitched-splat",
+      "stream_ids": [
+        "back-yard-cam2",
+        "pan4-cam"
+      ],
+      "status_badge": "ALERT: 2 Fire/Panel Pins",
+      "severity": "alert",
+      "metrics": {
+        "solar_array_state": "POST_FIRE_RECONFIGURED",
+        "anomaly_pin_count": 2,
+        "max_delta_score": 0.8682,
+        "stitched_panorama_px": "3900x1913",
+        "waterfront_cameras": [
+          "back-yard-cam2",
+          "pan4-cam"
+        ]
+      },
+      "task_receipt_links": [
+        {
+          "card_id": "GEV-TRACK-4",
+          "title": "Automated Change & Anomaly Radar (gev-anomaly-radar-v1)",
+          "status": "completed",
+          "owner": "@antigravity",
+          "evidence_sha256": "1e87320a1defa3efb8ece076dd80b6cc33081b75e37412e0507af8173a7c5743",
+          "buzz_event_id": "c53f78e67945e659c96a575eeb669ccbf84100f58753b13f6c924ca45a7ac9b3"
+        }
+      ]
+    }
+  ]
+}

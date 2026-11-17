@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>THE UPDATE BOARD — God's Eye View Master Execution Handoff Graph</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070a12;
+      --panel: #0f1626;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 14px 20px;
+      background: #0b1120;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .kpi-strip {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .kpi-pill {
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: #111827;
+      border: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .pattern-banner {
+      padding: 10px 20px;
+      background: #172554;
+      border-bottom: 1px solid #1d4ed8;
+      font-size: 12.5px;
+      color: #dbeafe;
+    }
+    .toolbar {
+      padding: 10px 20px;
+      background: #0b1120;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .filter-btn {
+      background: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      cursor: pointer;
+      margin-right: 6px;
+    }
+    .filter-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #60a5fa;
+      font-weight: 700;
+    }
+    .layout-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 16px;
+      padding: 16px 20px;
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+    .panel-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .item-row-card {
+      padding: 10px 12px;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      background: #0b1120;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .item-row-card:hover, .item-row-card.selected {
+      border-color: #38bdf8;
+      background: #111c33;
+    }
+    .ver-badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+    .sec-hdr {
+      margin: 14px 0 6px 0;
+      font-size: 12.5px;
+      color: #93c5fd;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 4px;
+    }
+    .receipt-box {
+      padding: 9px 11px;
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    a.nav-link {
+      color: #38bdf8;
+      text-decoration: none;
+      font-size: 12px;
+      margin-left: 12px;
+    }
+    .expand-graph-btn {
+      background: #1d4ed8;
+      color: #ffffff;
+      border: 1px solid #60a5fa;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .expand-graph-btn:hover {
+      background: #2563eb;
+    }
+    #graph-modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.84);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+    #graph-modal-backdrop.open {
+      display: flex;
+    }
+    #graph-modal-window {
+      width: 92vw;
+      height: 86vh;
+      min-width: 640px;
+      min-height: 440px;
+      max-width: 98vw;
+      max-height: 96vh;
+      resize: both;
+      overflow: auto;
+      background: #0b1120;
+      border: 2px solid #38bdf8;
+      border-radius: 12px;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      padding: 14px 18px;
+    }
+    .zoom-btn {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .zoom-btn:hover {
+      border-color: #38bdf8;
+      color: #38bdf8;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div style="font-size:18px;font-weight:800;color:#f8fafc;">
+        🛡️ THE UPDATE BOARD — Master Execution Handoff Graph (<code>gev-update-board-v1</code>)
+      </div>
+      <div id="board-load-status" style="font-size:11.5px;color:#94a3b8;margin-top:3px;">
+        Loading primary receipts from /gev-intel/update-board.json…
+      </div>
+    </div>
+    <div class="kpi-strip">
+      <div class="kpi-pill">Total Nodes: <strong id="kpi-total">-</strong></div>
+      <div class="kpi-pill" style="border-color:#ff4d6d;color:#ff8fa3;">
+        UNVERIFIED: <strong id="kpi-unverified">-</strong>
+      </div>
+      <div class="kpi-pill" style="border-color:#f59e0b;color:#fcd34d;">
+        NEEDS_IMPROVEMENT: <strong id="kpi-needs-imp">-</strong>
+      </div>
+      <div class="kpi-pill" style="border-color:#10b981;color:#6ee7b7;">
+        VERIFIED (SHADOW): <strong id="kpi-verified-shadow">-</strong>
+      </div>
+      <a class="nav-link" href="/memory-palace.html">→ 4D Spatial Memory Palace</a>
+      <a class="nav-link" href="/">→ Cesium Globe</a>
+    </div>
+  </header>
+
+  <div class="pattern-banner">
+    <strong>Primary-Receipt Invariant (“UNVERIFIED is the product”):</strong>
+    Author self-report never verifies a node. Every state below traces to Neo4j/Graphiti (<code>entity_web</code>),
+    live Postgres <code>public.tasks</code>, signed Buzz event receipts, executable unit tests, and SHA-256 file hashes.
+    <div id="pattern-banner-text" style="margin-top:4px;color:#93c5fd;font-weight:600;"></div>
+  </div>
+
+  <div class="toolbar">
+    <div>
+      <span style="font-size:12px;color:#94a3b8;margin-right:8px;">Filter by Verification State:</span>
+      <button class="filter-btn active" data-state-filter="ALL">ALL</button>
+      <button class="filter-btn" data-state-filter="UNVERIFIED">UNVERIFIED</button>
+      <button class="filter-btn" data-state-filter="NEEDS_IMPROVEMENT">NEEDS_IMPROVEMENT</button>
+      <button class="filter-btn" data-state-filter="VERIFIED_SHADOW_ONLY">VERIFIED_SHADOW_ONLY</button>
+    </div>
+    <div style="display:flex;align-items:center;">
+      <span style="font-size:12px;color:#94a3b8;margin-right:8px;">Open-End Holder:</span>
+      <div id="owner-filter-bar"></div>
+    </div>
+  </div>
+
+  <div class="layout-grid">
+    <div>
+      <div class="panel-card" style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
+          <div style="font-size:13px;font-weight:700;color:#cbd5e1;">
+            Interactive Handoff & Open-End Graph (Click box to blow up bigger, or click any node)
+          </div>
+          <button id="open-graph-modal-btn" class="expand-graph-btn" title="Pop out into a large resizable window">
+            ⛶ Blow Up / Resize Graph
+          </button>
+        </div>
+        <svg id="update-board-svg" viewBox="0 0 920 560" title="Click anywhere in this graph box to blow it up larger" style="width:100%;height:auto;background:#090d16;border-radius:8px;border:1px solid #1e293b;cursor:zoom-in;"></svg>
+      </div>
+      <div class="panel-card">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#cbd5e1;">
+          Master Handoff Scorecard & Section-3 Task Gates
+        </div>
+        <div id="items-card-list" style="max-height:380px;overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div id="receipt-inspector-body">
+        Select any node in the graph or list to inspect its primary receipts and re-runnable verification commands.
+      </div>
+    </div>
+  </div>
+
+  <div id="graph-modal-backdrop" role="dialog" aria-modal="true" aria-label="Expanded Node Graph">
+    <div id="graph-modal-window">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid #1e293b;">
+        <div>
+          <strong style="font-size:16px;color:#f8fafc;">🔍 Expanded Node Graph — Master Execution Handoff (Resizable Popup)</strong>
+          <span style="font-size:12px;color:#94a3b8;margin-left:10px;">Drag bottom-right corner to resize · Click any node to inspect</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:12px;color:#94a3b8;">Zoom:</span>
+          <button class="zoom-btn" data-zoom="1">100%</button>
+          <button class="zoom-btn" data-zoom="1.35">135%</button>
+          <button class="zoom-btn" data-zoom="1.75">175%</button>
+          <button class="zoom-btn" data-zoom="2.2">220%</button>
+          <button id="close-graph-modal-btn" class="expand-graph-btn" style="background:#b91c1c;border-color:#f87171;">✕ Close (Esc)</button>
+        </div>
+      </div>
+      <div id="graph-modal-selected-bar" style="padding:8px 12px;margin-top:8px;background:#111827;border:1px solid #1e293b;border-radius:6px;font-size:13px;color:#e2e8f0;">
+        Click any node or owner hub below to inspect its status and primary receipts.
+      </div>
+      <div style="flex:1;overflow:auto;margin-top:10px;background:#090d16;border:1px solid #1e293b;border-radius:8px;padding:8px;">
+        <svg id="update-board-modal-svg" viewBox="0 0 1320 820" style="width:100%;height:auto;min-height:640px;transform-origin:top left;"></svg>
+      </div>
+    </div>
+  </div>
+
+  <script src="/update-board.js"></script>
+</body>
+</html>

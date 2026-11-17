@@ -1,0 +1,193 @@
+{
+  "schema": "gev-rtsp-scrubber-fusion-v1",
+  "generated_at": "2026-10-27T23:21:35.546058Z",
+  "track": "Track 1 \u2014 Live RTSP/HLS + Historical 4D Time-Scrubber Fusion",
+  "privacy_guard": "EXTERIOR_ONLY (bed, camo, living-room-cam strictly excluded)",
+  "render_governor": {
+    "idle_gpu_target_pct": 0,
+    "live_frame_cadence_Rule": "Render only on dirty video frame or user camera slerp/scrub"
+  },
+  "scrubber_contract": {
+    "range_min": 0,
+    "range_max": 100,
+    "live_edge_threshold": 98,
+    "default_t_pct": 100
+  },
+  "stream_count": 4,
+  "streams": [
+    {
+      "camera_id": "yard-overview",
+      "label": "Wyze Cam V4 \u2014 Front Yard & Driveway",
+      "frustum_id": "yard-overview-20261012",
+      "enu_xyz": [
+        -4.2,
+        5.2,
+        11.5
+      ],
+      "look_at_xyz": [
+        2.5,
+        1.2,
+        -6.0
+      ],
+      "fov_deg": 62.0,
+      "live_hls_url": "/gev-intel/live/yard-overview/index.m3u8",
+      "live_snapshot_fallback": "/yard-frames/yard-overview-2026-10-12.png",
+      "keyframes": [
+        {
+          "t_pct": 0,
+          "timestamp_iso": "2026-10-12T14:22:00-05:00",
+          "mode": "historical_snapshot",
+          "url": "/yard-frames/yard-overview-2026-10-12.png",
+          "label": "Oct 12 Survey Baseline \u2014 Driveway & Fleet Pad"
+        },
+        {
+          "t_pct": 65,
+          "timestamp_iso": "2026-10-24T11:37:00-05:00",
+          "mode": "historical_snapshot",
+          "url": "/yard-frames/front-yard-stitched-2026-10-12.png",
+          "label": "Oct 24 TPS Ground-Pinned Composite"
+        },
+        {
+          "t_pct": 100,
+          "timestamp_iso": "LIVE_EDGE",
+          "mode": "live_rtsp_hls_or_fallback",
+          "url": "/yard-frames/yard-overview-2026-10-12.png",
+          "label": "LIVE EDGE \u2014 Wyze V4 Front Yard Stream"
+        }
+      ]
+    },
+    {
+      "camera_id": "back-yard-cam1",
+      "label": "Wyze Cam V3 \u2014 East Road & Culvert",
+      "frustum_id": "back-yard-cam1-plan",
+      "enu_xyz": [
+        13.5,
+        4.8,
+        6.0
+      ],
+      "look_at_xyz": [
+        -3.0,
+        0.8,
+        12.0
+      ],
+      "fov_deg": 60.0,
+      "live_hls_url": "/gev-intel/live/back-yard-cam1/index.m3u8",
+      "live_snapshot_fallback": "/yard-frames/back-yard-cam1-2026-10-12.jpg",
+      "keyframes": [
+        {
+          "t_pct": 0,
+          "timestamp_iso": "2026-10-12T14:20:00-05:00",
+          "mode": "historical_snapshot",
+          "url": "/yard-frames/back-yard-cam1-2026-10-12.jpg",
+          "label": "Oct 12 Survey Baseline \u2014 Palm Drive Culvert"
+        },
+        {
+          "t_pct": 100,
+          "timestamp_iso": "LIVE_EDGE",
+          "mode": "live_rtsp_hls_or_fallback",
+          "url": "/yard-frames/back-yard-cam1-2026-10-12.jpg",
+          "label": "LIVE EDGE \u2014 Back Yard Cam 1 Stream"
+        }
+      ]
+    },
+    {
+      "camera_id": "back-yard-cam2",
+      "label": "Wyze Cam V3 \u2014 Waterfront / North Pond & Solar Array",
+      "frustum_id": "back-yard-cam2-water",
+      "enu_xyz": [
+        2.8,
+        4.5,
+        -14.5
+      ],
+      "look_at_xyz": [
+        4.0,
+        1.0,
+        -32.0
+      ],
+      "fov_deg": 62.0,
+      "live_hls_url": "/gev-intel/live/back-yard-cam2/index.m3u8",
+      "live_snapshot_fallback": "/yard-frames/back-yard-cam2-stitched-2026-10-26.png",
+      "keyframes": [
+        {
+          "t_pct": 0,
+          "timestamp_iso": "2026-10-12T14:25:00-05:00",
+          "mode": "historical_snapshot",
+          "url": "/yard-frames/back-yard-cam2-2026-10-12.jpg",
+          "label": "Oct 12 Pre-Fire Waterfront Baseline"
+        },
+        {
+          "t_pct": 75,
+          "timestamp_iso": "2026-10-25T12:14:08-05:00",
+          "mode": "incident_keyframe",
+          "url": "/yard-frames/20261025_121408_back-yard-cam2_0.jpg",
+          "anomaly_pin_id": "anom-20261025-121408-back-yard-cam2-ignition",
+          "label": "Oct 25 12:14:08 CDT \u2014 Solar Array Ignition Frame"
+        },
+        {
+          "t_pct": 85,
+          "timestamp_iso": "2026-10-25T12:17:59-05:00",
+          "mode": "incident_keyframe",
+          "url": "/yard-frames/20261025_121759_back-yard-cam2_0.jpg",
+          "anomaly_pin_id": "anom-20261025-121759-back-yard-cam2-postfire",
+          "label": "Oct 25 12:17:59 CDT \u2014 Post-Fire Panel Displacement"
+        },
+        {
+          "t_pct": 95,
+          "timestamp_iso": "2026-10-26T09:21:00-05:00",
+          "mode": "stitched_composite",
+          "url": "/yard-frames/back-yard-cam2-stitched-2026-10-26.png",
+          "label": "Oct 26 3900x1913 Tree-Aligned Before+After Splat"
+        },
+        {
+          "t_pct": 100,
+          "timestamp_iso": "LIVE_EDGE",
+          "mode": "live_rtsp_hls_or_fallback",
+          "url": "/yard-frames/back-yard-cam2-stitched-2026-10-26.png",
+          "label": "LIVE EDGE \u2014 Waterfront Cam 2 Stream"
+        }
+      ]
+    },
+    {
+      "camera_id": "pan4-cam",
+      "label": "Wyze Cam Pan V4 \u2014 Boathouse Dock Cam (HL_PAN4)",
+      "frustum_id": "dock-cam-fire-121338",
+      "enu_xyz": [
+        -8.5,
+        2.2,
+        -25.0
+      ],
+      "look_at_xyz": [
+        1.5,
+        2.6,
+        -15.5
+      ],
+      "fov_deg": 62.0,
+      "live_hls_url": "/gev-intel/live/pan4-cam/index.m3u8",
+      "live_snapshot_fallback": "/yard-frames/20261025_121338_pan4-cam_0.jpg",
+      "incident_video_url": "/yard-frames/yard-fire-legs-cut-2026-10-25.mp4",
+      "keyframes": [
+        {
+          "t_pct": 72,
+          "timestamp_iso": "2026-10-25T12:13:38-05:00",
+          "mode": "incident_keyframe",
+          "url": "/yard-frames/20261025_121338_pan4-cam_0.jpg",
+          "label": "Oct 25 12:13:38 CDT \u2014 Dock Cam Smoke Plume"
+        },
+        {
+          "t_pct": 88,
+          "timestamp_iso": "2026-10-25T12:18:00-05:00",
+          "mode": "incident_video_cut",
+          "url": "/yard-frames/yard-fire-legs-cut-2026-10-25.mp4",
+          "label": "Oct 25 Legs-Only Patrol & Fire Video Cut (31.5s)"
+        },
+        {
+          "t_pct": 100,
+          "timestamp_iso": "LIVE_EDGE",
+          "mode": "live_rtsp_hls_or_fallback",
+          "url": "/yard-frames/20261025_121338_pan4-cam_0.jpg",
+          "label": "LIVE EDGE \u2014 Boathouse Dock Pan V4 Stream"
+        }
+      ]
+    }
+  ]
+}

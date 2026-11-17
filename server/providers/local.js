@@ -1,3 +1,4 @@
+import { kalshiPaperProxy } from './kalshiPaper.js';
 import { openSkyProxy } from './aircraft/opensky.js';
 import { celestrakProxy, rocketLaunchesProxy } from './space.js';
 import { tomtomProxy } from './traffic.js';
@@ -65,6 +66,7 @@ function localProviderPlugins({ realtime, gemini } = {}) {
     firePerimetersProxy(),
     gnssIntegrityProxy(),
     keySetupEndpoint(),
+    kalshiPaperProxy(),
   ];
 }
 

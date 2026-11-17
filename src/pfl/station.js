@@ -10,6 +10,7 @@ import { loadBrazoriaCadPlugin } from './brazoriaCadPlugin.js';
 import { loadNeo4jPersonalLayer } from './neo4jPersonalLayer.js';
 import { loadStarshipEventTheater } from './starshipEventTheater.js';
 import { loadPolymarketPlugin } from './polymarketPlugin.js';
+import { loadPflWindowFramework } from './pflWindowFramework.js';
 
 export const SOVEREIGN_ANCHOR = Object.freeze({
   id: 'lisa-muse-sovereign-anchor',
@@ -93,10 +94,12 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
   let neo4j = null;
   let starship = null;
   let polymarket = null;
+  let winFramework = null;
   let destroyed = false;
   const destroy = () => {
     if (destroyed) return;
     destroyed = true;
+    winFramework?.destroy?.();
     polymarket?.destroy?.();
     starship?.destroy?.();
     neo4j?.destroy?.();
@@ -152,6 +155,11 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
         rethrowAbort(signal, error);
         console.warn('[PFL Station] Polymarket radar overlay unavailable:', error);
       }
+    }
+    try {
+      winFramework = loadPflWindowFramework({ viewer });
+    } catch (error) {
+      console.warn('[PFL Station] window framework unavailable:', error);
     }
     signal?.throwIfAborted();
     governorRequestRender('pfl-station-load');

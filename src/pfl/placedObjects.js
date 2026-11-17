@@ -50,7 +50,7 @@ const SPLAT_CENTER_OFFSET = { x: -1.2614312, y: 0.70354426, z: 0.20455605 };
 
 const SPLAT_CREDIT = new Cesium.Credit(
   'Front-yard splat — captured by Paul Prime, Oct 2026',
-  true,
+  false,
 );
 
 // Lisa Muse's sign.
@@ -58,7 +58,7 @@ export const SIGN_TEXT = 'The night watch keeps this seat warm.';
 
 const CHAIR_CREDIT = new Cesium.Credit(
   '"Wooden Chair (Low Poly)" by Berk Gedik, CC Attribution — via Sketchfab',
-  true,
+  false,
 );
 
 function makePlaqueTexture(text) {

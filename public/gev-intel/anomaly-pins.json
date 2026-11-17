@@ -1,0 +1,77 @@
+{
+  "schema": "gev-anomaly-radar-v1",
+  "generated_at": "2026-10-27T22:42:01.489009Z",
+  "track": "Track 4 — Automated Change & Anomaly Radar",
+  "privacy_guard": "EXTERIOR_ONLY (bed, camo, living-room-cam strictly excluded)",
+  "registered_cameras": [
+    "yard-overview",
+    "back-yard-cam1",
+    "back-yard-cam2",
+    "pan4-cam"
+  ],
+  "pin_count": 2,
+  "pins": [
+    {
+      "pin_id": "anom-20261025-121408-back-yard-cam2-ignition",
+      "timestamp_iso": "2026-10-25T12:14:08-05:00",
+      "camera_id": "back-yard-cam2",
+      "camera_label": "Wyze Cam V3 — Waterfront / East Pond & Solar Array",
+      "category": "thermal_and_structural_change",
+      "enu_xyz": [
+        7.35,
+        0.0,
+        -5.23
+      ],
+      "frustum_bbox_uv": [
+        0.3063,
+        0.3944,
+        0.7875,
+        0.8472
+      ],
+      "ground_pin_uv": [
+        0.5469,
+        0.8472
+      ],
+      "luma_mae": 35.117,
+      "changed_fraction": 0.4996,
+      "delta_score": 0.8682,
+      "before_frame": "/yard-frames/back-yard-cam2-2026-10-12.jpg",
+      "before_sha256": "a77714898896edd1cde11f5651e4599b91c9905ffaf4f0684c291959f88f79e2",
+      "after_frame": "/yard-frames/20261025_121408_back-yard-cam2_0.jpg",
+      "after_sha256": "03ec390023f461ae2d763a80a708d8dffa3ec11bdb3ae7648eda3b2bf368f39b",
+      "diff_overlay": "/yard-frames/back-yard-cam2-fire-analysis-2026-10-26.png",
+      "summary": "Waterfront solar array burn scar & grass char boundary vs. Oct 12 baseline (back-yard-cam2)"
+    },
+    {
+      "pin_id": "anom-20261025-121759-back-yard-cam2-postfire",
+      "timestamp_iso": "2026-10-25T12:17:59-05:00",
+      "camera_id": "back-yard-cam2",
+      "camera_label": "Wyze Cam V3 — Waterfront / East Pond & Solar Array",
+      "category": "equipment_displacement_and_response",
+      "enu_xyz": [
+        7.12,
+        0.0,
+        -5.23
+      ],
+      "frustum_bbox_uv": [
+        0.2906,
+        0.3583,
+        0.8234,
+        0.8833
+      ],
+      "ground_pin_uv": [
+        0.557,
+        0.8833
+      ],
+      "luma_mae": 16.515,
+      "changed_fraction": 0.1505,
+      "delta_score": 0.5813,
+      "before_frame": "/yard-frames/20261025_121408_back-yard-cam2_0.jpg",
+      "before_sha256": "03ec390023f461ae2d763a80a708d8dffa3ec11bdb3ae7648eda3b2bf368f39b",
+      "after_frame": "/yard-frames/20261025_121759_back-yard-cam2_0.jpg",
+      "after_sha256": "a56ef3a2bf795981a22ee48739661c742afe28607ec063ad952d61f50ce7417c",
+      "diff_overlay": "/yard-frames/back-yard-cam2-stitched-2026-10-26.png",
+      "summary": "3m51s post-ignition frame diff: operator movement & displaced solar panel geometry on waterfront bank"
+    }
+  ]
+}

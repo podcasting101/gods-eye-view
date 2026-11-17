@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   HUD_SUMMARY_INSTRUCTIONS,
   keylessHudSummaryResponse,
@@ -28,6 +30,35 @@ function toFiveWordHudSummary(value) {
     .join(' ');
 }
 
+
+const _hudSummaryCachePath = path.join(process.cwd(), '.gev-cache', 'hud-summary-cache.json');
+let _hudSummaryDiskCache = null;
+let _openAi429Until = 0;
+
+function loadHudCache() {
+  if (_hudSummaryDiskCache) return _hudSummaryDiskCache;
+  try {
+    _hudSummaryDiskCache = JSON.parse(fs.readFileSync(_hudSummaryCachePath, 'utf8'));
+  } catch {
+    _hudSummaryDiskCache = {};
+  }
+  return _hudSummaryDiskCache;
+}
+
+function saveHudCache() {
+  try {
+    fs.mkdirSync(path.dirname(_hudSummaryCachePath), { recursive: true });
+    fs.writeFileSync(_hudSummaryCachePath, JSON.stringify(_hudSummaryDiskCache || {}));
+  } catch {}
+}
+
+function hudCacheKey(ctx) {
+  const lat = Number(ctx?.lat ?? ctx?.latitude ?? 0).toFixed(2);
+  const lon = Number(ctx?.lon ?? ctx?.longitude ?? 0).toFixed(2);
+  const locality = String(ctx?.locality || ctx?.place || '').slice(0, 40);
+  return `${lat},${lon}:${locality}`;
+}
+
 async function handleHudSummary(req, res) {
   if (req.method !== 'POST') {
     res.statusCode = 405;
@@ -54,6 +85,23 @@ async function handleHudSummary(req, res) {
   try {
     const body = await readRequestBody(req, 64 * 1024);
     const context = JSON.parse(body || '{}');
+    const cKey = hudCacheKey(context);
+    const cache = loadHudCache();
+    if (cache[cKey] && Date.now() - cache[cKey].at < 24 * 3600 * 1000) {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.end(JSON.stringify({ summary: cache[cKey].summary, error: null, cached: true }));
+      return;
+    }
+    if (Date.now() < _openAi429Until) {
+      const fallback = keylessHudSummaryResponse('');
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.end(JSON.stringify({ summary: cache[cKey]?.summary || fallback?.payload?.summary || null, error: null, cooldown: true }));
+      return;
+    }
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -75,8 +123,15 @@ async function handleHudSummary(req, res) {
     res.statusCode = response.ok && summary ? 200 : response.status || 502;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
-    if (!response.ok)
+    if (response.status === 429) {
+      _openAi429Until = Date.now() + 30 * 60 * 1000;
+    }
+    if (response.ok && summary) {
+      cache[cKey] = { summary, at: Date.now() };
+      saveHudCache();
+    } else if (!response.ok) {
       console.warn(`[hud-summary] upstream HTTP ${response.status}`);
+    }
     res.end(
       JSON.stringify({
         summary: summary || null,

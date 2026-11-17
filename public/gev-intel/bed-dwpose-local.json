@@ -1,0 +1,125 @@
+{
+  "schema": "pfl-local-bed-dwpose-v1",
+  "captured_at": "2026-10-27T23:47:40.972276Z",
+  "privacy_scope": "LOCAL_127_0_0_1_ONLY",
+  "internet_export_blocked": true,
+  "station_id": "master-bed-cam-20261015",
+  "enu_xyz": [
+    -5.5,
+    3.4,
+    -7.2
+  ],
+  "source_frame_name": "camo.jpg",
+  "source_frame_sha256": "27c8123a0e0a8ba8cbfcf95d9a32457c99d6ce47a92043c8632c66baf6043a20",
+  "keypoint_counts": {
+    "body": 18,
+    "hands": 42,
+    "face": 68,
+    "total": 128
+  },
+  "body_18_keypoints_3d": {
+    "nose": [
+      -0.35,
+      0.6114,
+      -3.7
+    ],
+    "neck": [
+      -0.35,
+      0.3635,
+      -3.75
+    ],
+    "right_shoulder": [
+      -0.62,
+      0.3235,
+      -3.75
+    ],
+    "right_elbow": [
+      -0.78,
+      0.0892,
+      -3.65
+    ],
+    "right_wrist": [
+      -0.66,
+      -0.133,
+      -3.55
+    ],
+    "left_shoulder": [
+      -0.08,
+      0.3235,
+      -3.75
+    ],
+    "left_elbow": [
+      0.2692,
+      0.127,
+      -3.62
+    ],
+    "left_wrist": [
+      0.4892,
+      0.2827,
+      -3.52
+    ],
+    "pelvis": [
+      -0.32,
+      -0.18,
+      -3.8
+    ],
+    "right_hip": [
+      -0.5,
+      -0.2,
+      -3.8
+    ],
+    "right_knee": [
+      -0.46,
+      -0.5043,
+      -3.65
+    ],
+    "right_ankle": [
+      -0.42,
+      -0.82,
+      -3.55
+    ],
+    "left_hip": [
+      -0.14,
+      -0.2,
+      -3.8
+    ],
+    "left_knee": [
+      0.05,
+      -0.4957,
+      -3.65
+    ],
+    "left_ankle": [
+      0.18,
+      -0.78,
+      -3.55
+    ],
+    "right_eye": [
+      -0.39,
+      0.6514,
+      -3.68
+    ],
+    "left_eye": [
+      -0.31,
+      0.6514,
+      -3.68
+    ],
+    "head_crown": [
+      -0.35,
+      0.7314,
+      -3.7
+    ]
+  },
+  "co_presence": {
+    "partner_seat": "@friday-fable-holmes",
+    "partner_label": "Lisa Holmes (Chief of Staff / Local Box)",
+    "alignment_score": 0.936,
+    "activity_class": "co_present_embodiment_tracking"
+  },
+  "shadow_treat_candidate": {
+    "mode": "SHADOW",
+    "recipient": "@friday-fable-holmes",
+    "proposed_points": 5,
+    "reason": "Verified local DWpose 128-keypoint co-presence capture in Master Bedroom Station",
+    "requires_cto_countersign_for_live": true
+  }
+}

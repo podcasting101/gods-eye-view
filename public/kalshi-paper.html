@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PFL God's Eye View — TradingView + Kalshi & Schwab Paper-Trading Arena</title>
+      <style>
+    :root {
+      --bg: #070b12; --panel: #0f1624; --border: #1e293b;
+      --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+      --green: #22c55e; --red: #ef4444; --gold: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); padding: 14px; }
+    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+    .title-group h1 { font-size: 1.15rem; font-weight: 700; color: #fff; }
+    .title-group p { font-size: 0.78rem; color: var(--muted); }
+    .nav-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill { padding: 6px 11px; border-radius: 6px; background: var(--panel); border: 1px solid var(--border); color: var(--accent); text-decoration: none; font-size: 0.76rem; font-weight: 600; cursor: pointer; }
+    .pill.active, .pill:hover { border-color: var(--accent); background: rgba(56,189,248,0.12); }
+    .grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px; }
+    @media (max-width: 1024px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 13px; margin-bottom: 14px; }
+    .card h2 { font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    #tv_advanced_chart { width: 100%; height: 420px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+    #kalshi_prob_chart { width: 100%; height: 220px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    th, td { padding: 7px 6px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; }
+    .pos-yes { color: var(--green); font-weight: 700; }
+    .pos-no { color: var(--red); font-weight: 700; }
+    .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 0.69rem; font-weight: 700; background: rgba(56,189,248,0.16); color: var(--accent); }
+    .badge-gold { background: rgba(245,158,11,0.18); color: var(--gold); }
+    .form-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
+    input, select, button, textarea { background: #090e18; border: 1px solid var(--border); color: var(--text); padding: 6px 9px; border-radius: 6px; font-size: 0.78rem; }
+    button { background: var(--accent); color: #041019; font-weight: 700; border: none; cursor: pointer; }
+    button:hover { opacity: 0.9; }
+    .market-row:hover { background: rgba(56,189,248,0.07); cursor: pointer; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 6px; }
+    textarea { width: 100%; height: 95px; font-family: 'JetBrains Mono', monospace; font-size: 0.73rem; color: #bae6fd; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title-group">
+      <h1><span class="status-dot"></span>PFL God's Eye View — TradingView + Kalshi & Schwab/ToS Paper-Trading Arena</h1>
+      <p>Full Trendline Drawing Tools + Pine Script v5/v6 BTC/SPX Workbench · $100 Agent Virtual Bounties ("Treat Pool")</p>
+    </div>
+    <div class="nav-pills">
+      <a class="pill" href="/">🌍 3D Globe (:4173)</a>
+      <a class="pill" href="/update-board.html">📋 Update Board</a>
+      <a class="pill" href="http://127.0.0.1:3004/d/strata-runtime" target="_blank">⚡ Strata (:3004)</a>
+      <a class="pill" href="https://kalshi.com/markets" target="_blank">📈 Kalshi Live</a>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>
+          <span>📊 Interactive TradingView Workbench (Draw Trendlines, Fibs, RSI/MACD — Cross-Check BTC & S&P 500)</span>
+          <div style="display:flex; gap:6px;">
+            <button>BTC/USD</button>
+            <button>S&P 500 (/ES)</button>
+            <button>NVDA (Chip Proxy)</button>
+            <button>SOXX Semi ETF</button>
+          </div>
+        </h2>
+        <div id="tv_advanced_chart"></div>
+      </div>
+
+      <div class="card">
+        <h2>
+          <span id="prob-title">Kalshi Event Contract Implied Probability (1¢–99¢ Trajectory)</span>
+          <span class="badge" id="prob-ticker">KXFAA-DELAY-4500</span>
+        </h2>
+        <div id="kalshi_prob_chart"></div>
+      </div>
+
+      <div class="card">
+        <h2>
+          <span>🌐 Live Kalshi Event Contracts + God's Eye View Telemetry Signals</span>
+          <button>↻ Refresh Live API</button>
+        </h2>
+        <table id="markets-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Contract</th>
+              <th>Yes Bid / Ask</th>
+              <th>Implied</th>
+              <th>PFL / Schwab Signal</th>
+            </tr>
+          </thead>
+          <tbody id="markets-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>
+          <span>🏆 Swarm Agent Leaderboard ($100 Virtual Bankroll -> Compute Bounties)</span>
+          <span class="badge badge-gold">TREAT POOL LIVE</span>
+        </h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Agent / Seat</th>
+              <th>Cash</th>
+              <th>Open Value</th>
+              <th>Total Equity</th>
+              <th>P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2><span>📝 Log Real or Virtual Paper Position (Diversified Basket)</span></h2>
+        <div class="form-row">
+          <select id="agent-select">
+            <option value="Paul Prime (Real/Paper)">Paul Prime ($100 Real/Paper)</option>
+            <option value="@harry (Carbon CTO)" selected>@harry (Carbon CTO — $100)</option>
+            <option value="@zelenka (AIS/ADS-B)">@zelenka (AIS/ADS-B — $100)</option>
+            <option value="@friday (Ops/Macro)">@friday (Ops/Macro — $100)</option>
+            <option value="@lisa (Sentiment)">@lisa (Sentiment — $100)</option>
+            <option value="@mckay (Contrarian)">@mckay (Contrarian — $100)</option>
+          </select>
+          <input id="pos-ticker" value="KXFAA-DELAY-4500" style="width:145px;" placeholder="Ticker" />
+          <select id="pos-side"><option value="YES">YES</option><option value="NO">NO</option></select>
+          <input id="pos-qty" type="number" value="10" min="1" max="500" style="width:68px;" title="Shares" />
+          <input id="pos-price" type="number" value="38" min="1" max="99" style="width:68px;" title="Entry ¢" />
+          <button>Log Trade</button>
+        </div>
+        <table style="margin-top:10px;">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Owner</th>
+              <th>Contract</th>
+              <th>Side/Qty</th>
+              <th>Entry</th>
+              <th>Thesis</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>
+          <span>🌲 Custom Pine Script v5/v6 -> PFL Signal Bridge (BTC / Schwab ToS / Kalshi)</span>
+          <span class="badge">PINE v5/v6</span>
+        </h2>
+        <p style="font-size:0.75rem; color:var(--muted);">
+          Paste your custom TradingView Bitcoin / S&amp;P Pine Script indicator logic below — Qwen 3.8 Strata compiles webhook alerts &amp; indicator thresholds directly into non-turnkey PFL paper-trade signals alongside Charles Schwab (<code>thinkorswim</code>) streaming ticks:
+        </p>
+        <textarea id="pine-box">//@version=5
+indicator("PFL Custom BTC & Macro Divergence", overlay=true)
+fastEMA = ta.ema(close, 13)
+slowEMA = ta.ema(close, 34)
+rsiVal  = ta.rsi(close, 14)
+bullSig = ta.crossover(fastEMA, slowEMA) and rsiVal < 68
+plot(fastEMA, color=color.aqua, linewidth=2)
+plot(slowEMA, color=color.orange, linewidth=2)
+alertcondition(bullSig, title="PFL Kalshi Trigger", message="PFL_SIGNAL:LONG")</textarea>
+      </div>
+    </div>
+  </div>
+
+  <script src="/lightweight-charts.js"></script>
+  <script src="/kalshi-paper.js"></script>
+</body>
+</html>

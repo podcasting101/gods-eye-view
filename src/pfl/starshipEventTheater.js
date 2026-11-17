@@ -2144,6 +2144,9 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
         <button type="button" class="pfl-f15-btn active" data-pfl-toggle-neo4j>Neo4j 3D: ON</button>
         <button type="button" class="pfl-f15-btn" data-pfl-inspect-neo4j title="Open Neo4j Dossier &amp; Original Sources">Inspect Sources</button>
         <button type="button" class="pfl-f15-btn watch" data-pfl-toggle-theater>Streams &amp; 4D</button>
+        <button type="button" class="pfl-f15-btn" data-pfl-open-kalshi style="border-color:rgba(34,197,94,0.65);color:#4ade80">📈 Kalshi Arena</button>
+        <button type="button" class="pfl-f15-btn" data-pfl-open-holodeck style="border-color:rgba(56,189,248,0.65);color:#38bdf8">🌐 3D Holodeck</button>
+        <button type="button" class="pfl-f15-btn" data-pfl-edit-photos style="border-color:rgba(245,158,11,0.65);color:#fbbf24">🛠️ Edit 3D Photos</button>
       </div>
       <div class="pfl-f15-marsh-modal" id="pfl-f15-marsh-sim-modal" data-pfl-marsh-modal>
         <div class="pfl-marsh-canvas-wrap">
@@ -2664,6 +2667,16 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
         else if (target === 'birdpond') flyToBirdPond();
         else if (target === 'ship42') flyToShip42();
       });
+    });
+
+    hudRoot.querySelector('[data-pfl-open-kalshi]')?.addEventListener('click', () => {
+      window.open('/kalshi-paper.html', '_blank', 'noopener');
+    });
+    hudRoot.querySelector('[data-pfl-open-holodeck]')?.addEventListener('click', () => {
+      window.open('http://127.0.0.1:8766', '_blank', 'noopener');
+    });
+    hudRoot.querySelector('[data-pfl-edit-photos]')?.addEventListener('click', () => {
+      (document.getElementById('gev-dock-arrange-btn') || document.querySelector('[data-arrange-yard-toggle]'))?.click();
     });
 
     neo4jBtn?.addEventListener('click', () => {

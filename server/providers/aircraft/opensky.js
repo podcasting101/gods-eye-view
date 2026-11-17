@@ -355,8 +355,12 @@ function buildOpenSkyHeaders({
 
 export function adsbLolFallbackAnchor(req) {
   const incoming = new URL(req?.url || '', 'http://localhost');
-  const latitude = requiredFiniteQueryNumber(incoming.searchParams, 'lat');
-  const longitude = requiredFiniteQueryNumber(incoming.searchParams, 'lon');
+  let latitude = requiredFiniteQueryNumber(incoming.searchParams, 'lat');
+  let longitude = requiredFiniteQueryNumber(incoming.searchParams, 'lon');
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    latitude = Number(process.env.PFL_HOME_LAT || 29.1391);
+    longitude = Number(process.env.PFL_HOME_LON || -95.8048);
+  }
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)
     return null;
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)
