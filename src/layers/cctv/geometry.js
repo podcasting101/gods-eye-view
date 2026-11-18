@@ -182,19 +182,23 @@ export function createGeometry({ state: layerState, services, parts, source }) {
     // Two lifts: what the mount's own ground demands (always honoured), plus
     // whatever the measured footprint adds, capped so a building under the
     // far edge cannot send the plane into the sky.
+    const clearanceM =
+      String(camera?.sourceKind || '').toLowerCase() === 'pfl-go2rtc-local'
+        ? 0.08
+        : FRUSTUM_GROUND_CLEARANCE_M;
     const base = requiredPlaneLift(
       capAlt,
       dims,
       null,
       ground,
-      FRUSTUM_GROUND_CLEARANCE_M,
+      clearanceM,
     );
     const measured = requiredPlaneLift(
       capAlt,
       dims,
       groundUnderPlane,
       ground,
-      FRUSTUM_GROUND_CLEARANCE_M,
+      clearanceM,
     );
     const footprintExtraM = Math.max(0, measured.liftM - base.liftM);
     const liftM =

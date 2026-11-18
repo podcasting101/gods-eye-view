@@ -194,7 +194,7 @@ export function createCatalog({ state: layerState, services, parts, source }) {
       );
       const pitchDeg = parts.model.clamp(
         parts.model.safeNumber(source.pitchDeg, seed?.pitchDeg ?? -17),
-        -55,
+        isPflYard ? -80 : -55,
         -2,
       );
       const groundElevationM = parts.model.safeNumber(

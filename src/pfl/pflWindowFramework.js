@@ -745,7 +745,7 @@ export function loadPflWindowFramework({ viewer }) {
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px" id="pfl-patrol-cam-btns">
         <button type="button" class="pfl-std-cbtn" data-live-src="wyze-cam-v4" data-fly-lat="29.24753" data-fly-lon="-95.23144" data-fly-hdg="223" style="border-color:#38bdf8;color:#38bdf8">▶ V4 Front Yard</button>
         <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam1" data-fly-lat="29.24751" data-fly-lon="-95.23130" data-fly-hdg="172">▶ Cam1 East Driveway &amp; RV</button>
-        <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam2" data-fly-lat="29.247640" data-fly-lon="-95.231380" data-fly-hdg="0">▶ Cam2 Bayou Dock</button>
+        <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam2" data-fly-lat="29.247640" data-fly-lon="-95.231385" data-fly-hdg="7.5">▶ Cam2 Bayou Dock</button>
         <button type="button" class="pfl-std-cbtn" data-live-src="hd" data-fly-lat="29.24756" data-fly-lon="-95.23136" data-fly-hdg="92" title="Standby until remounted on Monaco">▶ HD (Standby)</button>
       </div>
       <div style="font-weight:700;color:#cbd5e1;font-size:10.5px;margin-bottom:3px">Active 3D CCTV Rotation Checkboxes (Uncheck Sky/Idle Cams):</div>
