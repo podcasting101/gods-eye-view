@@ -328,11 +328,16 @@ function loadSavedLayout() {
  * `rollDeg` (in-plane rotation of the photo around its view axis).
  */
 export function activeYardDatumM(viewer, lon, lat) {
+  if (!viewer) return STORED_GROUND_HEIGHT_M;
   if (viewer?.scene?.globe?.show) {
     const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
     return Number.isFinite(gh) ? gh : 0.0;
   }
-  return STORED_GROUND_HEIGHT_M;
+  try {
+    const sh = viewer?.scene?.sampleHeight?.(Cesium.Cartographic.fromDegrees(lon, lat));
+    if (Number.isFinite(sh) && sh > -40 && sh < 40) return sh + 0.18;
+  } catch {}
+  return STORED_GROUND_HEIGHT_M + 1.55;
 }
 
 export function computeCorners(p, viewer = null) {

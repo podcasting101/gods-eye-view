@@ -651,10 +651,11 @@ export function loadPflWindowFramework({ viewer }) {
   });
   walkBar.querySelector('#pfl-go-spot')?.addEventListener('click', () => {
     try {
+      const gDatum = viewer?.scene?.globe?.show !== false ? 0 : -24.8;
       const sp = JSON.parse(localStorage.getItem(SAVED_SPOT_KEY) || 'null') || {
-        lon: Cesium.Math.toRadians(-95.231249),
-        lat: Cesium.Math.toRadians(29.247908),
-        height: 44,
+        lon: Cesium.Math.toRadians(-95.23125),
+        lat: Cesium.Math.toRadians(29.24782),
+        height: gDatum + 24,
         heading: Cesium.Math.toRadians(198),
         pitch: Cesium.Math.toRadians(-28),
       };
