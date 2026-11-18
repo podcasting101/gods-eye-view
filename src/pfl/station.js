@@ -7,6 +7,7 @@ import {
 } from './placedObjects.js';
 import { loadYardFrames } from './yardFrames.js';
 import { loadBrazoriaCadPlugin } from './brazoriaCadPlugin.js';
+import { initVirtualRealtorAgent } from './virtualRealtorAgent.js';
 import { loadNeo4jPersonalLayer } from './neo4jPersonalLayer.js';
 import { loadStarshipEventTheater } from './starshipEventTheater.js';
 import { loadPolymarketPlugin } from './polymarketPlugin.js';
@@ -156,6 +157,7 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
   let placed = null;
   let frames = null;
   let cad = null;
+  let realtor = null;
   let neo4j = null;
   let starship = null;
   let polymarket = null;
@@ -168,6 +170,7 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
     polymarket?.destroy?.();
     starship?.destroy?.();
     neo4j?.destroy?.();
+    realtor?.destroy?.();
     cad?.destroy?.();
     frames?.destroy?.();
     placed?.destroy?.();
@@ -211,6 +214,11 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
       console.warn('[PFL Station] Brazoria CAD overlay unavailable:', error);
     }
     try {
+      realtor = initVirtualRealtorAgent(viewer);
+    } catch (error) {
+      console.warn('[PFL Station] Virtual Realtor agent unavailable:', error);
+    }
+    try {
       neo4j = await loadNeo4jPersonalLayer({ viewer, signal });
     } catch (error) {
       rethrowAbort(signal, error);
@@ -237,7 +245,7 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
     }
     signal?.throwIfAborted();
     governorRequestRender('pfl-station-load');
-    return { anchor, placed, frames, cad, neo4j, starship, polymarket, destroy };
+    return { anchor, placed, frames, cad, realtor, neo4j, starship, polymarket, destroy };
   } catch (error) {
     destroy();
     throw error;
