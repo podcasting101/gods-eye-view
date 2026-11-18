@@ -20,6 +20,7 @@ function saveLayout(state) {
 
 export function loadPflWindowFramework({ viewer }) {
   if (typeof document === 'undefined') return { destroy() {} };
+  if (typeof window !== 'undefined') window.__pflViewer = viewer;
 
   const saved = loadSavedLayout();
   const createdEls = [];
@@ -30,7 +31,7 @@ export function loadPflWindowFramework({ viewer }) {
   style.textContent = `
     .pfl-std-box {
       position: fixed !important;
-      z-index: 9400 !important;
+      z-index: 9400;
       background: rgba(9, 14, 26, 0.92) !important;
       border: 1.5px solid rgba(56, 189, 248, 0.55) !important;
       border-radius: 12px !important;
@@ -42,6 +43,7 @@ export function loadPflWindowFramework({ viewer }) {
       overflow: hidden;
       min-width: 180px;
       min-height: 36px;
+      max-height: calc(100vh - 68px);
       transform-origin: top left;
     }
     .pfl-std-box.pfl-minimized > :not(.pfl-std-hdr) {
@@ -227,6 +229,11 @@ export function loadPflWindowFramework({ viewer }) {
   }
 
   // 1) Wrap PFL Sovereign Nodes, Flight 15, Kalshi Arena & Yard Tools in ONE Movable/Sizable Box
+  let unlockDroneCamera = () => {
+    try { viewer?.camera?.lookAtTransform?.(Cesium.Matrix4.IDENTITY); } catch {}
+  };
+  let openHolodeckHallway = () => {};
+
   const cmdWin = createStandardBox({
     id: 'pfl-win-command-dock',
     title: 'PFL SOVEREIGN COMMAND DOCK (3 NODES + KALSHI + 3D TOOLS)',
@@ -270,6 +277,7 @@ export function loadPflWindowFramework({ viewer }) {
     syncStaticBtn();
 
     function flyBalconyFront() {
+      unlockDroneCamera();
       try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
       let base = 0;
       try {
@@ -291,6 +299,7 @@ export function loadPflWindowFramework({ viewer }) {
       });
     }
     function flyBackyard180() {
+      unlockDroneCamera();
       try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
       let base = 0;
       try {
@@ -372,13 +381,15 @@ export function loadPflWindowFramework({ viewer }) {
   // 2) Bird Pond 3D Axis Compass Globe + Live Camera / Selected 3D Object Inspector Box
   const compassWin = createStandardBox({
     id: 'pfl-win-3d-compass-inspector',
-    title: 'PFL 3D COMPASS GLOBE & OBJECT ROTATOR',
-    defaultLeft: window.innerWidth - 265,
-    defaultTop: 62,
-    defaultWidth: 245,
+    title: 'PFL 3D COMPASS, DRONE ORBIT, LENS & PADS',
+    defaultLeft: Math.max(20, window.innerWidth - 312),
+    defaultTop: 58,
+    defaultWidth: 292,
   });
+  compassWin.box.style.zIndex = '9660';
   compassWin.body.innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#cbd5e1">
+      <div id="pfl-eye-elev-banner" style="width:100%;box-sizing:border-box;background:rgba(6,78,59,0.55);border:1.5px solid rgba(74,222,128,0.75);border-radius:7px;padding:6px 8px;text-align:center;font-size:13.5px;font-weight:800;color:#4ade80;letter-spacing:0.02em;line-height:1.25" title="Live Camera Height Above Ground Level (Meters &amp; Feet) + Optical Lens FOV">EYE: 1.8 m (5.9 ft) AGL · FOV: 60°</div>
       <canvas id="pfl-axis-globe" width="136" height="136" style="cursor:pointer;border-radius:50%" title="Click N/S/E/W/UP or drag to orbit camera"></canvas>
       <div id="pfl-cam-readout" style="text-align:center;font-size:10px;color:#94a3b8;line-height:1.35">CAM READY</div>
       <div style="width:100%;border-top:1px solid rgba(56,189,248,0.25);padding-top:6px">
@@ -407,6 +418,323 @@ export function loadPflWindowFramework({ viewer }) {
 
   let activeMovable = null;
   let clickToPlaceMode = false;
+
+  // Helper to resolve current local ground datum consistently across Photoreal 3D Tiles vs Cesium Globe
+  function resolveLocalGroundM(lonDeg = -95.23144, latDeg = 29.24750) {
+    let gBase = -26.19;
+    try {
+      if (viewer?.scene?.globe?.show !== false) {
+        const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lonDeg, latDeg));
+        gBase = Number.isFinite(gh) ? gh : 0;
+      }
+    } catch {}
+    return gBase;
+  }
+
+  // 1S788 Holodeck Hallway Portal Window (:8766 Stargate Room Map & Launchpad — 100% CSP-Clean Native DOM)
+  const HOLODECK_HALLWAY_URL = 'http://127.0.0.1:8766/?file=splats/take1-room-capture.spz';
+  let activeHolodeckUrl = HOLODECK_HALLWAY_URL;
+  const holodeckWin = createStandardBox({
+    id: 'pfl-win-holodeck-portal',
+    title: '🚪 1S788 HOLODECK HALLWAY PORTAL (:8766)',
+    defaultLeft: Math.max(40, Math.round((window.innerWidth - 620) * 0.5)),
+    defaultTop: 84,
+    defaultWidth: 620,
+  });
+  holodeckWin.box.style.display = 'none';
+  holodeckWin.body.innerHTML = `
+    <div id="pfl-holodeck-stargate-map" data-holodeck-target="${HOLODECK_HALLWAY_URL}" style="font-family:'Inter',system-ui,sans-serif;font-size:11.5px;color:#e2e8f0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <span style="color:#67e8f9;font-weight:700">🌀 1S788 Carport Breezeway → 3D Gaussian Splat Holodeck (:8766)</span>
+        <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+          <button type="button" class="pfl-std-cbtn" id="pfl-holodeck-step-in" style="background:rgba(34,211,238,0.18);border-color:#22d3ee;color:#67e8f9;padding:3px 8px">🚪 Walk Into Hallway Now (:8766)</button>
+          <a href="${HOLODECK_HALLWAY_URL}" target="_blank" rel="noopener" class="pfl-std-cbtn" id="pfl-holodeck-fulltab" style="border-color:#a855f7;color:#e9d5ff;text-decoration:none;padding:3px 8px">↗ Open in New Tab</a>
+          <button type="button" class="pfl-std-cbtn" id="pfl-holodeck-close" style="border-color:#f43f5e;color:#fda4af">✕ Close</button>
+        </div>
+      </div>
+      <div style="padding:12px;border:1.5px solid rgba(34,211,238,0.45);border-radius:10px;background:radial-gradient(circle at 50% 35%, rgba(34,211,238,0.14), rgba(88,28,135,0.20) 52%, rgba(3,7,18,0.96) 100%)">
+        <div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:#a5f3fc;margin-bottom:10px">
+          ● STARGATE DOOR GRAPH ONLINE · BIDIRECTIONAL RETURN TO <code>:4173</code> ACTIVE
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px">
+          <div style="padding:8px 10px;border:1px solid rgba(34,211,238,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
+            <strong style="color:#67e8f9">🚪 1. Entry Hallway (<code>take1-room-capture.spz</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">1S788 carport threshold · Doors to Main Hall, Command Center &amp; 417 Palm Dr Yard</span>
+            <div style="display:flex;gap:5px;margin-top:2px">
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="http://127.0.0.1:8766/?file=splats/take1-room-capture.spz" style="border-color:#22d3ee;color:#67e8f9">Step In →</button>
+              <a href="http://127.0.0.1:8766/?file=splats/take1-room-capture.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+            </div>
+          </div>
+          <div style="padding:8px 10px;border:1px solid rgba(168,85,247,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
+            <strong style="color:#e9d5ff">🏛️ 2. Main Hall (<code>take3-main-hall.spz</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">Central interior corridor · Connects Entry Hallway, Alt Angle &amp; Lisa Command Center</span>
+            <div style="display:flex;gap:5px;margin-top:2px">
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="http://127.0.0.1:8766/?file=splats/take3-main-hall.spz" style="border-color:#a855f7;color:#e9d5ff">Step In →</button>
+              <a href="http://127.0.0.1:8766/?file=splats/take3-main-hall.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+            </div>
+          </div>
+          <div style="padding:8px 10px;border:1px solid rgba(74,222,128,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
+            <strong style="color:#86efac">👑 3. Lisa Command Center (<code>lisa-command-center.spz</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">Sovereign bridge · Doors to Main Hall, Arcade Spaceship &amp; 417 Palm Dr Yard</span>
+            <div style="display:flex;gap:5px;margin-top:2px">
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="http://127.0.0.1:8766/?file=splats/lisa-command-center.spz" style="border-color:#4ade80;color:#86efac">Step In →</button>
+              <a href="http://127.0.0.1:8766/?file=splats/lisa-command-center.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+            </div>
+          </div>
+          <div style="padding:8px 10px;border:1px solid rgba(251,191,36,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
+            <strong style="color:#fde047">🕹️ 4. Arcade Spaceship (<code>arcade_spaceship.spz</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">Starship deck · Return portal wired back to Lisa Command Center</span>
+            <div style="display:flex;gap:5px;margin-top:2px">
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="http://127.0.0.1:8766/?file=splats/arcade_spaceship.spz" style="border-color:#fbbf24;color:#fde047">Step In →</button>
+              <a href="http://127.0.0.1:8766/?file=splats/arcade_spaceship.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  function closeHolodeckHallway() {
+    holodeckWin.box.style.display = 'none';
+  }
+  openHolodeckHallway = (customUrl = HOLODECK_HALLWAY_URL, launchTab = false) => {
+    activeHolodeckUrl = customUrl || HOLODECK_HALLWAY_URL;
+    holodeckWin.box.style.display = 'flex';
+    holodeckWin.box.classList.remove('pfl-minimized');
+    const mb = holodeckWin.box.querySelector('[data-act="min"]');
+    if (mb) mb.textContent = '—';
+    holodeckWin.box.style.zIndex = '9750';
+    const mapRoot = holodeckWin.body.querySelector('#pfl-holodeck-stargate-map');
+    const fullLink = holodeckWin.body.querySelector('#pfl-holodeck-fulltab');
+    if (mapRoot) mapRoot.setAttribute('data-holodeck-target', activeHolodeckUrl);
+    if (fullLink) fullLink.href = activeHolodeckUrl;
+    if (launchTab) {
+      try { window.open(activeHolodeckUrl, '_blank', 'noopener'); } catch {}
+    }
+  };
+  holodeckWin.body.querySelector('#pfl-holodeck-step-in')?.addEventListener('click', () => {
+    window.location.href = activeHolodeckUrl;
+  });
+  holodeckWin.body.querySelectorAll('[data-pfl-holo-nav]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-pfl-holo-nav');
+      if (target) window.location.href = target;
+    });
+  });
+  holodeckWin.body.querySelector('#pfl-holodeck-close')?.addEventListener('click', closeHolodeckHallway);
+  window.__pflOpenHolodeckHallway = openHolodeckHallway;
+
+  // Remote Drone Telepresence Orbit State & Target Resolver
+  let preDronePose = null;
+  const droneOrbitState = {
+    active: false,
+    targetKey: 'lisa',
+    targetLabel: '👑 Lisa Muse',
+    azimuthDeg: 12,
+    pitchDeg: -14,
+    rangeM: 3.0,
+  };
+
+  function resolveDroneTarget(targetKey) {
+    if (targetKey === 'lisa') {
+      const st = window.__pflMovables?.lisa?.getState?.() || { lat: 29.247436, lon: -95.231445, heading: 192, lift: 0 };
+      const lisaEnt = viewer?.entities?.getById?.('lisa-muse-sovereign-anchor');
+      if (lisaEnt?.position) {
+        try {
+          const cart = typeof lisaEnt.position.getValue === 'function'
+            ? lisaEnt.position.getValue(Cesium.JulianDate.now())
+            : lisaEnt.position;
+          if (cart) {
+            const cg = Cesium.Cartographic.fromCartesian(cart);
+            const feetAlt = cg.height - 0.998;
+            return {
+              key: 'lisa',
+              label: '👑 Lisa Muse',
+              lon: Cesium.Math.toDegrees(cg.longitude),
+              lat: Cesium.Math.toDegrees(cg.latitude),
+              alt: feetAlt,
+              defaultAz: ((Number(st.heading ?? 192) + 180) % 360 + 360) % 360,
+              defaultPitch: -14,
+              defaultRange: 3.0,
+            };
+          }
+        } catch {}
+      }
+      const alt = resolveLocalGroundM(st.lon, st.lat) + 0.8 + Number(st.lift || 0);
+      return {
+        key: 'lisa',
+        label: '👑 Lisa Muse',
+        lon: st.lon,
+        lat: st.lat,
+        alt,
+        defaultAz: ((Number(st.heading ?? 192) + 180) % 360 + 360) % 360,
+        defaultPitch: -14,
+        defaultRange: 3.0,
+      };
+    }
+    if (targetKey === 'chair') {
+      const st = window.__pflMovables?.chair?.getState?.() || { lat: 29.2475, lon: -95.23145, heading: 0, lift: 0 };
+      const alt = resolveLocalGroundM(st.lon, st.lat) + 0.8 + Number(st.lift || 0);
+      return {
+        key: 'chair',
+        label: '🪑 Wooden Chair',
+        lon: st.lon,
+        lat: st.lat,
+        alt,
+        defaultAz: 16,
+        defaultPitch: -18,
+        defaultRange: 3.2,
+      };
+    }
+    if (targetKey === 'carport') {
+      const lon = -95.231395;
+      const lat = 29.247518;
+      const alt = resolveLocalGroundM(lon, lat);
+      return {
+        key: 'carport',
+        label: '🚗 RV / 1S788 Carport',
+        lon,
+        lat,
+        alt,
+        defaultAz: 355,
+        defaultPitch: -22,
+        defaultRange: 6.5,
+      };
+    }
+    // Bayou Dock ('dock')
+    const dockEnt = viewer?.entities?.getById?.('pfl-bayou-dock-3d');
+    if (dockEnt?.position) {
+      try {
+        const cart = typeof dockEnt.position.getValue === 'function'
+          ? dockEnt.position.getValue(Cesium.JulianDate.now())
+          : dockEnt.position;
+        if (cart) {
+          const cg = Cesium.Cartographic.fromCartesian(cart);
+          return {
+            key: 'dock',
+            label: '⚓ Bayou Dock',
+            lon: Cesium.Math.toDegrees(cg.longitude),
+            lat: Cesium.Math.toDegrees(cg.latitude),
+            alt: cg.height - 0.35,
+            defaultAz: 7.5,
+            defaultPitch: -24,
+            defaultRange: 7.5,
+          };
+        }
+      } catch {}
+    }
+    const lon = -95.231380;
+    const lat = 29.247792;
+    return {
+      key: 'dock',
+      label: '⚓ Bayou Dock',
+      lon,
+      lat,
+      alt: resolveLocalGroundM(lon, lat),
+      defaultAz: 7.5,
+      defaultPitch: -24,
+      defaultRange: 7.5,
+    };
+  }
+
+  function syncDroneUi() {
+    const stEl = compassWin.body?.querySelector?.('#pfl-drone-status');
+    if (stEl) {
+      stEl.textContent = droneOrbitState.active ? `LOCKED: ${droneOrbitState.targetLabel}` : 'FREE CAM';
+      stEl.style.color = droneOrbitState.active ? '#4ade80' : '#94a3b8';
+    }
+    const azSl = compassWin.body?.querySelector?.('#pfl-drone-az-slider');
+    const azVal = compassWin.body?.querySelector?.('#pfl-drone-az-val');
+    const ptSl = compassWin.body?.querySelector?.('#pfl-drone-pitch-slider');
+    const ptVal = compassWin.body?.querySelector?.('#pfl-drone-pitch-val');
+    const dsSl = compassWin.body?.querySelector?.('#pfl-drone-dist-slider');
+    const dsVal = compassWin.body?.querySelector?.('#pfl-drone-dist-val');
+    if (azSl) azSl.value = String(Math.round(droneOrbitState.azimuthDeg));
+    if (azVal) azVal.textContent = `${Math.round(droneOrbitState.azimuthDeg)}°`;
+    if (ptSl) ptSl.value = String(Math.round(droneOrbitState.pitchDeg));
+    if (ptVal) ptVal.textContent = `${Math.round(droneOrbitState.pitchDeg)}°`;
+    if (dsSl) dsSl.value = String(Number(droneOrbitState.rangeM).toFixed(1));
+    if (dsVal) dsVal.textContent = `${Number(droneOrbitState.rangeM).toFixed(1)}m`;
+    compassWin.body?.querySelectorAll?.('[data-pfl-drone]')?.forEach((btn) => {
+      const on = droneOrbitState.active && btn.getAttribute('data-pfl-drone') === droneOrbitState.targetKey;
+      btn.style.borderColor = on ? '#4ade80' : '';
+      btn.style.color = on ? '#4ade80' : '';
+    });
+  }
+
+  function applyDroneOrbit() {
+    if (!viewer?.camera) return;
+    enforceZeroAltitudeKickGuard();
+    try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
+    const tgt = resolveDroneTarget(droneOrbitState.targetKey);
+    droneOrbitState.targetLabel = tgt.label;
+    const targetCartesian = Cesium.Cartesian3.fromDegrees(tgt.lon, tgt.lat, tgt.alt + 1.1);
+    const hdgRad = Cesium.Math.toRadians(((droneOrbitState.azimuthDeg % 360) + 360) % 360);
+    const pitchRad = Cesium.Math.toRadians(Math.max(-75, Math.min(5, droneOrbitState.pitchDeg)));
+    const rangeM = Math.max(1.2, Math.min(25, droneOrbitState.rangeM));
+    droneOrbitState.azimuthDeg = Cesium.Math.toDegrees(hdgRad);
+    droneOrbitState.pitchDeg = Cesium.Math.toDegrees(pitchRad);
+    droneOrbitState.rangeM = rangeM;
+    droneOrbitState.active = true;
+    viewer.camera.lookAt(targetCartesian, new Cesium.HeadingPitchRange(hdgRad, pitchRad, rangeM));
+    syncDroneUi();
+    governorRequestRender('pfl-drone-orbit');
+  }
+
+  function startDroneOrbit(targetKey = 'lisa', overrides = null) {
+    if (!droneOrbitState.active && viewer?.camera?.positionCartographic) {
+      const c = viewer.camera.positionCartographic;
+      preDronePose = {
+        lon: c.longitude,
+        lat: c.latitude,
+        height: c.height,
+        heading: viewer.camera.heading || 0,
+        pitch: viewer.camera.pitch || 0,
+        roll: viewer.camera.roll || 0,
+      };
+    }
+    const tgt = resolveDroneTarget(targetKey);
+    droneOrbitState.targetKey = tgt.key;
+    droneOrbitState.targetLabel = tgt.label;
+    droneOrbitState.azimuthDeg = overrides?.azimuthDeg ?? tgt.defaultAz;
+    droneOrbitState.pitchDeg = overrides?.pitchDeg ?? tgt.defaultPitch;
+    droneOrbitState.rangeM = overrides?.rangeM ?? tgt.defaultRange;
+    applyDroneOrbit();
+  }
+
+  unlockDroneCamera = () => {
+    const wasActive = droneOrbitState.active;
+    droneOrbitState.active = false;
+    try {
+      viewer?.camera?.lookAtTransform?.(Cesium.Matrix4.IDENTITY);
+    } catch {}
+    syncDroneUi();
+    if (wasActive) governorRequestRender('pfl-drone-unlock');
+  };
+
+  function returnFromDrone() {
+    unlockDroneCamera();
+    if (!preDronePose || !viewer?.camera) return;
+    enforceZeroAltitudeKickGuard();
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromRadians(preDronePose.lon, preDronePose.lat, preDronePose.height),
+      orientation: {
+        heading: preDronePose.heading,
+        pitch: preDronePose.pitch,
+        roll: 0,
+      },
+    });
+    governorRequestRender('pfl-drone-return');
+  }
+
+  window.__pflDroneTelepresence = {
+    getState: () => ({
+      ...droneOrbitState,
+      preDronePose: preDronePose ? { ...preDronePose } : null,
+    }),
+    orbit: startDroneOrbit,
+    unlock: unlockDroneCamera,
+    returnFromDrone,
+  };
 
   function bindMovable(mov) {
     if (!mov) return;
@@ -442,6 +770,9 @@ export function loadPflWindowFramework({ viewer }) {
       const newLat = st.lat + dN / 111320;
       const newLon = st.lon + dE / (111320 * Math.cos(Cesium.Math.toRadians(st.lat)));
       activeMovable.update({ lat: newLat, lon: newLon });
+      if (droneOrbitState.active && activeMovable.kind === droneOrbitState.targetKey) {
+        applyDroneOrbit();
+      }
     });
   });
 
@@ -476,9 +807,16 @@ export function loadPflWindowFramework({ viewer }) {
 
     const picked = viewer.scene.pick(movement.position);
     const ent = picked?.id;
+    if (ent && String(ent.id || '') === 'pfl-holodeck-portal-1s788') {
+      openHolodeckHallway();
+      return;
+    }
     if (ent && String(ent.id || '') === 'yardframe:yard-overview-20261012') return;
     if (ent?._pflMovable) {
       bindMovable(ent._pflMovable);
+      if (ent._pflMovable.kind === 'lisa') {
+        startDroneOrbit('lisa');
+      }
       return;
     }
     if (picked?.primitive && window.__pflMovables?.chair?.tileset && picked.primitive === window.__pflMovables.chair.tileset) {
@@ -523,6 +861,9 @@ export function loadPflWindowFramework({ viewer }) {
     const v = Number(e.target.value);
     compassWin.body.querySelector('#pfl-alt-val').textContent = `${v.toFixed(2)}m`;
     activeMovable?.update({ lift: v });
+    if (droneOrbitState.active && activeMovable?.kind === droneOrbitState.targetKey) {
+      applyDroneOrbit();
+    }
   });
 
   // Render the 3D Axis Compass Ball (ported directly from Bird Pond adventure.html)
@@ -587,13 +928,44 @@ export function loadPflWindowFramework({ viewer }) {
       gCtx.fillText(pt.lbl, pt.sx, pt.sy);
     }
 
+    if (droneOrbitState.active) {
+      try {
+        if (viewer.camera.transform && Cesium.Matrix4.equals(viewer.camera.transform, Cesium.Matrix4.IDENTITY)) {
+          droneOrbitState.active = false;
+          syncDroneUi();
+        } else if (!String(document.activeElement?.id || '').startsWith('pfl-drone-')) {
+          const rawMag = Cesium.Cartesian3.magnitude(viewer.camera.position);
+          if (Number.isFinite(rawMag) && rawMag > 0.2 && rawMag < 100) {
+            const liveAz = ((Cesium.Math.toDegrees(h) % 360) + 360) % 360;
+            const livePitch = Math.max(-75, Math.min(5, Cesium.Math.toDegrees(p)));
+            const liveDist = Math.max(1.2, Math.min(25, rawMag));
+            if (Number.isFinite(liveAz)) droneOrbitState.azimuthDeg = liveAz;
+            if (Number.isFinite(livePitch)) droneOrbitState.pitchDeg = livePitch;
+            droneOrbitState.rangeM = liveDist;
+            syncDroneUi();
+          }
+        }
+      } catch {}
+    }
+
     const c = viewer.camera.positionCartographic;
     if (c) {
-      const lat = Cesium.Math.toDegrees(c.latitude).toFixed(5);
-      const lon = Cesium.Math.toDegrees(c.longitude).toFixed(5);
-      const hdg = Math.round(Cesium.Math.toDegrees(h) % 360);
+      const latNum = Cesium.Math.toDegrees(c.latitude);
+      const lonNum = Cesium.Math.toDegrees(c.longitude);
+      const lat = latNum.toFixed(5);
+      const lon = lonNum.toFixed(5);
+      const hdg = Math.round(((Cesium.Math.toDegrees(h) % 360) + 360) % 360);
+      const fovDegNow = Math.round(Cesium.Math.toDegrees(viewer.camera.frustum?.fov || Cesium.Math.toRadians(60)));
+      const aglM = c.height - resolveLocalGroundM(lonNum, latNum);
+      const aglFt = aglM * 3.28084;
+      const eyeBanner = compassWin.body.querySelector('#pfl-eye-elev-banner');
+      if (eyeBanner) {
+        eyeBanner.textContent = Math.abs(aglM) > 9999
+          ? `EYE: ${(aglM / 1000).toFixed(0)} km AGL · FOV: ${fovDegNow}°`
+          : `EYE: ${aglM.toFixed(1)} m (${aglFt.toFixed(1)} ft) AGL · FOV: ${fovDegNow}°`;
+      }
       compassWin.body.querySelector('#pfl-cam-readout').textContent =
-        `${lat}, ${lon} · ALT ${c.height.toFixed(1)}m · HDG ${hdg}°`;
+        `${lat}, ${lon} · WGS ${c.height.toFixed(1)}m · HDG ${hdg}°`;
     }
   }
 
@@ -603,20 +975,417 @@ export function loadPflWindowFramework({ viewer }) {
     for (let i = hitTargets.length - 1; i >= 0; i--) {
       const t = hitTargets[i];
       if (Math.hypot(mx - t.sx, my - t.sy) <= 12) {
-        const c = viewer.camera.positionCartographic;
-        viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, c.height),
-          orientation: {
-            heading: Cesium.Math.toRadians(t.snapH),
-            pitch: Cesium.Math.toRadians(t.snapP),
-            roll: 0,
-          },
-          duration: 0.8,
-        });
+        if (droneOrbitState.active) {
+          droneOrbitState.azimuthDeg = t.snapH;
+          droneOrbitState.pitchDeg = Math.max(-75, Math.min(5, t.snapP));
+          applyDroneOrbit();
+        } else {
+          unlockDroneCamera();
+          const c = viewer.camera.positionCartographic;
+          viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, c.height),
+            orientation: {
+              heading: Cesium.Math.toRadians(t.snapH),
+              pitch: Cesium.Math.toRadians(t.snapP),
+              roll: 0,
+            },
+            duration: 0.8,
+          });
+        }
         break;
       }
     }
   });
+
+  // 2A) Remote Drone Telepresence Orbit + Stationary Optical Lens FOV + Second-Life Teleport Pads & 1S788 Holodeck Door
+  const telepresenceDeck = document.createElement('div');
+  telepresenceDeck.id = 'pfl-telepresence-deck';
+  telepresenceDeck.style.cssText = 'margin-top:6px;display:flex;flex-direction:column;gap:6px;font-family:"JetBrains Mono",monospace;font-size:10.5px;color:#cbd5e1';
+  telepresenceDeck.innerHTML = `
+    <div id="pfl-drone-orbit-panel" style="padding-top:6px;border-top:1px solid rgba(56,189,248,0.28);display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+        <span style="color:#38bdf8;font-weight:700">🚁 Drone Telepresence:</span>
+        <span id="pfl-drone-status" style="font-size:9.5px;color:#94a3b8;font-weight:700">FREE CAM</span>
+      </div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap">
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-lisa" data-pfl-drone="lisa" title="Send remote drone to orbit 360° around Lisa without losing your standing spot">🚁 Orbit Lisa</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-chair" data-pfl-drone="chair" title="Send remote drone to orbit around Wooden Chair">🪑 Orbit Chair</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-carport" data-pfl-drone="carport" title="Send remote drone to orbit RV &amp; 1S788 Carport">🚗 Orbit RV/Carport</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-dock" data-pfl-drone="dock" title="Send remote drone to orbit Chocolate Bayou Dock">⚓ Orbit Dock</button>
+      </div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap">
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-step-left" title="Orbit 15° Left around locked target">◀ Orbit L</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-step-right" title="Orbit 15° Right around locked target">Orbit R ▶</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-unlock" style="border-color:#fbbf24;color:#fde047" title="Unlock camera transform cleanly in place">🔓 Unlock Free Cam</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-return" style="border-color:#4ade80;color:#4ade80" title="Unlock drone &amp; return immediately to your saved pre-drone standing spot">↩️ Return from Drone</button>
+      </div>
+      <label style="display:flex;justify-content:space-between"><span>Drone Azimuth</span><span id="pfl-drone-az-val">12°</span></label>
+      <input type="range" id="pfl-drone-az-slider" min="0" max="360" step="1" value="12" style="width:100%;accent-color:#38bdf8" />
+      <label style="display:flex;justify-content:space-between"><span>Drone Pitch</span><span id="pfl-drone-pitch-val">-14°</span></label>
+      <input type="range" id="pfl-drone-pitch-slider" min="-75" max="5" step="1" value="-14" style="width:100%;accent-color:#38bdf8" />
+      <label style="display:flex;justify-content:space-between"><span>Drone Distance</span><span id="pfl-drone-dist-val">3.0m</span></label>
+      <input type="range" id="pfl-drone-dist-slider" min="1.2" max="25" step="0.1" value="3.0" style="width:100%;accent-color:#38bdf8" />
+    </div>
+
+    <div id="pfl-lens-fov-panel" style="padding-top:6px;border-top:1px solid rgba(56,189,248,0.28);display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:#c084fc;font-weight:700">🔭 Optical Lens (In-Place):</span>
+        <span id="pfl-fov-val" style="font-size:9.5px;color:#e9d5ff;font-weight:700">60° (1.0×)</span>
+      </div>
+      <input type="range" id="pfl-fov-slider" min="12" max="125" step="1" value="60" style="width:100%;accent-color:#c084fc" title="Zoom optical lens FOV in-place (12° Binoculars ↔ 125° Fisheye) without moving camera position! Tip: Alt + Mouse Wheel on globe" />
+      <div style="display:flex;gap:3px;flex-wrap:wrap">
+        <button type="button" class="pfl-std-cbtn" id="pfl-fov-preset-15" data-pfl-fov="15" title="4× Telephoto Binoculars (15° FOV, zero camera movement)">🔭 4× (15°)</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-fov-preset-30" data-pfl-fov="30" title="2× Portrait Lens (30° FOV, zero camera movement)">🔭 2× (30°)</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-fov-preset-60" data-pfl-fov="60" title="Standard 1× Human Eye Lens (60° FOV)">👁️ 1× (60°)</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-fov-preset-95" data-pfl-fov="95" title="Wide-Angle Architectural Lens (95° FOV)">📷 Wide (95°)</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-fov-preset-120" data-pfl-fov="120" title="Ultra-Wide Fisheye Lens (120° FOV)">🐟 Fisheye (120°)</button>
+      </div>
+    </div>
+
+    <div id="pfl-teleport-pads-panel" style="padding-top:6px;border-top:1px solid rgba(56,189,248,0.28);display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:#22d3ee;font-weight:700">⚡ Teleport Pads &amp; Holodeck:</span>
+      </div>
+      <div id="pfl-teleport-pads-list" style="display:flex;gap:3px;flex-wrap:wrap"></div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap">
+        <button type="button" class="pfl-std-cbtn" id="pfl-drop-pad-btn" style="border-color:#4ade80;color:#4ade80" title="Drop a persistent Second-Life teleport pad at your exact current camera position, angle &amp; lens FOV">➕ Drop Pad Here</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-enter-holodeck-btn" style="border-color:#a855f7;color:#e9d5ff" title="Step through the 1S788 Carport Portal into the 3D Gaussian Splat Holodeck Hallway (:8766)">🚪 Enter Holodeck Hallway (:8766)</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-s788-canopy-toggle" style="border-color:#38bdf8;color:#7dd3fc" title="Toggle 3D engineering wireframe of MIL-STD S-788/G shelters (102&quot;L × 84&quot;W × 67&quot;H = 2.59m × 2.13m × 1.70m) + 11ft (3.35m) walk-through overhead solar canopy">🏗️ S-788 &amp; 11ft Canopy: ON</button>
+      </div>
+    </div>
+  `;
+  compassWin.body.appendChild(telepresenceDeck);
+
+  // Wire Drone Telepresence controls
+  telepresenceDeck.querySelectorAll('[data-pfl-drone]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.getAttribute('data-pfl-drone');
+      if (key === 'lisa' && window.__pflMovables?.lisa) bindMovable(window.__pflMovables.lisa);
+      else if (key === 'chair' && window.__pflMovables?.chair) bindMovable(window.__pflMovables.chair);
+      startDroneOrbit(key);
+    });
+  });
+  telepresenceDeck.querySelector('#pfl-drone-unlock')?.addEventListener('click', unlockDroneCamera);
+  telepresenceDeck.querySelector('#pfl-drone-return')?.addEventListener('click', returnFromDrone);
+  telepresenceDeck.querySelector('#pfl-drone-step-left')?.addEventListener('click', () => {
+    if (!droneOrbitState.active) startDroneOrbit(droneOrbitState.targetKey || 'lisa');
+    droneOrbitState.azimuthDeg = ((droneOrbitState.azimuthDeg - 15) % 360 + 360) % 360;
+    applyDroneOrbit();
+  });
+  telepresenceDeck.querySelector('#pfl-drone-step-right')?.addEventListener('click', () => {
+    if (!droneOrbitState.active) startDroneOrbit(droneOrbitState.targetKey || 'lisa');
+    droneOrbitState.azimuthDeg = (droneOrbitState.azimuthDeg + 15) % 360;
+    applyDroneOrbit();
+  });
+  const onDroneAzInput = (e) => {
+    if (!droneOrbitState.active) startDroneOrbit(droneOrbitState.targetKey || 'lisa', { azimuthDeg: Number(e.target.value) });
+    else {
+      droneOrbitState.azimuthDeg = Number(e.target.value);
+      applyDroneOrbit();
+    }
+  };
+  const onDronePitchInput = (e) => {
+    if (!droneOrbitState.active) startDroneOrbit(droneOrbitState.targetKey || 'lisa', { pitchDeg: Number(e.target.value) });
+    else {
+      droneOrbitState.pitchDeg = Number(e.target.value);
+      applyDroneOrbit();
+    }
+  };
+  const onDroneDistInput = (e) => {
+    if (!droneOrbitState.active) startDroneOrbit(droneOrbitState.targetKey || 'lisa', { rangeM: Number(e.target.value) });
+    else {
+      droneOrbitState.rangeM = Number(e.target.value);
+      applyDroneOrbit();
+    }
+  };
+  telepresenceDeck.querySelector('#pfl-drone-az-slider')?.addEventListener('input', onDroneAzInput);
+  telepresenceDeck.querySelector('#pfl-drone-az-slider')?.addEventListener('change', onDroneAzInput);
+  telepresenceDeck.querySelector('#pfl-drone-pitch-slider')?.addEventListener('input', onDronePitchInput);
+  telepresenceDeck.querySelector('#pfl-drone-pitch-slider')?.addEventListener('change', onDronePitchInput);
+  telepresenceDeck.querySelector('#pfl-drone-dist-slider')?.addEventListener('input', onDroneDistInput);
+  telepresenceDeck.querySelector('#pfl-drone-dist-slider')?.addEventListener('change', onDroneDistInput);
+
+  // Wire Stationary Optical Lens FOV Zoom (12°–125° without touching camera.position!)
+  let currentLensFovDeg = 60;
+  try {
+    if (viewer?.camera?.frustum?.fov) {
+      const initDeg = Cesium.Math.toDegrees(viewer.camera.frustum.fov);
+      if (Number.isFinite(initDeg) && initDeg >= 10 && initDeg <= 140) currentLensFovDeg = Math.round(initDeg);
+    }
+  } catch {}
+
+  function setOpticalLensFov(deg) {
+    const clamped = Math.max(12, Math.min(125, Number(deg) || 60));
+    currentLensFovDeg = clamped;
+    try {
+      if (viewer?.camera?.frustum && 'fov' in viewer.camera.frustum) {
+        viewer.camera.frustum.fov = Cesium.Math.toRadians(clamped);
+      }
+    } catch {}
+    const sl = telepresenceDeck.querySelector('#pfl-fov-slider');
+    const vl = telepresenceDeck.querySelector('#pfl-fov-val');
+    if (sl && Number(sl.value) !== Math.round(clamped)) sl.value = String(Math.round(clamped));
+    if (vl) {
+      const mag = (60 / clamped).toFixed(1);
+      vl.textContent = `${Math.round(clamped)}° (${mag}×)`;
+    }
+    telepresenceDeck.querySelectorAll('[data-pfl-fov]').forEach((b) => {
+      const match = Math.abs(Number(b.getAttribute('data-pfl-fov')) - clamped) < 1.5;
+      b.style.borderColor = match ? '#c084fc' : '';
+      b.style.color = match ? '#e9d5ff' : '';
+    });
+    paintGlobe();
+    governorRequestRender('pfl-fov-lens');
+  }
+  window.__pflSetLensFov = setOpticalLensFov;
+
+  const fovSliderEl = telepresenceDeck.querySelector('#pfl-fov-slider');
+  fovSliderEl?.addEventListener('input', (e) => setOpticalLensFov(Number(e.target.value)));
+  fovSliderEl?.addEventListener('change', (e) => setOpticalLensFov(Number(e.target.value)));
+  telepresenceDeck.querySelectorAll('[data-pfl-fov]').forEach((btn) => {
+    btn.addEventListener('click', () => setOpticalLensFov(Number(btn.getAttribute('data-pfl-fov'))));
+  });
+  const altWheelLensHandler = (e) => {
+    if (!e.altKey) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const deltaDeg = e.deltaY > 0 ? 4 : -4;
+    setOpticalLensFov(currentLensFovDeg + deltaDeg);
+  };
+  viewer?.scene?.canvas?.addEventListener?.('wheel', altWheelLensHandler, { capture: true, passive: false });
+  setOpticalLensFov(currentLensFovDeg);
+
+  // Wire Second-Life Teleport Pads & 1S788 Carport -> Holodeck Portal
+  const TELEPORT_PADS_KEY = 'pfl_teleport_pads_v1';
+  const CURATED_TELEPORT_PADS = [
+    {
+      id: 'balcony-sweet',
+      domId: 'pfl-pad-balcony-sweet',
+      label: '⚡ Balcony Sweet Spot',
+      lat: 29.247485,
+      lon: -95.231515,
+      heightOffset: 5.2,
+      heading: 108,
+      pitch: -16,
+      fov: 60,
+      curated: true,
+    },
+    {
+      id: 'lisa-closeup',
+      domId: 'pfl-pad-lisa-closeup',
+      label: '⚡ Lisa Close-Up',
+      dynamicKind: 'lisa-closeup',
+      lat: 29.247416,
+      lon: -95.231450,
+      heightOffset: 1.65,
+      heading: 12,
+      pitch: -6,
+      fov: 50,
+      curated: true,
+    },
+    {
+      id: '1s788-carport',
+      domId: 'pfl-pad-1s788-carport',
+      label: '⚡ 1S788 Carport Portal',
+      lat: 29.247495,
+      lon: -95.231435,
+      heightOffset: 1.8,
+      heading: 0,
+      pitch: -6,
+      fov: 65,
+      curated: true,
+    },
+    {
+      id: 'bayou-dock',
+      domId: 'pfl-pad-bayou-dock',
+      label: '⚡ Bayou Dock',
+      lat: 29.247752,
+      lon: -95.231382,
+      heightOffset: 1.8,
+      heading: 7.5,
+      pitch: -10,
+      fov: 65,
+      curated: true,
+    },
+  ];
+
+  function loadTeleportPads() {
+    let custom = [];
+    try {
+      const raw = JSON.parse(localStorage.getItem(TELEPORT_PADS_KEY) || 'null');
+      if (Array.isArray(raw)) {
+        custom = raw.filter((p) => p && !p.curated && Number.isFinite(p.lat) && Number.isFinite(p.lon));
+      } else if (raw && Array.isArray(raw.customPads)) {
+        custom = raw.customPads.filter((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lon));
+      }
+    } catch {}
+    const merged = [...CURATED_TELEPORT_PADS, ...custom];
+    try {
+      localStorage.setItem(TELEPORT_PADS_KEY, JSON.stringify(merged));
+    } catch {}
+    return merged;
+  }
+
+  let teleportPads = loadTeleportPads();
+  let portalStepCooldownUntil = 0;
+  let insideHolodeckPortalZone = false;
+
+  function saveTeleportPads(list) {
+    teleportPads = list;
+    try {
+      localStorage.setItem(TELEPORT_PADS_KEY, JSON.stringify(list));
+    } catch {}
+  }
+
+  function teleportToPad(pad) {
+    if (!pad || !viewer?.camera) return;
+    unlockDroneCamera();
+    enforceZeroAltitudeKickGuard();
+    portalStepCooldownUntil = Date.now() + 1400;
+    insideHolodeckPortalZone = false;
+
+    let destLon = pad.lon;
+    let destLat = pad.lat;
+    let destHeight = Number.isFinite(pad.height) ? pad.height : resolveLocalGroundM(pad.lon, pad.lat) + (pad.heightOffset ?? 1.8);
+    let destHeadingDeg = pad.heading ?? 0;
+    let destPitchDeg = pad.pitch ?? -12;
+
+    if (pad.dynamicKind === 'lisa-closeup') {
+      const tgt = resolveDroneTarget('lisa');
+      const lisaHdgDeg = Number(window.__pflMovables?.lisa?.getState?.()?.heading ?? 192);
+      const frontRad = Cesium.Math.toRadians(lisaHdgDeg);
+      const distFrontM = 2.35;
+      destLat = tgt.lat + (Math.cos(frontRad) * distFrontM) / 111320;
+      destLon = tgt.lon + (Math.sin(frontRad) * distFrontM) / (111320 * Math.cos(Cesium.Math.toRadians(tgt.lat)));
+      destHeight = tgt.alt + 1.55;
+      destHeadingDeg = ((lisaHdgDeg + 180) % 360 + 360) % 360;
+      destPitchDeg = -6;
+    } else if (pad.curated) {
+      destHeight = resolveLocalGroundM(destLon, destLat) + (pad.heightOffset ?? 1.8);
+    } else if (Number.isFinite(pad.heightOffset)) {
+      const liveGround = resolveLocalGroundM(destLon, destLat);
+      if (!Number.isFinite(pad.height) || Math.abs((pad.height - pad.heightOffset) - liveGround) > 12) {
+        destHeight = liveGround + pad.heightOffset;
+      }
+    }
+
+    if (Number.isFinite(pad.fov)) setOpticalLensFov(pad.fov);
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(destLon, destLat, destHeight),
+      orientation: {
+        heading: Cesium.Math.toRadians(destHeadingDeg),
+        pitch: Cesium.Math.toRadians(destPitchDeg),
+        roll: 0,
+      },
+    });
+    paintGlobe();
+    governorRequestRender('pfl-teleport-pad');
+  }
+
+  function renderTeleportPadsList() {
+    const listEl = telepresenceDeck.querySelector('#pfl-teleport-pads-list');
+    if (!listEl) return;
+    listEl.innerHTML = teleportPads.map((p) => `
+      <span style="display:inline-flex;align-items:center;gap:1px">
+        <button type="button" class="pfl-std-cbtn" ${p.domId ? `id="${p.domId}"` : ''} data-pfl-pad-id="${p.id}" style="border-color:rgba(34,211,238,0.45);color:#e0f2fe">${p.label}</button>
+        ${p.curated ? '' : `<button type="button" class="pfl-std-cbtn" data-pfl-pad-del="${p.id}" title="Remove pad" style="padding:1px 4px;color:#fda4af">×</button>`}
+      </span>
+    `).join('');
+    listEl.querySelectorAll('[data-pfl-pad-id]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-pfl-pad-id');
+        const found = teleportPads.find((x) => x.id === id);
+        if (found) teleportToPad(found);
+      });
+    });
+    listEl.querySelectorAll('[data-pfl-pad-del]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-pfl-pad-del');
+        saveTeleportPads(teleportPads.filter((x) => x.id !== id));
+        renderTeleportPadsList();
+      });
+    });
+  }
+  renderTeleportPadsList();
+
+  telepresenceDeck.querySelector('#pfl-drop-pad-btn')?.addEventListener('click', (e) => {
+    const c = viewer?.camera?.positionCartographic;
+    if (!c) return;
+    const lon = Number(Cesium.Math.toDegrees(c.longitude).toFixed(6));
+    const lat = Number(Cesium.Math.toDegrees(c.latitude).toFixed(6));
+    const height = Number(c.height.toFixed(2));
+    const heightOffset = Number((c.height - resolveLocalGroundM(lon, lat)).toFixed(2));
+    const heading = Number((((Cesium.Math.toDegrees(viewer.camera.heading || 0) % 360) + 360) % 360).toFixed(1));
+    const pitch = Number(Cesium.Math.toDegrees(viewer.camera.pitch || 0).toFixed(1));
+    const fov = Math.round(currentLensFovDeg);
+    const customIdx = teleportPads.filter((x) => !x.curated).length + 1;
+    const newPad = {
+      id: `pad-${Date.now()}`,
+      label: `📍 Pad #${customIdx}`,
+      lon,
+      lat,
+      height,
+      heightOffset,
+      heading,
+      pitch,
+      fov,
+      curated: false,
+    };
+    saveTeleportPads([...teleportPads, newPad]);
+    renderTeleportPadsList();
+    const btn = e.currentTarget;
+    btn.textContent = '✅ Pad Saved!';
+    setTimeout(() => { btn.textContent = '➕ Drop Pad Here'; }, 1100);
+  });
+
+  telepresenceDeck.querySelector('#pfl-enter-holodeck-btn')?.addEventListener('click', () => {
+    openHolodeckHallway();
+  });
+
+  const S788_PREVIEW_KEY = 'pfl_s788_wireframe_v1';
+  let s788PreviewOn = true;
+  try {
+    const rawS788 = localStorage.getItem(S788_PREVIEW_KEY);
+    if (rawS788 !== null) s788PreviewOn = rawS788 !== 'false';
+  } catch {}
+  const s788ToggleBtn = telepresenceDeck.querySelector('#pfl-s788-canopy-toggle');
+  const syncS788BtnUi = () => {
+    if (!s788ToggleBtn) return;
+    s788ToggleBtn.textContent = s788PreviewOn ? '🏗️ S-788 & 11ft Canopy: ON' : '🏗️ S-788 & 11ft Canopy: OFF';
+    s788ToggleBtn.style.borderColor = s788PreviewOn ? '#38bdf8' : 'rgba(148,163,184,0.35)';
+    s788ToggleBtn.style.color = s788PreviewOn ? '#7dd3fc' : '#94a3b8';
+  };
+  syncS788BtnUi();
+  s788ToggleBtn?.addEventListener('click', () => {
+    s788PreviewOn = !s788PreviewOn;
+    try { localStorage.setItem(S788_PREVIEW_KEY, String(s788PreviewOn)); } catch {}
+    syncS788BtnUi();
+    buildYard3dLandmarks();
+    governorRequestRender('pfl-s788-toggle');
+  });
+
+  function checkHolodeckPortalStep() {
+    if (droneOrbitState.active || Date.now() < portalStepCooldownUntil) return;
+    const c = viewer?.camera?.positionCartographic;
+    if (!c) return;
+    const camLat = Cesium.Math.toDegrees(c.latitude);
+    const camLon = Cesium.Math.toDegrees(c.longitude);
+    const portalLat = 29.247518;
+    const portalLon = -95.231435;
+    const dN = (camLat - portalLat) * 111320;
+    const dE = (camLon - portalLon) * 111320 * Math.cos(Cesium.Math.toRadians(portalLat));
+    const distM = Math.hypot(dN, dE);
+    const hAbove = c.height - resolveLocalGroundM(portalLon, portalLat);
+    if (distM <= 1.35 && hAbove >= -1.5 && hAbove <= 5.5) {
+      if (!insideHolodeckPortalZone) {
+        insideHolodeckPortalZone = true;
+        openHolodeckHallway();
+      }
+    } else if (distM > 1.95) {
+      insideHolodeckPortalZone = false;
+    }
+  }
 
   // Add Vertical Elevator (Up/Down without backing through photos) + Walk Steps + Save/Undo Spot in 3D Compass Box:
   const walkBar = document.createElement('div');
@@ -644,6 +1413,7 @@ export function loadPflWindowFramework({ viewer }) {
   compassWin.body.appendChild(walkBar);
 
   function stepHorizontal(fwdM, rightM) {
+    unlockDroneCamera();
     const c = viewer.camera.positionCartographic;
     if (!c) return;
     enforceZeroAltitudeKickGuard();
@@ -656,11 +1426,13 @@ export function loadPflWindowFramework({ viewer }) {
       destination: Cesium.Cartesian3.fromDegrees(newLon, newLat, c.height),
       orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
     });
+    checkHolodeckPortalStep();
     governorRequestRender('pfl-walk-step');
   }
 
   walkBar.querySelectorAll('[data-pfl-elev]').forEach((btn) => {
     btn.addEventListener('click', () => {
+      unlockDroneCamera();
       const c = viewer.camera.positionCartographic;
       if (!c) return;
       enforceZeroAltitudeKickGuard();
@@ -703,7 +1475,7 @@ export function loadPflWindowFramework({ viewer }) {
     wasdBtn.textContent = wasdWalkOn ? '🚶 WASD: ON' : '🚶 WASD: OFF';
     wasdBtn.style.borderColor = wasdWalkOn ? '#4ade80' : '';
   });
-  window.addEventListener('keydown', (e) => {
+  const wasdKeydownHandler = (e) => {
     if (!wasdWalkOn) return;
     const tag = (e.target?.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
@@ -714,7 +1486,8 @@ export function loadPflWindowFramework({ viewer }) {
     else if (k === 'd') { e.preventDefault(); stepHorizontal(0, 2.0); }
     else if (k === 'e') { e.preventDefault(); walkBar.querySelector('[data-pfl-elev="+2"]')?.click(); }
     else if (k === 'q') { e.preventDefault(); walkBar.querySelector('[data-pfl-elev="-2"]')?.click(); }
-  });
+  };
+  window.addEventListener('keydown', wasdKeydownHandler);
 
   const SAVED_SPOT_KEY = 'pfl_saved_sweet_spot_v1';
   walkBar.querySelector('#pfl-save-spot')?.addEventListener('click', (e) => {
@@ -729,6 +1502,7 @@ export function loadPflWindowFramework({ viewer }) {
   });
   walkBar.querySelector('#pfl-go-spot')?.addEventListener('click', () => {
     try {
+      unlockDroneCamera();
       const gDatum = viewer?.scene?.globe?.show !== false ? 0 : -24.8;
       const sp = JSON.parse(localStorage.getItem(SAVED_SPOT_KEY) || 'null') || {
         lon: Cesium.Math.toRadians(-95.23125),
@@ -747,6 +1521,7 @@ export function loadPflWindowFramework({ viewer }) {
   });
   walkBar.querySelector('#pfl-undo-jump')?.addEventListener('click', () => {
     if (!lastSafeYardPose) return;
+    unlockDroneCamera();
     enforceZeroAltitudeKickGuard();
     viewer.camera.setView({
       destination: Cesium.Cartesian3.fromRadians(lastSafeYardPose.lon, lastSafeYardPose.lat, lastSafeYardPose.height),
@@ -756,6 +1531,7 @@ export function loadPflWindowFramework({ viewer }) {
 
   const timer = setInterval(() => {
     paintGlobe();
+    checkHolodeckPortalStep();
     syncAlways3dVisibility();
   }, 350);
 
@@ -977,12 +1753,7 @@ export function loadPflWindowFramework({ viewer }) {
 
   vaultWin.body.querySelector('#pfl-vault-refresh')?.addEventListener('click', refreshLocalVault);
   vaultWin.body.querySelector('#pfl-vault-embed-mp')?.addEventListener('click', () => {
-    const wrap = vaultWin.body.querySelector('#pfl-vault-iframe-wrap');
-    const ifr = vaultWin.body.querySelector('#pfl-vault-iframe');
-    if (!wrap || !ifr) return;
-    const opening = wrap.style.display === 'none';
-    wrap.style.display = opening ? 'block' : 'none';
-    if (opening && !ifr.src) ifr.src = '/memory-palace.html';
+    window.open('/memory-palace.html', '_blank', 'noopener');
   });
   setTimeout(() => {
     document.getElementById('pfl-btn-vault-inline')?.addEventListener('click', () => {
@@ -1004,7 +1775,7 @@ export function loadPflWindowFramework({ viewer }) {
   const patrolWin = createStandardBox({
     id: 'pfl-win-wyze-patrol',
     title: '🎥 PFL LIVE WYZE VIDEO PATROL & MOTION EVENTS',
-    defaultLeft: Math.max(40, window.innerWidth - 495),
+    defaultLeft: Math.max(40, window.innerWidth - 790),
     defaultTop: 110,
     defaultWidth: 465,
   });
@@ -1206,6 +1977,7 @@ export function loadPflWindowFramework({ viewer }) {
     }
 
     if (fly3d) {
+      unlockDroneCamera();
       if (ev.camera === 'back-yard-cam2') {
         if (typeof window.__pflFlyBackyard180 === 'function') window.__pflFlyBackyard180();
       } else if (ev.camera === 'wyze-cam-v4' || ev.camera === 'back-yard-cam1') {
@@ -1344,6 +2116,7 @@ export function loadPflWindowFramework({ viewer }) {
               window.open(ev.thumbUrl, '_blank');
             }
             if (Number.isFinite(ev.lat) && Number.isFinite(ev.lon)) {
+              unlockDroneCamera();
               try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
               let base = 0;
               try {
@@ -1381,6 +2154,7 @@ export function loadPflWindowFramework({ viewer }) {
       const lon = Number(btn.getAttribute('data-fly-lon'));
       const hdg = Number(btn.getAttribute('data-fly-hdg'));
       if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        unlockDroneCamera();
         let base = 0;
         try {
           if (viewer.scene?.globe?.show === false) base = -26.19;
@@ -1517,6 +2291,185 @@ export function loadPflWindowFramework({ viewer }) {
       },
     });
     yardLandmarkIds.push(dockId);
+
+    // Glowing 3D Cyan/Purple Holodeck Portal Ring under 1S788 Carport Entry (29.247518, -95.231435)
+    const portalCanvas = document.createElement('canvas');
+    portalCanvas.width = 256;
+    portalCanvas.height = 256;
+    const pctx = portalCanvas.getContext('2d');
+    const rg = pctx.createRadialGradient(128, 128, 12, 128, 128, 124);
+    rg.addColorStop(0.0, 'rgba(34, 211, 238, 0.38)');
+    rg.addColorStop(0.45, 'rgba(168, 85, 247, 0.48)');
+    rg.addColorStop(0.76, 'rgba(34, 211, 238, 0.92)');
+    rg.addColorStop(0.90, 'rgba(192, 132, 252, 0.95)');
+    rg.addColorStop(1.0, 'rgba(34, 211, 238, 0.0)');
+    pctx.fillStyle = rg;
+    pctx.beginPath();
+    pctx.arc(128, 128, 124, 0, Math.PI * 2);
+    pctx.fill();
+    pctx.strokeStyle = '#67e8f9';
+    pctx.lineWidth = 6;
+    pctx.beginPath();
+    pctx.arc(128, 128, 102, 0, Math.PI * 2);
+    pctx.stroke();
+    pctx.strokeStyle = '#c084fc';
+    pctx.lineWidth = 4;
+    pctx.beginPath();
+    pctx.arc(128, 128, 72, 0, Math.PI * 2);
+    pctx.stroke();
+
+    let portalGround = gBase;
+    try {
+      if (viewer.scene?.globe?.show !== false) {
+        const ph = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(-95.231435, 29.247518));
+        if (Number.isFinite(ph)) portalGround = ph;
+      }
+    } catch {}
+    const makeWorldTagCanvas = (text, borderHex, fgHex) => {
+      const c = document.createElement('canvas');
+      c.width = 320;
+      c.height = 38;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = 'rgba(9, 14, 26, 0.86)';
+      ctx.strokeStyle = borderHex;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(2, 2, 316, 34, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = fgHex;
+      ctx.font = '700 13px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 160, 19);
+      return c;
+    };
+
+    const portalId = 'pfl-holodeck-portal-1s788';
+    viewer.entities.add({
+      id: portalId,
+      name: '🚪 1S788 Carport → Holodeck Hallway Portal (:8766)',
+      position: Cesium.Cartesian3.fromDegrees(-95.231435, 29.247518, portalGround + 1.15),
+      ellipse: {
+        semiMajorAxis: 1.15,
+        semiMinorAxis: 1.15,
+        height: portalGround + 0.12,
+        material: new Cesium.ImageMaterialProperty({
+          image: portalCanvas,
+          transparent: true,
+        }),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString('#22d3ee').withAlpha(0.95),
+      },
+      cylinder: {
+        length: 2.15,
+        topRadius: 1.02,
+        bottomRadius: 1.02,
+        material: Cesium.Color.fromCssColorString('#a855f7').withAlpha(0.16),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString('#22d3ee').withAlpha(0.85),
+      },
+      billboard: {
+        image: makeWorldTagCanvas('🚪 1S788 HOLODECK PORTAL', '#22d3ee', '#67e8f9'),
+        width: 172,
+        height: 21,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(0, -18),
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 140),
+        disableDepthTestDistance: 45,
+      },
+    });
+    yardLandmarkIds.push(portalId);
+
+    // MIL-STD S-788/G Shelters (102" L × 84" W × 67" H = 2.59m × 2.13m × 1.70m) + 3.35m (11ft) Walk-Through Solar Canopy Preview
+    if (s788PreviewOn) {
+      const s788BaseLat = 29.247518;
+      const s788BaseLon = -95.231435;
+      const mPerDegLon = 111320 * Math.cos(Cesium.Math.toRadians(s788BaseLat));
+      const shelterLenM = 2.59; // 102 in
+      const shelterWidM = 2.13; // 84 in
+      const shelterHgtM = 1.70; // 67 in
+      const canopyRidgeM = 3.35; // 11.0 ft walk-under clearance
+      const canopyWidM = 6.80;
+      const canopyLenM = 4.60;
+
+      const shelterSpecs = [
+        { id: 'pfl-s788-shelter-west', tag: 'S-788/G WEST (2.59×2.13×1.70m)', dEastM: -2.25 },
+        { id: 'pfl-s788-shelter-east', tag: 'S-788/G EAST (2.59×2.13×1.70m)', dEastM: 2.25 },
+      ];
+      for (const sh of shelterSpecs) {
+        const sLon = s788BaseLon + sh.dEastM / mPerDegLon;
+        viewer.entities.add({
+          id: sh.id,
+          name: `🏗️ MIL-STD ${sh.tag}`,
+          position: Cesium.Cartesian3.fromDegrees(sLon, s788BaseLat, portalGround + shelterHgtM * 0.5),
+          box: {
+            dimensions: new Cesium.Cartesian3(shelterWidM, shelterLenM, shelterHgtM),
+            material: Cesium.Color.fromCssColorString('#65a30d').withAlpha(0.24),
+            outline: true,
+            outlineColor: Cesium.Color.fromCssColorString('#bef264').withAlpha(0.95),
+          },
+          billboard: {
+            image: makeWorldTagCanvas(sh.tag, '#84cc16', '#d9f99d'),
+            width: 158,
+            height: 19,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -10),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 95),
+          },
+        });
+        yardLandmarkIds.push(sh.id);
+      }
+
+      // 4 structural steel posts holding the 11ft (3.35m) solar canopy clear above head height
+      const postOffsets = [
+        [-canopyWidM * 0.46, -canopyLenM * 0.44, 'nw'],
+        [canopyWidM * 0.46, -canopyLenM * 0.44, 'ne'],
+        [-canopyWidM * 0.46, canopyLenM * 0.44, 'sw'],
+        [canopyWidM * 0.46, canopyLenM * 0.44, 'se'],
+      ];
+      for (const [dE, dN, tag] of postOffsets) {
+        const pid = `pfl-s788-post-${tag}`;
+        viewer.entities.add({
+          id: pid,
+          name: '🏗️ S-788 Solar Canopy Column (3.35m / 11ft)',
+          position: Cesium.Cartesian3.fromDegrees(
+            s788BaseLon + dE / mPerDegLon,
+            s788BaseLat + dN / 111320,
+            portalGround + canopyRidgeM * 0.5,
+          ),
+          cylinder: {
+            length: canopyRidgeM,
+            topRadius: 0.065,
+            bottomRadius: 0.065,
+            material: Cesium.Color.fromCssColorString('#94a3b8').withAlpha(0.85),
+          },
+        });
+        yardLandmarkIds.push(pid);
+      }
+
+      const canopyId = 'pfl-s788-solar-canopy';
+      viewer.entities.add({
+        id: canopyId,
+        name: '☀️ 1S788 Overhead Solar Canopy (3.35m / 11.0 ft Walk-Through Clearance)',
+        position: Cesium.Cartesian3.fromDegrees(s788BaseLon, s788BaseLat, portalGround + canopyRidgeM + 0.07),
+        box: {
+          dimensions: new Cesium.Cartesian3(canopyWidM, canopyLenM, 0.14),
+          material: Cesium.Color.fromCssColorString('#1d4ed8').withAlpha(0.30),
+          outline: true,
+          outlineColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.95),
+        },
+        billboard: {
+          image: makeWorldTagCanvas('☀️ 11.0 FT (3.35m) SOLAR CANOPY', '#38bdf8', '#7dd3fc'),
+          width: 176,
+          height: 20,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -12),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 120),
+        },
+      });
+      yardLandmarkIds.push(canopyId);
+    }
   }
   buildYard3dLandmarks();
   window.addEventListener('gev:map-stack-changed', () => setTimeout(buildYard3dLandmarks, 400));
@@ -1542,7 +2495,7 @@ export function loadPflWindowFramework({ viewer }) {
       if (nearYard) {
         ctrl.enableCollisionDetection = false;
         ctrl.minimumZoomDistance = 0.25;
-        if (c.height < 180) {
+        if (c.height < 180 && !droneOrbitState.active) {
           lastSafeYardPose = {
             lon: c.longitude,
             lat: c.latitude,
@@ -1822,11 +2775,12 @@ export function loadPflWindowFramework({ viewer }) {
         nctx.fillRect(0, 0, 960, 540);
         bmp.close?.();
         rt.material.uniforms.image = nextCanvas;
-        // Also texture the two 3D Backyard Live Oak canopies with the live Cam2 upper-canopy pixels so the 3D ellipsoids carry live Wyze lighting & color from all 360°!
+        // Also texture the two 3D Backyard Live Oak canopies ONCE with the live Cam2 upper-canopy pixels so the 3D ellipsoids carry live Wyze lighting & color without ever recompiling/blinking!
         if (rt.cam.src === 'back-yard-cam2') {
           for (const cid of ['pfl-oak-west-crown', 'pfl-oak-east-crown']) {
             const ent = viewer?.entities?.getById?.(cid);
-            if (ent?.ellipsoid) {
+            if (ent?.ellipsoid && !ent._pflOakTextured) {
+              ent._pflOakTextured = true;
               ent.ellipsoid.material = new Cesium.ImageMaterialProperty({
                 image: nextCanvas,
                 color: Cesium.Color.WHITE.withAlpha(0.82),
@@ -1932,12 +2886,16 @@ export function loadPflWindowFramework({ viewer }) {
 
   return {
     destroy() {
+      unlockDroneCamera();
       clearInterval(timer);
       clearInterval(kalshiPoll);
       clearInterval(patrolCycleTimer);
       clearTimeout(scrubTimeout);
       clearInterval(always3dTimer);
       clearInterval(alarmPollTimer);
+      window.removeEventListener('keydown', wasdKeydownHandler);
+      try { viewer?.scene?.canvas?.removeEventListener?.('wheel', altWheelLensHandler, { capture: true }); } catch {}
+      try { for (const id of yardLandmarkIds) viewer?.entities?.removeById?.(id); } catch {}
       try { viewer.scene.primitives.remove(always3dHost); } catch {}
       cancelAnimationFrame(rafId);
       pickHandler.destroy();
