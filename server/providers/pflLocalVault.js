@@ -68,7 +68,7 @@ const CAMERA_GEO = {
 
 const STANDBY_HD_SPEC = {
   id: 'pfl-house-hd-cam',
-  name: 'PFL Wyze HD Cam — Standby / Monaco Rear View (LIVE)',
+  name: 'HD Standby',
   city: 'Liverpool, TX',
   cityId: 'pfl-liverpool',
   provider: 'Project Free Life Sovereign Wyze Node (go2rtc)',
@@ -90,7 +90,7 @@ const STANDBY_HD_SPEC = {
 const DEFAULT_ACTIVE_SPECS = [
   {
     id: 'pfl-wyze-cam-v4',
-    name: 'PFL Wyze Cam V4 — 417 Palm Dr Front Yard & Driveway (LIVE)',
+    name: 'V4 Front',
     city: 'Liverpool, TX',
     cityId: 'pfl-liverpool',
     provider: 'Project Free Life Sovereign Wyze Node (go2rtc)',
@@ -110,7 +110,7 @@ const DEFAULT_ACTIVE_SPECS = [
   },
   {
     id: 'pfl-back-yard-cam1',
-    name: 'PFL Wyze Cam1 — East Driveway, Monaco RV & Culvert (LIVE)',
+    name: 'Cam1 RV',
     city: 'Liverpool, TX',
     cityId: 'pfl-liverpool',
     provider: 'Project Free Life Sovereign Wyze Node (go2rtc)',
@@ -130,7 +130,7 @@ const DEFAULT_ACTIVE_SPECS = [
   },
   {
     id: 'pfl-back-yard-cam2',
-    name: 'PFL Wyze Cam2 — Chocolate Bayou Dock & Waterfront (LIVE)',
+    name: 'Cam2 Dock',
     city: 'Liverpool, TX',
     cityId: 'pfl-liverpool',
     provider: 'Project Free Life Sovereign Wyze Node (go2rtc)',

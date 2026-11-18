@@ -735,7 +735,7 @@ export function loadPflWindowFramework({ viewer }) {
           <button type="button" class="pfl-std-cbtn" id="pfl-patrol-rec20" style="border-color:#f43f5e;color:#fda4af" title="Record smooth 20fps 8-second H.264 clip directly from local go2rtc RTSP">⏺ Rec 8s (20fps)</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-patrol-site" style="border-color:#38bdf8;color:#38bdf8" title="Filter between strictly 417 Palm Dr cameras vs shared Wyze cameras (Michael Mertz)">🏠 Yard Only</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-patrol-cycle" style="border-color:#22c55e;color:#4ade80">⟳ Auto-Cycle: OFF</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-patrol-pins" style="border-color:#fbbf24;color:#fde047">📍 3D Pins: ON</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-patrol-pins" style="border-color:#fbbf24;color:#fde047">📍 3D Pins: OFF</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-patrol-sync" title="Pull latest Wyze cloud Person/Vehicle clips now">↻ Sync</button>
         </div>
       </div>
@@ -757,7 +757,7 @@ export function loadPflWindowFramework({ viewer }) {
 
   let activeLiveSrc = 'wyze-cam-v4';
   let patrolCycleOn = false;
-  let patrolPinsOn = true;
+  let patrolPinsOn = false;
   let enabledLiveSrcs = ['wyze-cam-v4', 'back-yard-cam1', 'back-yard-cam2'];
   const eventPinIds = [];
 
@@ -812,7 +812,7 @@ export function loadPflWindowFramework({ viewer }) {
     for (const ev of (events || []).filter((x) => Number.isFinite(x.lat) && Number.isFinite(x.lon)).slice(0, 10)) {
       const n = seenPerCam.get(ev.camera) || 0;
       seenPerCam.set(ev.camera, n + 1);
-      if (n >= 3) continue;
+      if (n >= 1) continue;
       const pid = `pfl-wyze-ev-${ev.id}`;
       const tagStr = (ev.tags || ['EVENT']).join('+');
       const timeShort = String(ev.occurredAt || '').slice(11, 19) || ev.day;
@@ -831,8 +831,8 @@ export function loadPflWindowFramework({ viewer }) {
         position: Cesium.Cartesian3.fromDegrees(lon, lat, groundBase + 3.2 + n * 1.4),
         billboard: {
           image: makeEventPinCanvas(`🚨 ${tagStr} (${timeShort})`, ev.camera),
-          width: 155,
-          height: 31,
+          width: 96,
+          height: 20,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           disableDepthTestDistance: 800,
         },

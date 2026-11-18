@@ -1,7 +1,7 @@
 [
   {
     "id": "pfl-wyze-cam-v4",
-    "name": "PFL Wyze Cam V4 \u2014 417 Palm Dr Front Yard & Driveway (LIVE)",
+    "name": "V4 Front",
     "city": "Liverpool, TX",
     "cityId": "pfl-liverpool",
     "provider": "Project Free Life Sovereign Wyze Node (go2rtc)",
@@ -21,7 +21,7 @@
   },
   {
     "id": "pfl-back-yard-cam1",
-    "name": "PFL Wyze Cam1 \u2014 East Driveway, Monaco RV & Culvert (LIVE)",
+    "name": "Cam1 RV",
     "city": "Liverpool, TX",
     "cityId": "pfl-liverpool",
     "provider": "Project Free Life Sovereign Wyze Node (go2rtc)",
@@ -41,7 +41,7 @@
   },
   {
     "id": "pfl-back-yard-cam2",
-    "name": "PFL Wyze Cam2 \u2014 North Breezeway Screen -> Two Oaks & Boat Dock (LIVE)",
+    "name": "Cam2 Dock",
     "city": "Liverpool, TX",
     "cityId": "pfl-liverpool",
     "provider": "Project Free Life Sovereign Wyze Node (go2rtc)",
