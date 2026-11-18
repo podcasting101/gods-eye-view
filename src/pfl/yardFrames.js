@@ -88,12 +88,12 @@ export const YARD_FRAMES = [
     id: 'bed-station-20261012',
     image: '/yard-frames/bed-station-solar-2026-11-17.jpg',
     // i18n-ignore: Paul's private camera title is source data.
-    title: 'Wyze Bed Cam — Solar-Locked (243.95° WSW Sunbeam @ +6.33° El)',
+    title: 'Wyze Bed Cam — Solar-Locked (Feet Due West 270°, Headboard Due East 90°)',
     takenAt: '2026-11-17 16:49:58 CST',
-    camLat: 29.247595,
-    camLon: -95.231358,
+    camLat: 29.247618,
+    camLon: -95.231412,
     camHeightM: 0.32,
-    headingDeg: 154,
+    headingDeg: 90,
     pitchDeg: -5,
     distanceM: 2.85,
     fovHDeg: 68,
@@ -105,15 +105,15 @@ export const YARD_FRAMES = [
     // i18n-ignore: Paul's private camera title is source data.
     title: 'East Carport / Garage Cam — Corvette, Roadster & Monaco RV Nose',
     takenAt: '2026-11-17 00:09:55 CST',
-    camLat: 29.247535,
-    camLon: -95.231272,
-    camHeightM: 1.4,
-    headingDeg: 172,
-    pitchDeg: -14,
-    distanceM: 3.4,
-    fovHDeg: 88,
-    fovVDeg: 52,
-    flat: true,
+    camLat: 29.247555,
+    camLon: -95.231288,
+    camHeightM: 1.55,
+    headingDeg: 175,
+    pitchDeg: -6,
+    distanceM: 2.8,
+    fovHDeg: 82,
+    fovVDeg: 48,
+    flat: false,
   },
 ];
 
@@ -192,10 +192,10 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'bed-station-20261012': {
     hiddenByStitch: false,
-    camLat: 29.247595,
-    camLon: -95.231358,
+    camLat: 29.247618,
+    camLon: -95.231412,
     camHeightM: 0.32,
-    headingDeg: 154,
+    headingDeg: 90,
     pitchDeg: -5,
     distanceM: 2.85,
     fovHDeg: 68,
@@ -207,17 +207,17 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'garage-carport-20261117': {
     hiddenByStitch: false,
-    camLat: 29.247525,
-    camLon: -95.231272,
-    camHeightM: 0.28,
-    headingDeg: 172,
-    pitchDeg: -14,
-    distanceM: 3.3,
-    fovHDeg: 88,
-    fovVDeg: 52,
+    camLat: 29.247555,
+    camLon: -95.231288,
+    camHeightM: 1.55,
+    headingDeg: 175,
+    pitchDeg: -6,
+    distanceM: 2.8,
+    fovHDeg: 82,
+    fovVDeg: 48,
     widthScale: 1.0,
     rollDeg: 0,
-    flat: true,
+    flat: false,
     texRot: 0,
   },
 };
@@ -316,6 +316,8 @@ function loadSavedLayout() {
         version: 1,
         fixedSidewaysRoadV1: true,
         fixedHouseSurveyV3: true,
+        fixedRoofGluedNoParallaxV20: true,
+        fixedFeetDueWestAndGarageV21: true,
         savedAt: new Date().toISOString(),
         frames: { ...CALIBRATED_HOUSE_SURVEY },
       };
@@ -338,6 +340,17 @@ function loadSavedLayout() {
       parsed.fixedHideFloatingBedSideV18 = true;
       parsed.fixedBedOnRoofAndGarageV19 = true;
       parsed.fixedRoofGluedNoParallaxV20 = true;
+      parsed.fixedFeetDueWestAndGarageV21 = true;
+      parsed.frames = frames;
+      window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
+    } else if (parsed && !parsed.fixedFeetDueWestAndGarageV21) {
+      for (const id of ['bed-station-20261012', 'garage-carport-20261117']) {
+        frames[id] = {
+          ...(frames[id] || {}),
+          ...CALIBRATED_HOUSE_SURVEY[id],
+        };
+      }
+      parsed.fixedFeetDueWestAndGarageV21 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -543,17 +556,23 @@ function buildFrameEntity(viewer, def, params) {
   return entity;
 }
 
-// Live registry: id -> { def, params, entity }.
+// Live registry: id -> { def, params, entity, mov }.
 const frameState = new Map();
 
 function rebuildFrame(viewer, id) {
   const st = frameState.get(id);
-  if (!st) return;
+  if (!st) return null;
   st.entity = buildFrameEntity(viewer, st.def, st.params);
+  if (st.entity) {
+    const hiddenStitch = Boolean(st.params?.hiddenByStitch) && !(editor && editor.on);
+    st.entity.show = yardFramesVisible && !hiddenStitch;
+    if (st.mov) st.entity._pflMovable = st.mov;
+  }
   if (editor && editor.viewer === viewer && editor.selectedId === id) {
     drawOutline(viewer);
     refreshPanel();
   }
+  return st.entity;
 }
 
 function saveLayout() {
@@ -576,6 +595,8 @@ function saveLayout() {
         fixedHouseSurveyV10: true,
         fixedHouseSurveyV11: true,
         fixedSolarBedV12: true,
+        fixedRoofGluedNoParallaxV20: true,
+        fixedFeetDueWestAndGarageV21: true,
         savedAt: new Date().toISOString(),
         frames,
       }),
@@ -627,22 +648,28 @@ export function loadYardFrames({ viewer }) {
       const hiddenStitch = Boolean(params.hiddenByStitch);
       entity.show = yardFramesVisible && !hiddenStitch;
     }
-    frameState.set(f.id, { def: f, params, entity });
+    const stEntry = { def: f, params, entity, mov: null };
+    frameState.set(f.id, stEntry);
     if (entity && f.id !== 'yard-overview-20261012') {
       const mov = {
         kind: 'yardframe:' + f.id,
         label: f.id === 'bed-station-20261012' ? '🛏️ Paul & Lisa Bed Photo' : f.id === 'garage-carport-20261117' ? '🚗 Garage Carport Photo' : `🖼️ ${f.id}`,
-        getState: () => ({
-          lat: params.camLat,
-          lon: params.camLon,
-          heading: params.headingDeg || 0,
-          lift: params.camHeightM || 0,
-        }),
+        getState: () => {
+          const ctr = getFrameCenterGeo(params);
+          return {
+            lat: ctr.lat,
+            lon: ctr.lon,
+            heading: params.headingDeg || 0,
+            lift: ctr.heightM || 0,
+          };
+        },
         update: (patch) => {
-          if (typeof patch.lat === 'number') params.camLat = patch.lat;
-          if (typeof patch.lon === 'number') params.camLon = patch.lon;
+          const ctr = getFrameCenterGeo(params);
+          if (typeof patch.lat === 'number') ctr.lat = patch.lat;
+          if (typeof patch.lon === 'number') ctr.lon = patch.lon;
+          if (typeof patch.lift === 'number') ctr.heightM = patch.lift;
           if (typeof patch.heading === 'number') params.headingDeg = patch.heading;
-          if (typeof patch.lift === 'number') params.camHeightM = patch.lift;
+          pinFrameCenterGeo(params, ctr);
           params.hiddenByStitch = false;
           const rebuilt = rebuildFrame(viewer, f.id);
           if (rebuilt) rebuilt._pflMovable = mov;
@@ -650,6 +677,7 @@ export function loadYardFrames({ viewer }) {
           governorRequestRender('pfl-move-yardframe');
         },
       };
+      stEntry.mov = mov;
       entity._pflMovable = mov;
       if (typeof window !== 'undefined') {
         window.__pflMovables = window.__pflMovables || {};

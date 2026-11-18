@@ -397,6 +397,8 @@ export function loadPflWindowFramework({ viewer }) {
         <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px">
           <button type="button" class="pfl-std-cbtn" data-pfl-pick="lisa" title="Select Lisa Muse avatar">👑 Lisa</button>
           <button type="button" class="pfl-std-cbtn" data-pfl-pick="chair" title="Select Wooden Chair & Sign">🪑 Chair</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-pick-house" data-pfl-pick="house" title="Select 3D 417 Palm Drive Yellow House">🏠 House</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-pick-monaco" data-pfl-pick="monaco" title="Select 3D Monaco 40ft Coach RV in East Driveway">🚌 Monaco</button>
           <button type="button" class="pfl-std-cbtn" data-pfl-pick="bed-station-20261012" title="Select Paul & Lisa Bed Photo">🛏️ Bed</button>
           <button type="button" class="pfl-std-cbtn" data-pfl-pick="garage-carport-20261117" title="Select Garage Carport Photo">🚗 Garage</button>
         </div>
@@ -585,6 +587,34 @@ export function loadPflWindowFramework({ viewer }) {
         defaultRange: 3.2,
       };
     }
+    if (targetKey === 'house') {
+      const st = window.__pflMovables?.house?.getState?.() || { lat: 29.247595, lon: -95.231385, heading: 0, lift: 0 };
+      const alt = resolveLocalGroundM(st.lon, st.lat) + Number(st.lift || 0) + 3.2;
+      return {
+        key: 'house',
+        label: '🏠 417 Palm Dr House',
+        lon: st.lon,
+        lat: st.lat,
+        alt,
+        defaultAz: 15,
+        defaultPitch: -24,
+        defaultRange: 18.5,
+      };
+    }
+    if (targetKey === 'monaco') {
+      const st = window.__pflMovables?.monaco?.getState?.() || { lat: 29.247485, lon: -95.231315, heading: 175, lift: 0 };
+      const alt = resolveLocalGroundM(st.lon, st.lat) + Number(st.lift || 0) + 0.8;
+      return {
+        key: 'monaco',
+        label: '🚌 Monaco 40ft Coach',
+        lon: st.lon,
+        lat: st.lat,
+        alt,
+        defaultAz: ((Number(st.heading ?? 175) + 145) % 360 + 360) % 360,
+        defaultPitch: -20,
+        defaultRange: 10.5,
+      };
+    }
     if (targetKey === 'carport') {
       const lon = -95.231395;
       const lat = 29.247518;
@@ -736,6 +766,74 @@ export function loadPflWindowFramework({ viewer }) {
     returnFromDrone,
   };
 
+  const GIZMO_ENTITY_ID = 'pfl-active-movable-gizmo';
+  function makeGizmoBadgeCanvas(labelText) {
+    const c = document.createElement('canvas');
+    c.width = 340;
+    c.height = 40;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.roundRect(2, 2, 336, 36, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#fde047';
+    ctx.font = '700 12.5px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`✥ DRAG / SPIN: ${String(labelText).slice(0, 22)}`, 170, 20);
+    return c;
+  }
+
+  function syncActiveMovableGizmo() {
+    if (!viewer?.entities || !activeMovable) return;
+    try {
+      const st = activeMovable.getState();
+      if (!st || !Number.isFinite(st.lat) || !Number.isFinite(st.lon)) return;
+      const gM = resolveLocalGroundM(st.lon, st.lat);
+      const liftM = Number(st.lift || 0);
+      const baseAlt = gM + liftM + 0.16;
+      const radiusM = activeMovable.kind === 'house' ? 8.2 : activeMovable.kind === 'monaco' ? 6.4 : String(activeMovable.kind || '').startsWith('yardframe:') ? 2.4 : 1.45;
+      const badgeLift = activeMovable.kind === 'house' ? 8.6 : activeMovable.kind === 'monaco' ? 4.2 : String(activeMovable.kind || '').startsWith('yardframe:') ? 2.1 : 2.35;
+      let giz = viewer.entities.getById(GIZMO_ENTITY_ID);
+      const pos = Cesium.Cartesian3.fromDegrees(st.lon, st.lat, baseAlt + badgeLift);
+      if (!giz) {
+        giz = viewer.entities.add({
+          id: GIZMO_ENTITY_ID,
+          name: 'Selected Object Gizmo',
+          position: pos,
+          ellipse: {
+            semiMajorAxis: radiusM,
+            semiMinorAxis: radiusM,
+            height: baseAlt,
+            material: Cesium.Color.fromCssColorString('#facc15').withAlpha(0.22),
+            outline: true,
+            outlineColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.98),
+          },
+          billboard: {
+            image: makeGizmoBadgeCanvas(activeMovable.label || activeMovable.kind),
+            width: 185,
+            height: 22,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            disableDepthTestDistance: 160,
+          },
+        });
+      } else {
+        giz.position = pos;
+        giz.ellipse.semiMajorAxis = radiusM;
+        giz.ellipse.semiMinorAxis = radiusM;
+        giz.ellipse.height = baseAlt;
+        if (giz._lastLabel !== activeMovable.label) {
+          giz.billboard.image = makeGizmoBadgeCanvas(activeMovable.label || activeMovable.kind);
+          giz._lastLabel = activeMovable.label;
+        }
+      }
+      governorRequestRender('pfl-movable-gizmo');
+    } catch {}
+  }
+
   function bindMovable(mov) {
     if (!mov) return;
     activeMovable = mov;
@@ -745,6 +843,7 @@ export function loadPflWindowFramework({ viewer }) {
     compassWin.body.querySelector('#pfl-hdg-val').textContent = `${Math.round(st.heading || 0)}°`;
     compassWin.body.querySelector('#pfl-alt-slider').value = String(st.lift || 0);
     compassWin.body.querySelector('#pfl-alt-val').textContent = `${Number(st.lift || 0).toFixed(2)}m`;
+    syncActiveMovableGizmo();
   }
 
   compassWin.body.querySelectorAll('[data-pfl-pick]').forEach((btn) => {
@@ -770,14 +869,154 @@ export function loadPflWindowFramework({ viewer }) {
       const newLat = st.lat + dN / 111320;
       const newLon = st.lon + dE / (111320 * Math.cos(Cesium.Math.toRadians(st.lat)));
       activeMovable.update({ lat: newLat, lon: newLon });
+      syncActiveMovableGizmo();
       if (droneOrbitState.active && activeMovable.kind === droneOrbitState.targetKey) {
         applyDroneOrbit();
       }
     });
   });
 
+  function wrapBirdpondWallMovable(ent) {
+    if (ent._pflWallMov) return ent._pflWallMov;
+    const st = ent._pflWallMeta || { lat: 29.139116, lon: -95.804794, width: 13.93, height: 9.23, heading: 107, baseAlt: -17.5, lift: 0 };
+    ent._pflWallMeta = st;
+    ent._pflWallMov = {
+      kind: ent.id,
+      label: ent.name || ent.id,
+      getState: () => ({ lat: st.lat, lon: st.lon, heading: st.heading, lift: st.lift || 0 }),
+      update: (patch) => {
+        Object.assign(st, patch);
+        const halfW = (st.width || 13.93) * 0.5;
+        const rad = (st.heading * Math.PI) / 180.0;
+        const dN = Math.cos(rad) * halfW;
+        const dE = Math.sin(rad) * halfW;
+        const mLat = 111320.0;
+        const mLon = 111320.0 * Math.cos((st.lat * Math.PI) / 180.0);
+        const bAlt = (st.baseAlt ?? -17.5) + (st.lift || 0);
+        const tAlt = bAlt + (st.height || 9.23);
+        ent.wall.positions = Cesium.Cartesian3.fromDegreesArrayHeights([
+          st.lon - dE / mLon, st.lat - dN / mLat, tAlt,
+          st.lon + dE / mLon, st.lat + dN / mLat, tAlt,
+        ]);
+        ent.wall.minimumHeights = [bAlt, bAlt];
+        governorRequestRender('pfl-wall-rotate');
+      },
+    };
+    return ent._pflWallMov;
+  }
+
+  function drillFindTarget(screenPos) {
+    let list = [];
+    try {
+      list = viewer.scene.drillPick(screenPos, 12) || [];
+    } catch {}
+    if (!list.length) {
+      const single = viewer.scene.pick(screenPos);
+      if (single) list = [single];
+    }
+    for (const p of list) {
+      const ent = p?.id;
+      const eid = String(ent?.id || '');
+      if (eid === GIZMO_ENTITY_ID && activeMovable) {
+        return { type: 'movable', mov: activeMovable, viaGizmo: true };
+      }
+      if (eid === 'yardframe:yard-overview-20261012') continue;
+      if (eid.startsWith('pfl-s788-') || eid.startsWith('pfl-oak-')) continue;
+      if (eid === 'pfl-holodeck-portal-1s788') {
+        return { type: 'portal' };
+      }
+      if (ent?._pflMovable) {
+        return { type: 'movable', mov: ent._pflMovable };
+      }
+      if (p?.primitive && window.__pflMovables?.chair?.tileset && p.primitive === window.__pflMovables.chair.tileset) {
+        return { type: 'movable', mov: window.__pflMovables.chair };
+      }
+      if (ent && ent.wall && eid.startsWith('birdpond_')) {
+        return { type: 'movable', mov: wrapBirdpondWallMovable(ent) };
+      }
+    }
+    return null;
+  }
+
+  let dragMovableSession = null;
+  let lastDragReleaseMs = 0;
+
   const pickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+  pickHandler.setInputAction((downEv) => {
+    if (clickToPlaceMode) return;
+    const hit = drillFindTarget(downEv.position);
+    if (hit?.type !== 'movable' || !hit.mov) return;
+    bindMovable(hit.mov);
+    const st = hit.mov.getState();
+    const planeAlt = resolveLocalGroundM(st.lon, st.lat) + Number(st.lift || 0);
+    const anchorCart = Cesium.Cartesian3.fromDegrees(st.lon, st.lat, planeAlt);
+    const enu = Cesium.Transforms.eastNorthUpToFixedFrame(anchorCart);
+    const invEnu = Cesium.Matrix4.inverseTransformation(enu, new Cesium.Matrix4());
+    dragMovableSession = {
+      mov: hit.mov,
+      startX: downEv.position.x,
+      startY: downEv.position.y,
+      moved: false,
+      enu,
+      invEnu,
+    };
+    const ctrl = viewer?.scene?.screenSpaceCameraController;
+    if (ctrl) {
+      ctrl.enableRotate = false;
+      ctrl.enableTranslate = false;
+      ctrl.enableTilt = false;
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+
+  pickHandler.setInputAction((moveEv) => {
+    if (!dragMovableSession || !moveEv?.endPosition) return;
+    const dx = moveEv.endPosition.x - dragMovableSession.startX;
+    const dy = moveEv.endPosition.y - dragMovableSession.startY;
+    if (!dragMovableSession.moved && Math.hypot(dx, dy) < 4) return;
+    dragMovableSession.moved = true;
+    try {
+      const ray = viewer.camera.getPickRay(moveEv.endPosition);
+      if (!ray) return;
+      const origL = Cesium.Matrix4.multiplyByPoint(dragMovableSession.invEnu, ray.origin, new Cesium.Cartesian3());
+      const dirL = Cesium.Matrix4.multiplyByPointAsVector(dragMovableSession.invEnu, ray.direction, new Cesium.Cartesian3());
+      if (Math.abs(dirL.z) > 1e-4) {
+        const t = -origL.z / dirL.z;
+        if (t > 0 && t < 450) {
+          const hitLocal = new Cesium.Cartesian3(
+            Math.max(-85, Math.min(85, origL.x + dirL.x * t)),
+            Math.max(-85, Math.min(85, origL.y + dirL.y * t)),
+            0,
+          );
+          const hitWorld = Cesium.Matrix4.multiplyByPoint(dragMovableSession.enu, hitLocal, new Cesium.Cartesian3());
+          const cg = Cesium.Cartographic.fromCartesian(hitWorld);
+          dragMovableSession.mov.update({
+            lat: Cesium.Math.toDegrees(cg.latitude),
+            lon: Cesium.Math.toDegrees(cg.longitude),
+          });
+          syncActiveMovableGizmo();
+          if (droneOrbitState.active && dragMovableSession.mov.kind === droneOrbitState.targetKey) {
+            applyDroneOrbit();
+          }
+        }
+      }
+    } catch {}
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+  pickHandler.setInputAction(() => {
+    if (!dragMovableSession) return;
+    const wasMoved = dragMovableSession.moved;
+    dragMovableSession = null;
+    if (wasMoved) lastDragReleaseMs = Date.now();
+    const ctrl = viewer?.scene?.screenSpaceCameraController;
+    if (ctrl) {
+      ctrl.enableRotate = true;
+      ctrl.enableTranslate = true;
+      ctrl.enableTilt = true;
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_UP);
+
   pickHandler.setInputAction((movement) => {
+    if (Date.now() - lastDragReleaseMs < 260) return;
     if (clickToPlaceMode && activeMovable) {
       let cart = null;
       try {
@@ -796,6 +1035,7 @@ export function loadPflWindowFramework({ viewer }) {
           lat: Cesium.Math.toDegrees(cg.latitude),
           lon: Cesium.Math.toDegrees(cg.longitude),
         });
+        syncActiveMovableGizmo();
         clickToPlaceMode = false;
         if (placeBtn) {
           placeBtn.textContent = '✋ Click-to-Place: OFF';
@@ -805,49 +1045,17 @@ export function loadPflWindowFramework({ viewer }) {
       }
     }
 
-    const picked = viewer.scene.pick(movement.position);
-    const ent = picked?.id;
-    if (ent && String(ent.id || '') === 'pfl-holodeck-portal-1s788') {
+    const hit = drillFindTarget(movement.position);
+    if (!hit) return;
+    if (hit.type === 'portal') {
       openHolodeckHallway();
       return;
     }
-    if (ent && String(ent.id || '') === 'yardframe:yard-overview-20261012') return;
-    if (ent?._pflMovable) {
-      bindMovable(ent._pflMovable);
-      if (ent._pflMovable.kind === 'lisa') {
+    if (hit.type === 'movable' && hit.mov) {
+      bindMovable(hit.mov);
+      if (hit.mov.kind === 'lisa' && !hit.viaGizmo) {
         startDroneOrbit('lisa');
       }
-      return;
-    }
-    if (picked?.primitive && window.__pflMovables?.chair?.tileset && picked.primitive === window.__pflMovables.chair.tileset) {
-      bindMovable(window.__pflMovables.chair);
-      return;
-    }
-    if (ent && ent.wall && String(ent.id || '').startsWith('birdpond_')) {
-      const st = ent._pflWallMeta || { lat: 29.139116, lon: -95.804794, width: 13.93, height: 9.23, heading: 107, baseAlt: -17.5, lift: 0 };
-      ent._pflWallMeta = st;
-      bindMovable({
-        kind: ent.id,
-        label: ent.name || ent.id,
-        getState: () => ({ lat: st.lat, lon: st.lon, heading: st.heading, lift: st.lift || 0 }),
-        update: (patch) => {
-          Object.assign(st, patch);
-          const halfW = (st.width || 13.93) * 0.5;
-          const rad = (st.heading * Math.PI) / 180.0;
-          const dN = Math.cos(rad) * halfW;
-          const dE = Math.sin(rad) * halfW;
-          const mLat = 111320.0;
-          const mLon = 111320.0 * Math.cos((st.lat * Math.PI) / 180.0);
-          const bAlt = (st.baseAlt ?? -17.5) + (st.lift || 0);
-          const tAlt = bAlt + (st.height || 9.23);
-          ent.wall.positions = Cesium.Cartesian3.fromDegreesArrayHeights([
-            st.lon - dE / mLon, st.lat - dN / mLat, tAlt,
-            st.lon + dE / mLon, st.lat + dN / mLat, tAlt,
-          ]);
-          ent.wall.minimumHeights = [bAlt, bAlt];
-          governorRequestRender('pfl-wall-rotate');
-        },
-      });
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -855,12 +1063,14 @@ export function loadPflWindowFramework({ viewer }) {
     const v = Number(e.target.value);
     compassWin.body.querySelector('#pfl-hdg-val').textContent = `${v}°`;
     activeMovable?.update({ heading: v });
+    syncActiveMovableGizmo();
   });
 
   compassWin.body.querySelector('#pfl-alt-slider')?.addEventListener('input', (e) => {
     const v = Number(e.target.value);
     compassWin.body.querySelector('#pfl-alt-val').textContent = `${v.toFixed(2)}m`;
     activeMovable?.update({ lift: v });
+    syncActiveMovableGizmo();
     if (droneOrbitState.active && activeMovable?.kind === droneOrbitState.targetKey) {
       applyDroneOrbit();
     }
@@ -1010,7 +1220,9 @@ export function loadPflWindowFramework({ viewer }) {
       <div style="display:flex;gap:3px;flex-wrap:wrap">
         <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-lisa" data-pfl-drone="lisa" title="Send remote drone to orbit 360° around Lisa without losing your standing spot">🚁 Orbit Lisa</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-chair" data-pfl-drone="chair" title="Send remote drone to orbit around Wooden Chair">🪑 Orbit Chair</button>
-        <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-carport" data-pfl-drone="carport" title="Send remote drone to orbit RV &amp; 1S788 Carport">🚗 Orbit RV/Carport</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-house" data-pfl-drone="house" title="Send remote drone to orbit 360° around 417 Palm Dr House">🏠 Orbit House</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-monaco" data-pfl-drone="monaco" title="Send remote drone to orbit 360° around the 40ft Monaco Coach RV">🚌 Orbit Monaco</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-carport" data-pfl-drone="carport" title="Send remote drone to orbit 1S788 Carport">🚗 Orbit Carport</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-dock" data-pfl-drone="dock" title="Send remote drone to orbit Chocolate Bayou Dock">⚓ Orbit Dock</button>
       </div>
       <div style="display:flex;gap:3px;flex-wrap:wrap">
@@ -1050,7 +1262,8 @@ export function loadPflWindowFramework({ viewer }) {
       <div style="display:flex;gap:3px;flex-wrap:wrap">
         <button type="button" class="pfl-std-cbtn" id="pfl-drop-pad-btn" style="border-color:#4ade80;color:#4ade80" title="Drop a persistent Second-Life teleport pad at your exact current camera position, angle &amp; lens FOV">➕ Drop Pad Here</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-enter-holodeck-btn" style="border-color:#a855f7;color:#e9d5ff" title="Step through the 1S788 Carport Portal into the 3D Gaussian Splat Holodeck Hallway (:8766)">🚪 Enter Holodeck Hallway (:8766)</button>
-        <button type="button" class="pfl-std-cbtn" id="pfl-s788-canopy-toggle" style="border-color:#38bdf8;color:#7dd3fc" title="Toggle 3D engineering wireframe of MIL-STD S-788/G shelters (102&quot;L × 84&quot;W × 67&quot;H = 2.59m × 2.13m × 1.70m) + 11ft (3.35m) walk-through overhead solar canopy">🏗️ S-788 &amp; 11ft Canopy: ON</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-house-3d-toggle" style="border-color:#fbbf24;color:#fde047" title="Toggle 3D 417 Palm Dr Yellow Coastal House GLB model &amp; auto-elevate Bed photo onto upstairs west-bedroom roof">🏠 3D House: ON</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-s788-canopy-toggle" style="border-color:rgba(148,163,184,0.35);color:#94a3b8" title="Toggle 3D engineering wireframe of MIL-STD S-788/G shelters (102&quot;L × 84&quot;W × 67&quot;H = 2.59m × 2.13m × 1.70m) + 11ft (3.35m) walk-through overhead solar canopy">🏗️ S-788 &amp; 11ft Canopy: OFF</button>
       </div>
     </div>
   `;
@@ -1062,6 +1275,8 @@ export function loadPflWindowFramework({ viewer }) {
       const key = btn.getAttribute('data-pfl-drone');
       if (key === 'lisa' && window.__pflMovables?.lisa) bindMovable(window.__pflMovables.lisa);
       else if (key === 'chair' && window.__pflMovables?.chair) bindMovable(window.__pflMovables.chair);
+      else if (key === 'house' && window.__pflMovables?.house) bindMovable(window.__pflMovables.house);
+      else if (key === 'monaco' && window.__pflMovables?.monaco) bindMovable(window.__pflMovables.monaco);
       startDroneOrbit(key);
     });
   });
@@ -1343,11 +1558,48 @@ export function loadPflWindowFramework({ viewer }) {
     openHolodeckHallway();
   });
 
-  const S788_PREVIEW_KEY = 'pfl_s788_wireframe_v1';
-  let s788PreviewOn = true;
+  const HOUSE_3D_ON_KEY = 'pfl_house_3d_on_v1';
+  let house3dOn = true;
+  let houseGlbAvailable = null; // null = unchecked, boolean once probed
+  try {
+    const rawHouseOn = localStorage.getItem(HOUSE_3D_ON_KEY);
+    if (rawHouseOn !== null) house3dOn = rawHouseOn !== 'false';
+  } catch {}
+  const houseToggleBtn = telepresenceDeck.querySelector('#pfl-house-3d-toggle');
+  const syncBedElevationForHouse = (isOnAndLoaded) => {
+    try {
+      const bedMov = window.__pflMovables?.['bed-station-20261012'];
+      if (!bedMov) return;
+      const bst = bedMov.getState();
+      if (isOnAndLoaded && Number(bst.lift || 0) < 4.0) {
+        bedMov.update({ lift: 7.95 });
+      } else if (!isOnAndLoaded && Number(bst.lift || 0) > 4.0) {
+        bedMov.update({ lift: 0.35 });
+      }
+    } catch {}
+  };
+  const syncHouseBtnUi = () => {
+    if (!houseToggleBtn) return;
+    houseToggleBtn.textContent = house3dOn ? '🏠 3D House: ON' : '🏠 3D House: OFF';
+    houseToggleBtn.style.borderColor = house3dOn ? '#fbbf24' : 'rgba(148,163,184,0.35)';
+    houseToggleBtn.style.color = house3dOn ? '#fde047' : '#94a3b8';
+  };
+  syncHouseBtnUi();
+  houseToggleBtn?.addEventListener('click', () => {
+    house3dOn = !house3dOn;
+    if (house3dOn && !houseGlbAvailable) houseGlbAvailable = null;
+    try { localStorage.setItem(HOUSE_3D_ON_KEY, String(house3dOn)); } catch {}
+    syncHouseBtnUi();
+    syncBedElevationForHouse(house3dOn && houseGlbAvailable === true);
+    buildYard3dLandmarks();
+    governorRequestRender('pfl-house-toggle');
+  });
+
+  const S788_PREVIEW_KEY = 'pfl_s788_wireframe_v2';
+  let s788PreviewOn = false;
   try {
     const rawS788 = localStorage.getItem(S788_PREVIEW_KEY);
-    if (rawS788 !== null) s788PreviewOn = rawS788 !== 'false';
+    if (rawS788 !== null) s788PreviewOn = rawS788 === 'true';
   } catch {}
   const s788ToggleBtn = telepresenceDeck.querySelector('#pfl-s788-canopy-toggle');
   const syncS788BtnUi = () => {
@@ -2381,10 +2633,10 @@ export function loadPflWindowFramework({ viewer }) {
     });
     yardLandmarkIds.push(portalId);
 
-    // MIL-STD S-788/G Shelters (102" L × 84" W × 67" H = 2.59m × 2.13m × 1.70m) + 3.35m (11ft) Walk-Through Solar Canopy Preview
+    // MIL-STD S-788/G Shelters (102" L × 84" W × 67" H = 2.59m × 2.13m × 1.70m) + 3.35m (11ft) Walk-Through Solar Canopy Preview (OFF by default; compact over west carport when toggled ON)
     if (s788PreviewOn) {
-      const s788BaseLat = 29.247518;
-      const s788BaseLon = -95.231435;
+      const s788BaseLat = 29.247485;
+      const s788BaseLon = -95.231495;
       const mPerDegLon = 111320 * Math.cos(Cesium.Math.toRadians(s788BaseLat));
       const shelterLenM = 2.59; // 102 in
       const shelterWidM = 2.13; // 84 in
@@ -2470,6 +2722,285 @@ export function loadPflWindowFramework({ viewer }) {
       });
       yardLandmarkIds.push(canopyId);
     }
+
+    // 3D Monaco 40ft Class-A Diesel Pusher Coach RV in East Driveway (12.2m L × 2.59m W × 3.65m H)
+    const MONACO_POSE_KEY = 'pfl_monaco_pose_v1';
+    let monacoState = { lat: 29.247485, lon: -95.231315, heading: 175, lift: 0 };
+    try {
+      const savedMon = JSON.parse(localStorage.getItem(MONACO_POSE_KEY) || 'null');
+      if (savedMon && Number.isFinite(savedMon.lat) && Number.isFinite(savedMon.lon)) {
+        monacoState = { ...monacoState, ...savedMon };
+      }
+    } catch {}
+
+    let rvGround = gBase;
+    try {
+      if (viewer.scene?.globe?.show !== false) {
+        const rh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(monacoState.lon, monacoState.lat));
+        if (Number.isFinite(rh)) rvGround = rh;
+      }
+    } catch {}
+
+    if (!viewer._pflMonacoLiveryCanvas) {
+      const lc = document.createElement('canvas');
+      lc.width = 512;
+      lc.height = 256;
+      const lctx = lc.getContext('2d');
+      lctx.fillStyle = '#e7dfd3';
+      lctx.fillRect(0, 0, 512, 256);
+      // Champagne lower basement bays
+      lctx.fillStyle = '#cbbba4';
+      lctx.fillRect(0, 174, 512, 82);
+      // Burgundy & Gold Monaco signature swoosh stripes
+      lctx.fillStyle = '#7f1d1d';
+      lctx.beginPath();
+      lctx.moveTo(0, 148);
+      lctx.quadraticCurveTo(220, 122, 512, 158);
+      lctx.lineTo(512, 176);
+      lctx.quadraticCurveTo(220, 142, 0, 166);
+      lctx.closePath();
+      lctx.fill();
+      lctx.strokeStyle = '#d97706';
+      lctx.lineWidth = 4;
+      lctx.beginPath();
+      lctx.moveTo(0, 142);
+      lctx.quadraticCurveTo(220, 116, 512, 152);
+      lctx.stroke();
+      // Tinted coach salon windows
+      lctx.fillStyle = '#0f172a';
+      for (const [wx, ww] of [[38, 110], [168, 96], [284, 88], [392, 82]]) {
+        lctx.beginPath();
+        lctx.roundRect(wx, 48, ww, 58, 6);
+        lctx.fill();
+      }
+      // Storage bay doors lines
+      lctx.strokeStyle = 'rgba(71, 85, 105, 0.55)';
+      lctx.lineWidth = 2;
+      for (let bx = 42; bx < 470; bx += 72) {
+        lctx.strokeRect(bx, 184, 64, 58);
+      }
+      viewer._pflMonacoLiveryCanvas = lc;
+    }
+
+    const monacoIds = [
+      'pfl-monaco-rv-body',
+      'pfl-monaco-rv-windshield',
+      'pfl-monaco-rv-cablamp',
+      'pfl-monaco-rv-ac-front',
+      'pfl-monaco-rv-ac-rear',
+      'pfl-monaco-rv-awning',
+    ];
+    for (const mid of monacoIds) viewer.entities.removeById(mid);
+
+    const placeMonacoPart = (id, name, localX, localY, localZ, dims, mat, outlineCol, billboardSpec = null) => {
+      const origin = Cesium.Cartesian3.fromDegrees(monacoState.lon, monacoState.lat, rvGround + (monacoState.lift || 0));
+      const hpr = new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(monacoState.heading || 175), 0, 0);
+      const frame = Cesium.Transforms.headingPitchRollToFixedFrame(origin, hpr);
+      const pos = Cesium.Matrix4.multiplyByPoint(frame, new Cesium.Cartesian3(localX, localY, localZ), new Cesium.Cartesian3());
+      const ori = Cesium.Transforms.headingPitchRollQuaternion(pos, hpr);
+      const ent = viewer.entities.add({
+        id,
+        name,
+        position: pos,
+        orientation: ori,
+        box: {
+          dimensions: dims,
+          material: mat,
+          outline: Boolean(outlineCol),
+          outlineColor: outlineCol || Cesium.Color.WHITE,
+        },
+        ...(billboardSpec ? { billboard: billboardSpec } : {}),
+      });
+      yardLandmarkIds.push(id);
+      return ent;
+    };
+
+    const renderMonacoParts = () => {
+      for (const mid of monacoIds) viewer.entities.removeById(mid);
+      try {
+        if (viewer.scene?.globe?.show !== false) {
+          const rh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(monacoState.lon, monacoState.lat));
+          if (Number.isFinite(rh)) rvGround = rh;
+        } else {
+          rvGround = -26.19;
+        }
+      } catch {}
+      const parts = [
+        // Main 40ft (12.2m) × 8.5ft (2.59m) × 12ft (3.65m roof) Champagne/Cream Coach Body
+        placeMonacoPart(
+          'pfl-monaco-rv-body',
+          '🚌 Monaco 40ft Diesel Pusher Coach',
+          0, 0, 1.98,
+          new Cesium.Cartesian3(2.59, 12.20, 3.26),
+          new Cesium.ImageMaterialProperty({ image: viewer._pflMonacoLiveryCanvas }),
+          Cesium.Color.fromCssColorString('#f5ebe0').withAlpha(0.75),
+          {
+            image: makeWorldTagCanvas('🚌 MONACO 40FT COACH', '#fbbf24', '#fef08a'),
+            width: 164,
+            height: 20,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -28),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 165),
+          },
+        ),
+        // Dark Tinted Panoramic Front Windshield & Sun Visor at Front Nose (+Y)
+        placeMonacoPart(
+          'pfl-monaco-rv-windshield',
+          '🚌 Monaco Front Panoramic Windshield',
+          0, 5.98, 2.48,
+          new Cesium.Cartesian3(2.42, 0.30, 1.16),
+          Cesium.Color.fromCssColorString('#0f172a').withAlpha(0.88),
+          Cesium.Color.fromCssColorString('#64748b').withAlpha(0.7),
+        ),
+        // Warm Glowing ~70W Interior Cab Lamp visible behind windshield
+        placeMonacoPart(
+          'pfl-monaco-rv-cablamp',
+          '💡 Monaco ~70W Interior Cab Lamp',
+          0, 5.38, 2.38,
+          new Cesium.Cartesian3(1.52, 0.72, 0.62),
+          Cesium.Color.fromCssColorString('#fde68a').withAlpha(0.92),
+          Cesium.Color.fromCssColorString('#fbbf24').withAlpha(0.95),
+        ),
+        // Dual Rooftop Coleman A/C Pods
+        placeMonacoPart(
+          'pfl-monaco-rv-ac-front',
+          '🚌 Monaco Rooftop A/C Front',
+          0, 2.45, 3.75,
+          new Cesium.Cartesian3(0.94, 1.24, 0.28),
+          Cesium.Color.fromCssColorString('#f8fafc').withAlpha(0.95),
+          Cesium.Color.fromCssColorString('#94a3b8').withAlpha(0.7),
+        ),
+        placeMonacoPart(
+          'pfl-monaco-rv-ac-rear',
+          '🚌 Monaco Rooftop A/C Rear',
+          0, -2.35, 3.75,
+          new Cesium.Cartesian3(0.94, 1.24, 0.28),
+          Cesium.Color.fromCssColorString('#f8fafc').withAlpha(0.95),
+          Cesium.Color.fromCssColorString('#94a3b8').withAlpha(0.7),
+        ),
+        // Passenger-Side Burgundy/Gold Patio Awning Cassette (+X right side)
+        placeMonacoPart(
+          'pfl-monaco-rv-awning',
+          '🚌 Monaco Patio Awning',
+          1.34, 0.85, 3.42,
+          new Cesium.Cartesian3(0.16, 6.80, 0.20),
+          Cesium.Color.fromCssColorString('#7f1d1d').withAlpha(0.94),
+          Cesium.Color.fromCssColorString('#f59e0b').withAlpha(0.9),
+        ),
+      ];
+      return parts;
+    };
+
+    const monacoMovable = {
+      kind: 'monaco',
+      label: '🚌 Monaco 40ft Coach (RV)',
+      getState: () => ({ ...monacoState }),
+      update: (patch) => {
+        Object.assign(monacoState, patch);
+        try { localStorage.setItem(MONACO_POSE_KEY, JSON.stringify(monacoState)); } catch {}
+        const rebuiltParts = renderMonacoParts();
+        for (const ent of rebuiltParts) ent._pflMovable = monacoMovable;
+        governorRequestRender('pfl-move-monaco');
+      },
+    };
+    const builtMonaco = renderMonacoParts();
+    for (const ent of builtMonaco) ent._pflMovable = monacoMovable;
+    window.__pflMovables = window.__pflMovables || {};
+    window.__pflMovables.monaco = monacoMovable;
+
+    // 3D 417 Palm Drive Two-Story Yellow Coastal House GLB (/models/pfl-palm-drive-house.glb)
+    // In Cesium glTF axis conversion, heading=90° aligns glTF +X (14.6m width) East-West and glTF +Z (+5.6m front porch/balcony) Due South!
+    const HOUSE_POSE_KEY = 'pfl_house_pose_v2';
+    let houseState = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0 };
+    try {
+      const savedHouse = JSON.parse(localStorage.getItem(HOUSE_POSE_KEY) || 'null');
+      if (savedHouse && Number.isFinite(savedHouse.lat) && Number.isFinite(savedHouse.lon)) {
+        houseState = { ...houseState, ...savedHouse };
+      }
+    } catch {}
+
+    const houseEntityId = 'pfl-palm-drive-house-3d';
+    viewer.entities.removeById(houseEntityId);
+
+    const spawnHouseEntityIfReady = () => {
+      viewer.entities.removeById(houseEntityId);
+      if (!house3dOn || !houseGlbAvailable) {
+        syncBedElevationForHouse(false);
+        return null;
+      }
+      let hGround = gBase;
+      try {
+        if (viewer.scene?.globe?.show !== false) {
+          const hh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(houseState.lon, houseState.lat));
+          if (Number.isFinite(hh)) hGround = hh;
+        }
+      } catch {}
+      const hPos = Cesium.Cartesian3.fromDegrees(houseState.lon, houseState.lat, hGround + Number(houseState.lift || 0));
+      const hOri = Cesium.Transforms.headingPitchRollQuaternion(
+        hPos,
+        new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(houseState.heading || 0), 0, 0),
+      );
+      const hEnt = viewer.entities.add({
+        id: houseEntityId,
+        name: '🏠 417 Palm Drive Two-Story Yellow House',
+        position: hPos,
+        orientation: hOri,
+        model: {
+          uri: `/models/pfl-palm-drive-house.glb?v=${viewer._pflHouseRev || 1}`,
+          scale: 1.0,
+          heightReference: Cesium.HeightReference.NONE,
+          minimumPixelSize: 0,
+          maximumScale: 50,
+          lightColor: new Cesium.Color(1.45, 1.40, 1.32, 1.0),
+          imageBasedLightingFactor: new Cesium.Cartesian2(1.0, 1.0),
+        },
+        billboard: {
+          image: makeWorldTagCanvas('🏠 417 PALM DR HOUSE', '#fbbf24', '#fef08a'),
+          width: 156,
+          height: 19,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -34),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 165),
+        },
+      });
+      if (!yardLandmarkIds.includes(houseEntityId)) yardLandmarkIds.push(houseEntityId);
+      hEnt._pflMovable = houseMovable;
+      syncBedElevationForHouse(true);
+      governorRequestRender('pfl-spawn-house');
+      return hEnt;
+    };
+
+    const houseMovable = {
+      kind: 'house',
+      label: '🏠 417 Palm Dr House (3D)',
+      getState: () => ({ ...houseState }),
+      update: (patch) => {
+        Object.assign(houseState, patch);
+        try { localStorage.setItem(HOUSE_POSE_KEY, JSON.stringify(houseState)); } catch {}
+        spawnHouseEntityIfReady();
+        governorRequestRender('pfl-move-house');
+      },
+    };
+    window.__pflMovables.house = houseMovable;
+    window.__pflReloadHouse3d = () => {
+      viewer._pflHouseRev = (viewer._pflHouseRev || 1) + 1;
+      houseGlbAvailable = null;
+      buildYard3dLandmarks();
+    };
+
+    if (houseGlbAvailable === true) {
+      spawnHouseEntityIfReady();
+    } else if (houseGlbAvailable === null) {
+      fetch('/models/pfl-palm-drive-house.glb', { method: 'HEAD', cache: 'no-store' })
+        .then((res) => {
+          const ct = String(res.headers.get('content-type') || '').toLowerCase();
+          houseGlbAvailable = Boolean(res.ok && !ct.includes('text/html'));
+          if (houseGlbAvailable) spawnHouseEntityIfReady();
+        })
+        .catch(() => {
+          houseGlbAvailable = false;
+        });
+    }
   }
   buildYard3dLandmarks();
   window.addEventListener('gev:map-stack-changed', () => setTimeout(buildYard3dLandmarks, 400));
@@ -2516,8 +3047,8 @@ export function loadPflWindowFramework({ viewer }) {
       src: 'back-yard-cam2',
       cctvId: 'pfl-back-yard-cam2',
       label: 'Cam2 Dock (Draped on Bayou & Lawn)',
-      // Starts just north of the back porch (29.24768) and drapes flat (-86° ground skin, 0% drive-in movie billboard!) across the lawn, dock & bayou viewable from ALL 360° angles!
-      lat: 29.247745,
+      // Anchored along the shoreline & dock (29.247775) so grass sits on the south/house side and crisp blue bayou water stretches cleanly across the north dock/water edge!
+      lat: 29.247775,
       lon: -95.231382,
       headingDeg: 7.5,
       pitchDeg: -86,
@@ -2749,14 +3280,100 @@ export function loadPflWindowFramework({ viewer }) {
       if (r.ok) {
         const blob = await r.blob();
         const bmp = await createImageBitmap(blob);
+        // Preserve Paul Prime's dreamlike mirrored Live Oak sphere reflection ONCE (non-blinking!)
+        if (rt.cam.src === 'back-yard-cam2') {
+          for (const cid of ['pfl-oak-west-crown', 'pfl-oak-east-crown']) {
+            const ent = viewer?.entities?.getById?.(cid);
+            if (ent?.ellipsoid && !ent._pflOakTextured) {
+              ent._pflOakTextured = true;
+              const mirrorOakCanvas = document.createElement('canvas');
+              mirrorOakCanvas.width = 960;
+              mirrorOakCanvas.height = 540;
+              const mctx = mirrorOakCanvas.getContext('2d');
+              mctx.filter = 'contrast(1.14) saturate(1.12) brightness(1.03)';
+              mctx.drawImage(bmp, 0, 0, 960, 540);
+              mctx.filter = 'none';
+              ent.ellipsoid.material = new Cesium.ImageMaterialProperty({
+                image: mirrorOakCanvas,
+                color: Cesium.Color.WHITE.withAlpha(0.84),
+                transparent: true,
+              });
+            }
+          }
+        }
+
         // Upload via fresh canvas swap so Cesium Image material updates texture cleanly every tick
         const nextCanvas = document.createElement('canvas');
         nextCanvas.width = 960;
         nextCanvas.height = 540;
         const nctx = nextCanvas.getContext('2d');
-        nctx.filter = 'contrast(1.16) saturate(1.12) brightness(1.03)';
+        nctx.filter = 'contrast(1.16) saturate(1.14) brightness(1.03)';
         nctx.drawImage(bmp, 0, 0, 960, 540);
         nctx.filter = 'none';
+
+        if (rt.cam.src === 'back-yard-cam2') {
+          // 1) Scrub artificial #00ff00 Wyze motion-detection rectangle & stretch crisp blue bayou water across the north/dock upper zone
+          try {
+            const imgData = nctx.getImageData(0, 0, 960, 540);
+            const px = imgData.data;
+            for (let y = 2; y < 538; y++) {
+              const rowOff = y * 960 * 4;
+              for (let x = 2; x < 958; x++) {
+                const i = rowOff + x * 4;
+                const rC = px[i], gC = px[i + 1], bC = px[i + 2];
+                if (gC > 195 && rC < 85 && bC < 85 && gC - Math.max(rC, bC) > 115) {
+                  const up = i - 960 * 4 * 3;
+                  const dn = i + 960 * 4 * 3;
+                  px[i] = (px[up] + px[dn]) >> 1;
+                  px[i + 1] = (px[up + 1] + px[dn + 1]) >> 1;
+                  px[i + 2] = (px[up + 2] + px[dn + 2]) >> 1;
+                }
+              }
+            }
+            nctx.putImageData(imgData, 0, 0);
+          } catch {}
+          // Subtle crisp bayou blue tint over the open water strip (y=0..235) so shoreline & dock blend seamlessly into Chocolate Bayou
+          const waterTint = nctx.createLinearGradient(0, 0, 0, 245);
+          waterTint.addColorStop(0.0, 'rgba(14, 116, 144, 0.52)');
+          waterTint.addColorStop(0.65, 'rgba(2, 132, 199, 0.22)');
+          waterTint.addColorStop(1.0, 'rgba(2, 132, 199, 0.0)');
+          nctx.fillStyle = waterTint;
+          nctx.fillRect(160, 0, 620, 245);
+
+          // 2) Feather out the 2D foreground left & right Live Oak trunks/branches from the flat ground drape so ONLY upright 3D Live Oaks stand in 3D space (zero upside-down 2D trees from Bayou Overlook!)
+          nctx.globalCompositeOperation = 'destination-out';
+          const leftTreeMask = nctx.createLinearGradient(0, 0, 205, 0);
+          leftTreeMask.addColorStop(0.0, 'rgba(0,0,0,1)');
+          leftTreeMask.addColorStop(0.68, 'rgba(0,0,0,0.92)');
+          leftTreeMask.addColorStop(1.0, 'rgba(0,0,0,0)');
+          nctx.fillStyle = leftTreeMask;
+          nctx.fillRect(0, 0, 205, 540);
+
+          const rightTreeMask = nctx.createLinearGradient(715, 0, 960, 0);
+          rightTreeMask.addColorStop(0.0, 'rgba(0,0,0,0)');
+          rightTreeMask.addColorStop(0.32, 'rgba(0,0,0,0.92)');
+          rightTreeMask.addColorStop(1.0, 'rgba(0,0,0,1)');
+          nctx.fillStyle = rightTreeMask;
+          nctx.fillRect(715, 0, 245, 540);
+
+          // Upper-right forked branch overhang mask
+          const forkMask = nctx.createRadialGradient(775, 110, 40, 775, 110, 225);
+          forkMask.addColorStop(0.0, 'rgba(0,0,0,1)');
+          forkMask.addColorStop(0.65, 'rgba(0,0,0,0.85)');
+          forkMask.addColorStop(1.0, 'rgba(0,0,0,0)');
+          nctx.fillStyle = forkMask;
+          nctx.fillRect(540, 0, 420, 320);
+
+          // Opposite reed bank at very top edge (y < 78) so bayou water feathers into map water
+          const topBankMask = nctx.createLinearGradient(0, 0, 0, 92);
+          topBankMask.addColorStop(0.0, 'rgba(0,0,0,1)');
+          topBankMask.addColorStop(0.60, 'rgba(0,0,0,0.85)');
+          topBankMask.addColorStop(1.0, 'rgba(0,0,0,0)');
+          nctx.fillStyle = topBankMask;
+          nctx.fillRect(0, 0, 960, 92);
+          nctx.globalCompositeOperation = 'source-over';
+        }
+
         // Soft vignette alpha feathering around edges so live Wyze pixels blend organically into the satellite map instead of hard rectangular borders!
         nctx.globalCompositeOperation = 'destination-in';
         const gX = nctx.createLinearGradient(0, 0, 960, 0);
@@ -2775,20 +3392,6 @@ export function loadPflWindowFramework({ viewer }) {
         nctx.fillRect(0, 0, 960, 540);
         bmp.close?.();
         rt.material.uniforms.image = nextCanvas;
-        // Also texture the two 3D Backyard Live Oak canopies ONCE with the live Cam2 upper-canopy pixels so the 3D ellipsoids carry live Wyze lighting & color without ever recompiling/blinking!
-        if (rt.cam.src === 'back-yard-cam2') {
-          for (const cid of ['pfl-oak-west-crown', 'pfl-oak-east-crown']) {
-            const ent = viewer?.entities?.getById?.(cid);
-            if (ent?.ellipsoid && !ent._pflOakTextured) {
-              ent._pflOakTextured = true;
-              ent.ellipsoid.material = new Cesium.ImageMaterialProperty({
-                image: nextCanvas,
-                color: Cesium.Color.WHITE.withAlpha(0.82),
-                transparent: true,
-              });
-            }
-          }
-        }
         governorRequestRender('pfl-always3d-frame');
       }
     } catch {}
@@ -2895,6 +3498,7 @@ export function loadPflWindowFramework({ viewer }) {
       clearInterval(alarmPollTimer);
       window.removeEventListener('keydown', wasdKeydownHandler);
       try { viewer?.scene?.canvas?.removeEventListener?.('wheel', altWheelLensHandler, { capture: true }); } catch {}
+      try { viewer?.entities?.removeById?.(GIZMO_ENTITY_ID); } catch {}
       try { for (const id of yardLandmarkIds) viewer?.entities?.removeById?.(id); } catch {}
       try { viewer.scene.primitives.remove(always3dHost); } catch {}
       cancelAnimationFrame(rafId);
