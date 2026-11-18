@@ -487,6 +487,14 @@ function buildFrameEntity(viewer, def, params) {
       : def.id === 'back-yard-cam2-water' && params.stitchedWaterPano
         ? '/yard-frames/back-yard-cam2-stitched-2026-10-26.png'
         : def.image;
+  if (typeof Image !== 'undefined' && typeof imgUrl === 'string') {
+    const pre = new Image();
+    pre.onload = () => {
+      governorRequestRender('yardframe-tex-ready');
+      setTimeout(() => governorRequestRender('yardframe-tex-ready-2'), 120);
+    };
+    pre.src = imgUrl;
+  }
   const matProps = { image: imgUrl };
   if (opacity < 0.99 || params.stitchedPano || params.stitchedWaterPano) {
     matProps.color = Cesium.Color.WHITE.withAlpha(opacity);
