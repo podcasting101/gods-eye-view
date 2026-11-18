@@ -389,6 +389,28 @@ export function pflLocalVaultProxy() {
         return;
       }
 
+
+      // 1d) POST/GET /live-stitch — runs live_stitch_front_yard.py on fresh Cam1 + lowered Wyze V4 frames!
+      if (url.pathname === '/live-stitch') {
+        const scriptPath = path.resolve(process.cwd(), 'scripts', 'live_stitch_front_yard.py');
+        if (req.method === 'POST' && fs.existsSync(scriptPath)) {
+          await new Promise((resolve) => {
+            execFile('python3', [scriptPath], { timeout: 22000 }, () => resolve());
+          });
+        }
+        const panoPath = path.resolve(process.cwd(), 'public', 'yard-frames', 'front-yard-pano-preview.png');
+        const groundPath = path.resolve(process.cwd(), 'public', 'yard-frames', 'front-yard-stitched-live.png');
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            panoUrl: fs.existsSync(panoPath) ? `/yard-frames/front-yard-pano-preview.png?t=${Date.now()}` : null,
+            groundUrl: fs.existsSync(groundPath) ? `/yard-frames/front-yard-stitched-live.png?t=${Date.now()}` : null,
+          }),
+        );
+        return;
+      }
+
       // 2) Live H.264/MP4 stream relay directly from local go2rtc (closes immediately on client disconnect!)
       if (url.pathname.startsWith('/wyze-live/')) {
         const src = path.basename(decodeURIComponent(url.pathname.slice('/wyze-live/'.length)));

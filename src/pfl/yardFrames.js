@@ -462,7 +462,7 @@ function buildFrameEntity(viewer, def, params) {
   const opacity = typeof params.opacity === 'number' ? params.opacity : 1.0;
   const imgUrl =
     def.id === 'yard-overview-20261012' && params.stitchedPano
-      ? '/yard-frames/front-yard-stitched-2026-10-12.png'
+      ? (window.__pflLiveStitchUrl || '/yard-frames/front-yard-stitched-live.png')
       : def.id === 'back-yard-cam2-water' && params.stitchedWaterPano
         ? '/yard-frames/back-yard-cam2-stitched-2026-10-26.png'
         : def.image;
@@ -563,10 +563,10 @@ let viewTiltUnsub = null;
  */
 
 const YARD_FRAMES_VIS_KEY = 'pfl_yard_frames_visible_v1';
-let yardFramesVisible = false;
+let yardFramesVisible = true;
 try {
   const rawVis = typeof localStorage !== 'undefined' ? localStorage.getItem(YARD_FRAMES_VIS_KEY) : null;
-  yardFramesVisible = rawVis === '1';
+  yardFramesVisible = rawVis !== '0';
 } catch {}
 
 export function setYardFramesVisible(viewer, visible) {
@@ -603,6 +603,11 @@ export function loadYardFrames({ viewer }) {
   if (typeof window !== 'undefined') {
     window.__pflSetYardFramesVisible = (v) => setYardFramesVisible(viewer, v);
     window.__pflGetYardFramesVisible = () => yardFramesVisible;
+    window.__pflReloadLiveStitchedYard = (bustUrl) => {
+      window.__pflLiveStitchUrl = bustUrl || ('/yard-frames/front-yard-stitched-live.png?t=' + Date.now());
+      if (!yardFramesVisible) setYardFramesVisible(viewer, true);
+      else rebuildFrame(viewer, 'yard-overview-20261012');
+    };
   }
   if (viewer?.camera?.changed?.addEventListener) {
     let lastPitchDeg = null;

@@ -244,9 +244,12 @@ export function loadPflWindowFramework({ viewer }) {
     extraRow.innerHTML = `
       <button type="button" class="pfl-f15-btn" id="pfl-btn-kalshi-inline" style="border-color:#22c55e;color:#4ade80;font-weight:700">📈 Kalshi Paper Arena (Show / Hide)</button>
       <a href="/kalshi-paper.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-kalshi-tab" style="border-color:#38bdf8;color:#38bdf8;text-decoration:none;display:inline-flex;align-items:center">↗ Full TradingView &amp; Kalshi Tab</a>
-      <button type="button" class="pfl-f15-btn" id="pfl-btn-wyze-patrol" style="border-color:#f97316;color:#fdba74;font-weight:700">🎥 Live Wyze Patrol &amp; Events</button>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-wyze-patrol" style="border-color:#f97316;color:#fdba74;font-weight:700">🎥 Live Wyze Patrol &amp; 4D Scrubber</button>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-balcony-front" style="border-color:#38bdf8;color:#7dd3fc;font-weight:700" title="Lock 3D view onto your 2nd-story Balcony looking across the stitched Front Yard, Neighbor's House &amp; Horizon">🏠 Balcony Front Splat</button>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-flip-backyard" style="border-color:#2dd4bf;color:#5eead4;font-weight:700" title="180° flip over the roof to your Backyard Oaks, Boat Dock &amp; Chocolate Bayou">🔄 Flip 180° Backyard</button>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-live-restitch" style="border-color:#c084fc;color:#e9d5ff" title="Grab fresh frames from Cam1 + V4 right now and rebuild the live stitched ground splat">🧵 Rebuild Live Stitch</button>
       <button type="button" class="pfl-f15-btn active" id="pfl-btn-always3d" style="border-color:#22c55e;color:#4ade80;font-weight:700" title="Keep your Wyze cameras projected in 3D space 24/7 even when CCTV is turned OFF">👁️ Always-On 3D Cams: ON</button>
-      <button type="button" class="pfl-f15-btn" id="pfl-btn-static-yard" title="Show/hide the old static seamed yard photo splat vs live 3D camera feeds">🧩 Static Yard Splat: OFF</button>
+      <button type="button" class="pfl-f15-btn active" id="pfl-btn-static-yard" title="Show/hide the stitched front yard ground splat">🧩 Ground Splat: ON</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-arrange">🖼️ Arrange Yard Photos</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-fire">🔥 Yard Fire &amp; Legs</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-vault-inline" style="border-color:#a855f7;color:#d8b4fe;font-weight:700">🏛️ Local Palace &amp; Wyze Vault</button>
@@ -260,11 +263,72 @@ export function loadPflWindowFramework({ viewer }) {
     const syncStaticBtn = () => {
       const vis = typeof window.__pflGetYardFramesVisible === 'function' ? window.__pflGetYardFramesVisible() : false;
       if (staticYardBtn) {
-        staticYardBtn.textContent = vis ? '🧩 Static Yard Splat: ON' : '🧩 Static Yard Splat: OFF';
+        staticYardBtn.textContent = vis ? '🧩 Ground Splat: ON' : '🧩 Ground Splat: OFF';
         staticYardBtn.classList.toggle('active', vis);
       }
     };
     syncStaticBtn();
+
+    function flyBalconyFront() {
+      try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
+      let base = 0;
+      try {
+        if (viewer.scene?.globe?.show === false) base = -26.19;
+        else {
+          const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(-95.23136, 29.24764));
+          if (Number.isFinite(h)) base = h;
+        }
+      } catch {}
+      // Paul's 2nd-story Balcony vantage looking SSW (198°) across the stitched Front Yard (Cam1+V4), Neighbor's House & Horizon!
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(-95.23134, 29.24782, base + 22.0),
+        orientation: {
+          heading: Cesium.Math.toRadians(198),
+          pitch: Cesium.Math.toRadians(-22),
+          roll: 0,
+        },
+        duration: 1.15,
+      });
+    }
+    function flyBackyard180() {
+      try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
+      let base = 0;
+      try {
+        if (viewer.scene?.globe?.show === false) base = -26.19;
+        else {
+          const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(-95.231385, 29.24764));
+          if (Number.isFinite(h)) base = h;
+        }
+      } catch {}
+      // 180° flip over the house roof looking 7.5° NNE through the two 3D Live Oak trees onto the Boat Dock & Chocolate Bayou!
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(-95.23141, 29.24748, base + 14.5),
+        orientation: {
+          heading: Cesium.Math.toRadians(7.5),
+          pitch: Cesium.Math.toRadians(-22),
+          roll: 0,
+        },
+        duration: 1.15,
+      });
+    }
+    window.__pflFlyBalconyFront = flyBalconyFront;
+    window.__pflFlyBackyard180 = flyBackyard180;
+    extraRow.querySelector('#pfl-btn-balcony-front')?.addEventListener('click', flyBalconyFront);
+    extraRow.querySelector('#pfl-btn-flip-backyard')?.addEventListener('click', flyBackyard180);
+    extraRow.querySelector('#pfl-btn-live-restitch')?.addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget;
+      btn.textContent = '⏳ Stitching Cam1+V4...';
+      try {
+        const r = await fetch('/api/pfl/local-vault/live-stitch', { method: 'POST' });
+        const d = await r.json();
+        if (d.ok && typeof window.__pflReloadLiveStitchedYard === 'function') {
+          window.__pflReloadLiveStitchedYard(d.groundUrl);
+        }
+      } catch {}
+      btn.textContent = '🧵 Rebuild Live Stitch';
+      syncStaticBtn();
+    });
+
     staticYardBtn?.addEventListener('click', () => {
       const cur = typeof window.__pflGetYardFramesVisible === 'function' ? window.__pflGetYardFramesVisible() : false;
       if (typeof window.__pflSetYardFramesVisible === 'function') window.__pflSetYardFramesVisible(!cur);
@@ -753,8 +817,28 @@ export function loadPflWindowFramework({ viewer }) {
       <div id="pfl-always3d-checks" style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 6px;background:rgba(6,78,59,0.32);border:1px solid rgba(34,197,94,0.45);border-radius:6px;margin-bottom:6px;font-size:10.5px"></div>
       <div style="font-weight:700;color:#cbd5e1;font-size:10.5px;margin-bottom:3px">Legacy CCTV Catalog Filter (Optional):</div>
       <div id="pfl-patrol-checks" style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 6px;background:rgba(15,23,42,0.75);border:1px solid #1e293b;border-radius:6px;margin-bottom:6px;font-size:10.5px"></div>
+      <div style="background:rgba(15,23,42,0.88);border:1px solid rgba(251,191,36,0.45);border-radius:7px;padding:6px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px">
+          <span style="font-weight:700;color:#fde047;font-size:10.5px">⏱️ 4D EVENT TIME-SLIDER SCRUBBER</span>
+          <div style="display:flex;gap:4px;align-items:center">
+            <button type="button" class="pfl-std-cbtn" id="pfl-4d-play" style="border-color:#fde047;color:#fde047">▶ Scrub Events</button>
+            <select id="pfl-4d-speed" style="background:#090e18;border:1px solid #475569;color:#fde047;border-radius:4px;font-size:10px;padding:1px 4px">
+              <option value="1">1× (6s/ev)</option>
+              <option value="2" selected>2× (3s/ev)</option>
+              <option value="4">4× (1.5s/ev)</option>
+              <option value="8">8× (0.8s/ev)</option>
+            </select>
+            <button type="button" class="pfl-std-cbtn" id="pfl-4d-director" style="border-color:#38bdf8;color:#38bdf8" title="Automatically pan the 3D view to follow new Person &amp; Vehicle detections">🎯 Auto-Director: OFF</button>
+          </div>
+        </div>
+        <input type="range" id="pfl-4d-slider" min="0" max="0" value="0" style="width:100%;accent-color:#fbbf24;cursor:pointer" />
+        <div id="pfl-4d-readout" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#cbd5e1;display:flex;justify-content:space-between;margin-top:2px">
+          <span>Drag slider to scrub event-to-event in 4D</span>
+          <span id="pfl-4d-idx">0 / 0</span>
+        </div>
+      </div>
       <div style="font-weight:700;color:#fbbf24;margin-bottom:3px">Captured Person &amp; Vehicle Events (Click to Play Clip &amp; Fly to Camera):</div>
-      <div id="pfl-patrol-events" style="max-height:135px;overflow:auto;border:1px solid #1e293b;border-radius:6px;padding:4px;font-size:10.5px">Loading archived Wyze events...</div>
+      <div id="pfl-patrol-events" style="max-height:125px;overflow:auto;border:1px solid #1e293b;border-radius:6px;padding:4px;font-size:10.5px">Loading archived Wyze events...</div>
     </div>
   `;
 
@@ -846,6 +930,103 @@ export function loadPflWindowFramework({ viewer }) {
   }
 
   let patrolSiteFilter = 'liverpool';
+
+  // 4D Event Time-Slider + Auto-Director Engine
+  let chronoEvents = []; // oldest -> newest so scrubbing left->right moves forward in time!
+  let scrubPlaying = false;
+  let autoDirectorOn = false;
+  let lastSeenNewestEventId = null;
+  let scrubTimeout = 0;
+
+  function jumpTo4dEvent(chronoIdx, fly3d = true) {
+    if (!chronoEvents.length) return;
+    const clamped = Math.max(0, Math.min(chronoEvents.length - 1, chronoIdx));
+    const ev = chronoEvents[clamped];
+    const slider = patrolWin.body.querySelector('#pfl-4d-slider');
+    const rd = patrolWin.body.querySelector('#pfl-4d-readout > span:first-child');
+    const idxEl = patrolWin.body.querySelector('#pfl-4d-idx');
+    if (slider) slider.value = String(clamped);
+    if (idxEl) idxEl.textContent = `${clamped + 1} / ${chronoEvents.length}`;
+    const tShort = String(ev.occurredAt || '').replace('T', ' ').slice(0, 19);
+    const badge = (ev.tags || []).join('+');
+    if (rd) rd.textContent = `${tShort} · ${badge} (${ev.camera})`;
+
+    if (ev.videoUrl) {
+      playPatrolStream(ev.camera, `${badge} @ ${tShort.slice(11, 19)}`, ev.videoUrl);
+    } else if (ev.thumbUrl) {
+      const vid = patrolWin.body.querySelector('#pfl-patrol-video');
+      if (vid) vid.poster = ev.thumbUrl;
+    }
+
+    if (fly3d) {
+      if (ev.camera === 'back-yard-cam2') {
+        if (typeof window.__pflFlyBackyard180 === 'function') window.__pflFlyBackyard180();
+      } else if (ev.camera === 'wyze-cam-v4' || ev.camera === 'back-yard-cam1') {
+        if (typeof window.__pflFlyBalconyFront === 'function') window.__pflFlyBalconyFront();
+      } else if (Number.isFinite(ev.lat) && Number.isFinite(ev.lon)) {
+        try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
+        let base = 0;
+        try {
+          if (viewer.scene?.globe?.show === false) base = -26.19;
+          else {
+            const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(ev.lon, ev.lat));
+            if (Number.isFinite(h)) base = h;
+          }
+        } catch {}
+        const hRad = Cesium.Math.toRadians(ev.headingDeg ?? 198);
+        const eyeLat = ev.lat - (Math.cos(hRad) * 16) / 110800;
+        const eyeLon = ev.lon - (Math.sin(hRad) * 16) / (111320 * Math.cos((ev.lat * Math.PI) / 180));
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(eyeLon, eyeLat, base + 14),
+          orientation: { heading: hRad, pitch: Cesium.Math.toRadians(-21), roll: 0 },
+          duration: 0.95,
+        });
+      }
+    }
+  }
+
+  function update4dEventTimeline(descEvents) {
+    chronoEvents = [...(descEvents || [])].reverse();
+    const slider = patrolWin.body.querySelector('#pfl-4d-slider');
+    const idxEl = patrolWin.body.querySelector('#pfl-4d-idx');
+    if (slider) {
+      slider.max = String(Math.max(0, chronoEvents.length - 1));
+      if (!scrubPlaying) slider.value = String(Math.max(0, chronoEvents.length - 1));
+    }
+    if (idxEl) idxEl.textContent = chronoEvents.length ? `${chronoEvents.length} / ${chronoEvents.length}` : '0 / 0';
+    const newest = chronoEvents[chronoEvents.length - 1];
+    if (newest && lastSeenNewestEventId && newest.id !== lastSeenNewestEventId && autoDirectorOn) {
+      jumpTo4dEvent(chronoEvents.length - 1, true);
+    }
+    if (newest) lastSeenNewestEventId = newest.id;
+  }
+
+  function step4dScrub() {
+    if (!scrubPlaying || !chronoEvents.length) return;
+    const slider = patrolWin.body.querySelector('#pfl-4d-slider');
+    const speedSel = patrolWin.body.querySelector('#pfl-4d-speed');
+    const spd = Math.max(1, Number(speedSel?.value || 2));
+    const cur = Number(slider?.value || 0);
+    const next = (cur + 1) % chronoEvents.length;
+    jumpTo4dEvent(next, true);
+    scrubTimeout = window.setTimeout(step4dScrub, Math.round(6000 / spd));
+  }
+
+  patrolWin.body.querySelector('#pfl-4d-slider')?.addEventListener('input', (e) => {
+    jumpTo4dEvent(Number(e.target.value), true);
+  });
+  patrolWin.body.querySelector('#pfl-4d-play')?.addEventListener('click', (e) => {
+    scrubPlaying = !scrubPlaying;
+    e.currentTarget.textContent = scrubPlaying ? '⏸ Pause Scrub' : '▶ Scrub Events';
+    clearTimeout(scrubTimeout);
+    if (scrubPlaying) step4dScrub();
+  });
+  patrolWin.body.querySelector('#pfl-4d-director')?.addEventListener('click', (e) => {
+    autoDirectorOn = !autoDirectorOn;
+    e.currentTarget.textContent = autoDirectorOn ? '🎯 Auto-Director: ON' : '🎯 Auto-Director: OFF';
+    if (autoDirectorOn && chronoEvents.length) jumpTo4dEvent(chronoEvents.length - 1, true);
+  });
+
   async function refreshWyzePatrol(triggerHarvest = false) {
     try {
       const r = await fetch(`/api/pfl/local-vault/wyze-events?site=${encodeURIComponent(patrolSiteFilter)}`, {
@@ -881,6 +1062,7 @@ export function loadPflWindowFramework({ viewer }) {
       const evEl = patrolWin.body.querySelector('#pfl-patrol-events');
       if (evEl) {
         const list = d.events || [];
+        update4dEventTimeline(list);
         syncEventPinsToGlobe(list);
         evEl.innerHTML = list.length
           ? list.map((ev, idx) => {
@@ -1387,6 +1569,7 @@ export function loadPflWindowFramework({ viewer }) {
       clearInterval(timer);
       clearInterval(kalshiPoll);
       clearInterval(patrolCycleTimer);
+      clearTimeout(scrubTimeout);
       clearInterval(always3dTimer);
       try { viewer.scene.primitives.remove(always3dHost); } catch {}
       cancelAnimationFrame(rafId);
