@@ -88,14 +88,14 @@ export const YARD_FRAMES = [
     id: 'bed-station-20261012',
     image: '/yard-frames/bed-station-solar-2026-11-17.jpg',
     // i18n-ignore: Paul's private camera title is source data.
-    title: 'Wyze Bed Cam — Solar-Locked (Feet Due West 270°, Headboard Due East 90°)',
+    title: 'Wyze Bed Cam — Queen Bed on West Bedroom Roof (Headboard East, Feet Due West 270°)',
     takenAt: '2026-11-17 16:49:58 CST',
     camLat: 29.247618,
     camLon: -95.231412,
     camHeightM: 0.32,
-    headingDeg: 90,
+    headingDeg: 60,
     pitchDeg: -5,
-    distanceM: 2.85,
+    distanceM: 2.5,
     fovHDeg: 68,
     fovVDeg: 38,
   },
@@ -195,13 +195,16 @@ const CALIBRATED_HOUSE_SURVEY = {
     camLat: 29.247618,
     camLon: -95.231412,
     camHeightM: 0.32,
-    headingDeg: 90,
+    // Photo space: headboard at upper-right, bed axis (head -> feet) points down-left at ~240° math-angle,
+    // so a heading of 60° rotates the photo clockwise until the feet point Due West (270°) & headboard Due East.
+    headingDeg: 60,
     pitchDeg: -5,
-    distanceM: 2.85,
+    distanceM: 2.5,
     fovHDeg: 68,
     fovVDeg: 38,
     widthScale: 1.0,
     rollDeg: 0,
+    sizeScale: 1.0,
     flat: true,
     texRot: 0,
   },
@@ -318,6 +321,7 @@ function loadSavedLayout() {
         fixedHouseSurveyV3: true,
         fixedRoofGluedNoParallaxV20: true,
         fixedFeetDueWestAndGarageV21: true,
+        fixedBedQueenDueWestV22: true,
         savedAt: new Date().toISOString(),
         frames: { ...CALIBRATED_HOUSE_SURVEY },
       };
@@ -351,6 +355,15 @@ function loadSavedLayout() {
         };
       }
       parsed.fixedFeetDueWestAndGarageV21 = true;
+      parsed.frames = frames;
+      window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
+    }
+    if (parsed && !parsed.fixedBedQueenDueWestV22) {
+      frames['bed-station-20261012'] = {
+        ...(frames['bed-station-20261012'] || {}),
+        ...CALIBRATED_HOUSE_SURVEY['bed-station-20261012'],
+      };
+      parsed.fixedBedQueenDueWestV22 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -398,18 +411,22 @@ export function computeCorners(p, viewer = null) {
     !p.flat && p.viewTiltCompensate && typeof p._viewTiltScale === 'number'
       ? p._viewTiltScale
       : 1;
+  const sizeScale =
+    typeof p.sizeScale === 'number' && p.sizeScale > 0 ? p.sizeScale : 1;
   const w =
-    p.stitchedPano && p.flat
+    sizeScale *
+    (p.stitchedPano && p.flat
       ? 58.82 * (dist / 16.7) * wScale
       : 2 *
         dist *
         Math.tan(toRad((p.fovHDeg || DEFAULT_FOV_H_DEG) / 2)) *
         wScale *
-        (p.stitchedWaterPano ? 1.42 : 1);
+        (p.stitchedWaterPano ? 1.42 : 1));
   const h =
-    p.stitchedPano && p.flat
+    sizeScale *
+    (p.stitchedPano && p.flat
       ? 42.5 * (dist / 16.7)
-      : 2 * dist * Math.tan(toRad((p.fovVDeg || DEFAULT_FOV_V_DEG) / 2)) * tiltFactor;
+      : 2 * dist * Math.tan(toRad((p.fovVDeg || DEFAULT_FOV_V_DEG) / 2)) * tiltFactor);
   let right;
   let up;
   let center;
@@ -597,6 +614,7 @@ function saveLayout() {
         fixedSolarBedV12: true,
         fixedRoofGluedNoParallaxV20: true,
         fixedFeetDueWestAndGarageV21: true,
+        fixedBedQueenDueWestV22: true,
         savedAt: new Date().toISOString(),
         frames,
       }),
@@ -661,6 +679,7 @@ export function loadYardFrames({ viewer }) {
             lon: ctr.lon,
             heading: params.headingDeg || 0,
             lift: ctr.heightM || 0,
+            scale: typeof params.sizeScale === 'number' && params.sizeScale > 0 ? params.sizeScale : 1,
           };
         },
         update: (patch) => {
@@ -669,6 +688,9 @@ export function loadYardFrames({ viewer }) {
           if (typeof patch.lon === 'number') ctr.lon = patch.lon;
           if (typeof patch.lift === 'number') ctr.heightM = patch.lift;
           if (typeof patch.heading === 'number') params.headingDeg = patch.heading;
+          if (typeof patch.scale === 'number' && patch.scale > 0) {
+            params.sizeScale = Math.max(0.4, Math.min(2.5, patch.scale));
+          }
           pinFrameCenterGeo(params, ctr);
           params.hiddenByStitch = false;
           const rebuilt = rebuildFrame(viewer, f.id);
