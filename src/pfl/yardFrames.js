@@ -177,14 +177,13 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'bed-station-20261012': {
     hiddenByStitch: true,
-    // Solar-locked 2026-11-17 16:49:58 CST: Sun @ Az 243.95° WSW, El +6.33° shining in WSW (~248°) bedroom door/blinds (right edge of frame).
-    // In flat ENU, headingDeg=158 aligns +up (headboard) -> 158° SSE, +right (door/blinds) -> 248° WSW (into 244° Sun!), camHeightM=4.15m (stilted 2nd-floor bedroom).
-    camLat: 29.24756,
-    camLon: -95.23142,
-    camHeightM: 4.15,
+    // Grounded inside yellow house bedroom footprint (29.247585, -95.231390) at surface height and hidden outside Arrange mode so it never floats over the yard!
+    camLat: 29.247585,
+    camLon: -95.231390,
+    camHeightM: 0.35,
     headingDeg: 158,
     pitchDeg: -5,
-    distanceM: 2.8,
+    distanceM: 2.4,
     fovHDeg: 68,
     fovVDeg: 38,
     widthScale: 1.0,
@@ -296,7 +295,7 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedYardBoundedPOV_V17) {
+    if (parsed && !parsed.fixedHideFloatingBedSideV18) {
       for (const id of Object.keys(CALIBRATED_HOUSE_SURVEY)) {
         frames[id] = {
           ...(frames[id] || {}),
@@ -307,6 +306,7 @@ function loadSavedLayout() {
       parsed.fixedCleanHomogV15 = true;
       parsed.fixedCrispSurveyV16 = true;
       parsed.fixedYardBoundedPOV_V17 = true;
+      parsed.fixedHideFloatingBedSideV18 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -462,7 +462,7 @@ function buildFrameEntity(viewer, def, params) {
     matProps.transparent = true;
   }
   const polygon = {
-    show: !(def.id === 'back-yard-cam1-plan' && params.hiddenByStitch),
+    show: !Boolean(params.hiddenByStitch),
     hierarchy: new Cesium.PolygonHierarchy(positions),
     material: new Cesium.ImageMaterialProperty(matProps),
     perPositionHeight: true,
