@@ -42,6 +42,15 @@ export const CITY_POIS = {
         buildingHeight: 5,
       },
       {
+        name: 'Bayou North Overlook (52.47N)',
+        lat: 29.247908,
+        lon: -95.231249,
+        alt: 38,
+        pitch: -28,
+        heading: 198,
+        buildingHeight: 2,
+      },
+      {
         name: 'Monaco RV & Tesla Pad',
         lat: 29.24748,
         lon: -95.23127,

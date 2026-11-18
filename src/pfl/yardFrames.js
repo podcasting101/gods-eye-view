@@ -447,7 +447,7 @@ function buildFrameEntity(viewer, def, params) {
   const opacity = typeof params.opacity === 'number' ? params.opacity : 1.0;
   const imgUrl =
     def.id === 'yard-overview-20261012' && params.stitchedPano
-      ? (window.__pflLiveStitchUrl || '/yard-frames/front-yard-stitched-live.png')
+      ? (window.__pflLiveStitchUrl || '/yard-frames/front-yard-stitched-live.png?v=18')
       : def.id === 'back-yard-cam2-water' && params.stitchedWaterPano
         ? '/yard-frames/back-yard-cam2-stitched-2026-10-26.png'
         : def.image;
@@ -606,7 +606,7 @@ export function loadYardFrames({ viewer }) {
     // Oblique balcony composite is physically valid from low/oblique southward viewpoints (pitch > -48°, alt < 52m, heading ~105°..285°).
     // From straight-down overhead views (like ALT 71m / pitch -75°) or looking backwards from the street, hide oblique projection so the map stays 100% unwarped!
     const hdgDiff = Math.abs((((hdgDeg - 194) + 540) % 360) - 180);
-    const validPOV = pitchDeg > -48 && altM < 54 && hdgDiff < 92;
+    const validPOV = pitchDeg > -56 && altM < 92 && hdgDiff < 98;
     yo.entity.show = validPOV;
   }
 

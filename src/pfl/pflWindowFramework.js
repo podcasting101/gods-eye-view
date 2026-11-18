@@ -651,8 +651,13 @@ export function loadPflWindowFramework({ viewer }) {
   });
   walkBar.querySelector('#pfl-go-spot')?.addEventListener('click', () => {
     try {
-      const sp = JSON.parse(localStorage.getItem(SAVED_SPOT_KEY) || 'null');
-      if (!sp) return;
+      const sp = JSON.parse(localStorage.getItem(SAVED_SPOT_KEY) || 'null') || {
+        lon: Cesium.Math.toRadians(-95.231249),
+        lat: Cesium.Math.toRadians(29.247908),
+        height: 44,
+        heading: Cesium.Math.toRadians(198),
+        pitch: Cesium.Math.toRadians(-28),
+      };
       enforceZeroAltitudeKickGuard();
       viewer.camera.flyTo({
         destination: Cesium.Cartesian3.fromRadians(sp.lon, sp.lat, sp.height),
