@@ -219,6 +219,10 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
     });
     await splat.readyPromise;
     signal?.throwIfAborted();
+    splat.show = false; // Hidden by default so legacy Oct-2026 spiky point cloud never warps across live 3D camera views!
+    if (typeof window !== 'undefined') {
+      window.__pflToggleLegacyPointSplat = (v) => { splat.show = typeof v === 'boolean' ? v : !splat.show; return splat.show; };
+    }
     viewer.scene.primitives.add(splat);
     viewer.creditDisplay.addStaticCredit(SPLAT_CREDIT);
     console.info(
