@@ -595,19 +595,19 @@ export function loadYardFrames({ viewer }) {
     };
   }
   function updateViewDependentYardFrame() {
-    if (!yardFramesVisible || arrangeActive) return;
-    const yo = frameState.get('yard-overview-20261012');
-    if (!yo?.entity?.polygon) return;
-    const c = viewer?.camera?.positionCartographic;
-    if (!c) return;
-    const pitchDeg = Cesium.Math.toDegrees(viewer.camera.pitch || 0);
-    const hdgDeg = ((Cesium.Math.toDegrees(viewer.camera.heading || 0) % 360) + 360) % 360;
-    const altM = c.height;
-    // Oblique balcony composite is physically valid from low/oblique southward viewpoints (pitch > -48°, alt < 52m, heading ~105°..285°).
-    // From straight-down overhead views (like ALT 71m / pitch -75°) or looking backwards from the street, hide oblique projection so the map stays 100% unwarped!
-    const hdgDiff = Math.abs((((hdgDeg - 194) + 540) % 360) - 180);
-    const validPOV = pitchDeg > -56 && altM < 92 && hdgDiff < 98;
-    yo.entity.show = validPOV;
+    try {
+      if (!yardFramesVisible || (typeof editor !== 'undefined' && editor?.on)) return;
+      const yo = frameState.get('yard-overview-20261012');
+      if (!yo?.entity?.polygon) return;
+      const c = viewer?.camera?.positionCartographic;
+      if (!c) return;
+      const pitchDeg = Cesium.Math.toDegrees(viewer.camera.pitch || 0);
+      const hdgDeg = ((Cesium.Math.toDegrees(viewer.camera.heading || 0) % 360) + 360) % 360;
+      const altM = c.height;
+      const hdgDiff = Math.abs((((hdgDeg - 194) + 540) % 360) - 180);
+      const validPOV = pitchDeg > -56 && altM < 92 && hdgDiff < 98;
+      yo.entity.show = validPOV;
+    } catch {}
   }
 
   if (viewer?.camera?.changed?.addEventListener) {
