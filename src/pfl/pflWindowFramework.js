@@ -245,6 +245,7 @@ export function loadPflWindowFramework({ viewer }) {
       <button type="button" class="pfl-f15-btn" id="pfl-btn-kalshi-inline" style="border-color:#22c55e;color:#4ade80;font-weight:700">📈 Kalshi Paper Arena (Show / Hide)</button>
       <a href="/kalshi-paper.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-kalshi-tab" style="border-color:#38bdf8;color:#38bdf8;text-decoration:none;display:inline-flex;align-items:center">↗ Full TradingView &amp; Kalshi Tab</a>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-wyze-patrol" style="border-color:#f97316;color:#fdba74;font-weight:700">🎥 Live Wyze Patrol &amp; Events</button>
+      <button type="button" class="pfl-f15-btn active" id="pfl-btn-always3d" style="border-color:#22c55e;color:#4ade80;font-weight:700" title="Keep your Wyze cameras projected in 3D space 24/7 even when CCTV is turned OFF">👁️ Always-On 3D Cams: ON</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-static-yard" title="Show/hide the old static seamed yard photo splat vs live 3D camera feeds">🧩 Static Yard Splat: OFF</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-arrange">🖼️ Arrange Yard Photos</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-fire">🔥 Yard Fire &amp; Legs</button>
@@ -748,7 +749,9 @@ export function loadPflWindowFramework({ viewer }) {
         <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam2" data-fly-lat="29.247640" data-fly-lon="-95.231385" data-fly-hdg="7.5">▶ Cam2 Bayou Dock</button>
         <button type="button" class="pfl-std-cbtn" data-live-src="hd" data-fly-lat="29.24756" data-fly-lon="-95.23136" data-fly-hdg="92" title="Standby until remounted on Monaco">▶ HD (Standby)</button>
       </div>
-      <div style="font-weight:700;color:#cbd5e1;font-size:10.5px;margin-bottom:3px">Active 3D CCTV Rotation Checkboxes (Uncheck Sky/Idle Cams):</div>
+      <div style="font-weight:700;color:#4ade80;font-size:10.5px;margin-bottom:3px">📌 Pin Always-On 3D Yard Projections (Stays ON Even With CCTV OFF!):</div>
+      <div id="pfl-always3d-checks" style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 6px;background:rgba(6,78,59,0.32);border:1px solid rgba(34,197,94,0.45);border-radius:6px;margin-bottom:6px;font-size:10.5px"></div>
+      <div style="font-weight:700;color:#cbd5e1;font-size:10.5px;margin-bottom:3px">Legacy CCTV Catalog Filter (Optional):</div>
       <div id="pfl-patrol-checks" style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 6px;background:rgba(15,23,42,0.75);border:1px solid #1e293b;border-radius:6px;margin-bottom:6px;font-size:10.5px"></div>
       <div style="font-weight:700;color:#fbbf24;margin-bottom:3px">Captured Person &amp; Vehicle Events (Click to Play Clip &amp; Fly to Camera):</div>
       <div id="pfl-patrol-events" style="max-height:135px;overflow:auto;border:1px solid #1e293b;border-radius:6px;padding:4px;font-size:10.5px">Loading archived Wyze events...</div>
@@ -1085,11 +1088,307 @@ export function loadPflWindowFramework({ viewer }) {
   playPatrolStream('wyze-cam-v4', 'Wyze Cam V4 (Front Yard & Driveway)');
   refreshWyzePatrol(false);
 
+
+  // 7) Sovereign Always-On 3D Camera Projections (Independent of Native CCTV Layer!)
+  //    Lets Paul turn Bilawal's single-camera CCTV panel OFF completely while keeping Cam2 Dock, V4 Front, and/or Cam1 RV projected 24/7 in 3D space!
+  const ALWAYS3D_KEY = 'pfl_always3d_cams_v1';
+  const SOVEREIGN_3D_CAMS = [
+    {
+      src: 'back-yard-cam2',
+      cctvId: 'pfl-back-yard-cam2',
+      label: 'Cam2 Dock (Backyard Water)',
+      lat: 29.247640,
+      lon: -95.231385,
+      headingDeg: 7.5,
+      pitchDeg: -56,
+      fovDeg: 103,
+      rangeM: 21.0,
+      mountHeightM: 5.2,
+      defaultOn: true,
+    },
+    {
+      src: 'wyze-cam-v4',
+      cctvId: 'pfl-wyze-cam-v4',
+      label: 'V4 Front Yard',
+      lat: 29.24753,
+      lon: -95.23144,
+      headingDeg: 223,
+      pitchDeg: -46,
+      fovDeg: 103,
+      rangeM: 20.5,
+      mountHeightM: 7.67,
+      defaultOn: true,
+    },
+    {
+      src: 'back-yard-cam1',
+      cctvId: 'pfl-back-yard-cam1',
+      label: 'Cam1 East RV',
+      lat: 29.24751,
+      lon: -95.23130,
+      headingDeg: 172,
+      pitchDeg: -50,
+      fovDeg: 103,
+      rangeM: 17.5,
+      mountHeightM: 6.2,
+      defaultOn: true,
+    },
+    {
+      src: 'hd',
+      cctvId: 'pfl-house-hd-cam',
+      label: 'HD (Monaco Standby)',
+      lat: 29.24756,
+      lon: -95.23136,
+      headingDeg: 92,
+      pitchDeg: -12,
+      fovDeg: 100,
+      rangeM: 18.0,
+      mountHeightM: 3.4,
+      defaultOn: false,
+    },
+  ];
+
+  let always3dMasterOn = true;
+  let always3dSelected = {};
+  try {
+    const raw = JSON.parse(localStorage.getItem(ALWAYS3D_KEY) || 'null');
+    if (raw && typeof raw === 'object') {
+      always3dMasterOn = raw.master !== false;
+      always3dSelected = raw.cams || {};
+    }
+  } catch {}
+  for (const c of SOVEREIGN_3D_CAMS) {
+    if (typeof always3dSelected[c.src] !== 'boolean') always3dSelected[c.src] = c.defaultOn;
+  }
+
+  function saveAlways3dState() {
+    try {
+      localStorage.setItem(ALWAYS3D_KEY, JSON.stringify({ master: always3dMasterOn, cams: always3dSelected }));
+    } catch {}
+  }
+
+  const always3dRuntimes = new Map(); // src -> { prim, outlinePrim, canvas, ctx, busy }
+  const always3dHost = new Cesium.PrimitiveCollection();
+  viewer.scene.primitives.add(always3dHost);
+
+  function computePflQuadPose(cam) {
+    let gBase = -26.19;
+    try {
+      if (viewer.scene?.globe?.show !== false) {
+        const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(cam.lon, cam.lat));
+        if (Number.isFinite(h)) gBase = h;
+      }
+    } catch {}
+    const R = cam.rangeM;
+    const pitch = Cesium.Math.toRadians(cam.pitchDeg);
+    const hFov = Cesium.Math.toRadians(cam.fovDeg);
+    const halfW = R * Math.tan(hFov / 2);
+    const vFov = 2 * Math.atan(Math.tan(hFov / 2) / (16 / 9));
+    const halfH = R * Math.tan(vFov / 2);
+    const horiz = R * Math.cos(pitch);
+    const vert = R * Math.sin(pitch);
+    const upVert = Math.cos(pitch) * halfH;
+    const hdgRad = Cesium.Math.toRadians(cam.headingDeg);
+
+    const mountAlt = gBase + cam.mountHeightM;
+    const dLat = (Math.cos(hdgRad) * horiz) / 110800;
+    const dLon = (Math.sin(hdgRad) * horiz) / (111320 * Math.cos(Cesium.Math.toRadians(cam.lat)));
+    const capLat = cam.lat + dLat;
+    const capLon = cam.lon + dLon;
+    const rawCapAlt = mountAlt + vert;
+    const bottomAlt = rawCapAlt - upVert;
+    const liftM = Math.max(0, gBase + 0.08 - bottomAlt);
+    const capAlt = rawCapAlt + liftM;
+
+    const center = Cesium.Cartesian3.fromDegrees(capLon, capLat, capAlt);
+    const enu = Cesium.Transforms.eastNorthUpToFixedFrame(center);
+    const east = new Cesium.Cartesian3(enu[0], enu[1], enu[2]);
+    const north = new Cesium.Cartesian3(enu[4], enu[5], enu[6]);
+    const up = new Cesium.Cartesian3(enu[8], enu[9], enu[10]);
+
+    // Forward dir along heading & pitch:
+    const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
+    const sinH = Math.sin(hdgRad), cosH = Math.cos(hdgRad);
+    const horizVec = new Cesium.Cartesian3(
+      east.x * sinH + north.x * cosH,
+      east.y * sinH + north.y * cosH,
+      east.z * sinH + north.z * cosH,
+    );
+    const dir = Cesium.Cartesian3.normalize(
+      new Cesium.Cartesian3(
+        horizVec.x * cosP + up.x * sinP,
+        horizVec.y * cosP + up.y * sinP,
+        horizVec.z * cosP + up.z * sinP,
+      ),
+      new Cesium.Cartesian3(),
+    );
+    const rightAxis = Cesium.Cartesian3.normalize(
+      Cesium.Cartesian3.cross(dir, up, new Cesium.Cartesian3()),
+      new Cesium.Cartesian3(),
+    );
+    const upAxis = Cesium.Cartesian3.normalize(
+      Cesium.Cartesian3.cross(rightAxis, dir, new Cesium.Cartesian3()),
+      new Cesium.Cartesian3(),
+    );
+    const faceNormal = Cesium.Cartesian3.negate(dir, new Cesium.Cartesian3());
+    const rotMat = new Cesium.Matrix3(
+      rightAxis.x, upAxis.x, faceNormal.x,
+      rightAxis.y, upAxis.y, faceNormal.y,
+      rightAxis.z, upAxis.z, faceNormal.z,
+    );
+    const quat = Cesium.Quaternion.fromRotationMatrix(rotMat);
+    return Cesium.Matrix4.fromTranslationQuaternionRotationScale(
+      center,
+      quat,
+      new Cesium.Cartesian3(halfW * 2, halfH * 2, 1),
+    );
+  }
+
+  function ensureAlways3dRuntime(cam) {
+    if (always3dRuntimes.has(cam.src)) return always3dRuntimes.get(cam.src);
+    const canvas = document.createElement('canvas');
+    canvas.width = 960;
+    canvas.height = 540;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#041019';
+    ctx.fillRect(0, 0, 960, 540);
+
+    const modelMatrix = computePflQuadPose(cam);
+    const material = Cesium.Material.fromType('Image', {
+      image: canvas,
+      color: Cesium.Color.WHITE.withAlpha(0.96),
+    });
+    const prim = always3dHost.add(
+      new Cesium.Primitive({
+        geometryInstances: new Cesium.GeometryInstance({
+          geometry: new Cesium.PlaneGeometry({
+            vertexFormat: Cesium.MaterialAppearance.MaterialSupport.TEXTURED.vertexFormat,
+          }),
+        }),
+        appearance: new Cesium.MaterialAppearance({
+          material,
+          translucent: true,
+          closed: false,
+          renderState: { cull: { enabled: true } },
+        }),
+        modelMatrix,
+        allowPicking: false,
+        asynchronous: false,
+        show: false,
+      }),
+    );
+    const outlinePrim = always3dHost.add(
+      new Cesium.Primitive({
+        geometryInstances: new Cesium.GeometryInstance({
+          geometry: new Cesium.PlaneOutlineGeometry(),
+          attributes: {
+            color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+              Cesium.Color.fromCssColorString('#4ade80').withAlpha(0.65),
+            ),
+          },
+        }),
+        appearance: new Cesium.PerInstanceColorAppearance({
+          flat: true,
+          translucent: true,
+        }),
+        modelMatrix: Cesium.Matrix4.clone(modelMatrix),
+        allowPicking: false,
+        asynchronous: false,
+        show: false,
+      }),
+    );
+    const rt = { cam, prim, outlinePrim, material, canvas, ctx, busy: false };
+    always3dRuntimes.set(cam.src, rt);
+    return rt;
+  }
+
+  async function pumpAlways3dFrame(rt) {
+    if (rt.busy || !rt.prim.show) return;
+    rt.busy = true;
+    try {
+      const r = await fetch(`/api/cctv/frame/${encodeURIComponent(rt.cam.cctvId)}?ts=${Date.now()}`, { cache: 'no-store' });
+      if (r.ok) {
+        const blob = await r.blob();
+        const bmp = await createImageBitmap(blob);
+        // Upload via fresh canvas swap so Cesium Image material updates texture cleanly every tick
+        const nextCanvas = document.createElement('canvas');
+        nextCanvas.width = 960;
+        nextCanvas.height = 540;
+        nextCanvas.getContext('2d').drawImage(bmp, 0, 0, 960, 540);
+        bmp.close?.();
+        rt.material.uniforms.image = nextCanvas;
+        governorRequestRender('pfl-always3d-frame');
+      }
+    } catch {}
+    rt.busy = false;
+  }
+
+  function syncAlways3dVisibility() {
+    for (const cam of SOVEREIGN_3D_CAMS) {
+      const want = always3dMasterOn && Boolean(always3dSelected[cam.src]);
+      if (!want && !always3dRuntimes.has(cam.src)) continue;
+      const rt = ensureAlways3dRuntime(cam);
+      const m = computePflQuadPose(cam);
+      Cesium.Matrix4.clone(m, rt.prim.modelMatrix);
+      Cesium.Matrix4.clone(m, rt.outlinePrim.modelMatrix);
+      rt.prim.show = want;
+      rt.outlinePrim.show = want;
+      if (want) pumpAlways3dFrame(rt);
+    }
+    const dockBtn = document.getElementById('pfl-btn-always3d');
+    if (dockBtn) {
+      dockBtn.textContent = always3dMasterOn ? '👁️ Always-On 3D Cams: ON' : '👁️ Always-On 3D Cams: OFF';
+      dockBtn.classList.toggle('active', always3dMasterOn);
+    }
+    governorRequestRender('pfl-always3d-vis');
+  }
+
+  const always3dChecksEl = patrolWin.body.querySelector('#pfl-always3d-checks');
+  if (always3dChecksEl) {
+    always3dChecksEl.innerHTML = SOVEREIGN_3D_CAMS.map((c) => `
+      <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;color:#e2e8f0">
+        <input type="checkbox" class="pfl-a3d-chk" value="${c.src}" ${always3dSelected[c.src] ? 'checked' : ''} />
+        <span><strong>${c.label}</strong></span>
+      </label>
+    `).join('');
+    always3dChecksEl.querySelectorAll('.pfl-a3d-chk').forEach((chk) => {
+      chk.addEventListener('change', () => {
+        always3dSelected[chk.value] = chk.checked;
+        saveAlways3dState();
+        syncAlways3dVisibility();
+      });
+    });
+  }
+
+  setTimeout(() => {
+    const dockBtn = document.getElementById('pfl-btn-always3d');
+    dockBtn?.addEventListener('click', () => {
+      always3dMasterOn = !always3dMasterOn;
+      saveAlways3dState();
+      syncAlways3dVisibility();
+    });
+    syncAlways3dVisibility();
+  }, 500);
+
+  // Staggered 2.5s live frame refresh across pinned 3D quads (zero repeater overload, smooth continuous updates!)
+  let a3dRobin = 0;
+  const always3dTimer = setInterval(() => {
+    if (!always3dMasterOn) return;
+    const activeList = SOVEREIGN_3D_CAMS.filter((c) => always3dSelected[c.src]);
+    if (!activeList.length) return;
+    const cam = activeList[a3dRobin % activeList.length];
+    a3dRobin++;
+    const rt = always3dRuntimes.get(cam.src);
+    if (rt && rt.prim.show) pumpAlways3dFrame(rt);
+  }, 2200);
+  window.addEventListener('gev:map-stack-changed', () => setTimeout(syncAlways3dVisibility, 400));
+
   return {
     destroy() {
       clearInterval(timer);
       clearInterval(kalshiPoll);
       clearInterval(patrolCycleTimer);
+      clearInterval(always3dTimer);
+      try { viewer.scene.primitives.remove(always3dHost); } catch {}
       cancelAnimationFrame(rafId);
       pickHandler.destroy();
       for (const el of createdEls) el.remove();
