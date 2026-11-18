@@ -171,7 +171,10 @@ export function flyToLandmark(viewer, lat, lon, options = {}) {
           guardCameraAboveGround(
             viewer,
             { lat, lon },
-            { isStale: () => generation !== arrivalGeneration },
+            {
+              clearanceM: framingRange < 150 ? 0.5 : undefined,
+              isStale: () => generation !== arrivalGeneration,
+            },
           );
         } catch {
           /* best-effort */

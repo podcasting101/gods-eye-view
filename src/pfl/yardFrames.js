@@ -130,23 +130,23 @@ const CALIBRATED_HOUSE_SURVEY = {
     hiddenByStitch: true,
   },
   'yard-overview-20261012': {
-    // Calibrated directly to Paul's See-Thru alignment in 28748c3f.jpg:
-    // House across the way sits on top of itself, neighbor's culvert & driveway match Palm Drive,
-    // telephone pole & little yellow pump house sit in place, and Monaco RV sits on the original driveway pad.
-    camLat: 29.247315,
-    camLon: -95.231524,
-    camHeightM: 0.45,
-    headingDeg: 198,
+    // Strictly bounded inside Paul's Lots 23 & 24 NORTH of Palm Drive (26m E-W x 17m N-S):
+    // Cropped at Palm Drive curb (zero neighbor yard / floodlight spillover!) + View-Dependent Balcony POV weighting!
+    camLat: 29.247488,
+    camLon: -95.231372,
+    camHeightM: 0.22,
+    headingDeg: 192,
     pitchDeg: -18,
-    distanceM: 17.5,
-    widthScale: 0.88,
-    rollDeg: 5,
+    distanceM: 6.8,
+    widthScale: 0.86,
+    rollDeg: 2,
     flat: true,
     texRot: 0,
     stitchedPano: true,
     viewTiltCompensate: true,
   },
   'house-side-20261012': {
+    hiddenByStitch: true,
     // Between yellow house W wall and Beaver solar arch, looking NNW (348°) toward back yard & bayou
     // Kept compact at ground level alongside the W wall so it never pokes through Yard Overview
     camLat: 29.24758,
@@ -161,6 +161,7 @@ const CALIBRATED_HOUSE_SURVEY = {
     texRot: 0,
   },
   'back-yard-cam2-water': {
+    hiddenByStitch: true,
     // Positioned cleanly under the two 3D backyard Live Oak trees along the shoreline & dock (never floating out in the bayou)
     camLat: 29.24774,
     camLon: -95.231385,
@@ -175,6 +176,7 @@ const CALIBRATED_HOUSE_SURVEY = {
     stitchedWaterPano: true,
   },
   'bed-station-20261012': {
+    hiddenByStitch: true,
     // Solar-locked 2026-11-17 16:49:58 CST: Sun @ Az 243.95° WSW, El +6.33° shining in WSW (~248°) bedroom door/blinds (right edge of frame).
     // In flat ENU, headingDeg=158 aligns +up (headboard) -> 158° SSE, +right (door/blinds) -> 248° WSW (into 244° Sun!), camHeightM=4.15m (stilted 2nd-floor bedroom).
     camLat: 29.24756,
@@ -294,7 +296,7 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedCleanHomogV14) {
+    if (parsed && !parsed.fixedYardBoundedPOV_V17) {
       for (const id of Object.keys(CALIBRATED_HOUSE_SURVEY)) {
         frames[id] = {
           ...(frames[id] || {}),
@@ -302,7 +304,9 @@ function loadSavedLayout() {
         };
       }
       parsed.fixedSolarBedV12 = true;
-      parsed.fixedCleanHomogV14 = true;
+      parsed.fixedCleanHomogV15 = true;
+      parsed.fixedCrispSurveyV16 = true;
+      parsed.fixedYardBoundedPOV_V17 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -331,7 +335,7 @@ export function activeYardDatumM(viewer, lon, lat) {
   return STORED_GROUND_HEIGHT_M;
 }
 
-function computeCorners(p, viewer = null) {
+export function computeCorners(p, viewer = null) {
   const baseDatum = activeYardDatumM(viewer, p.camLon, p.camLat);
   const anchor = Cesium.Cartesian3.fromDegrees(
     p.camLon,
@@ -355,7 +359,7 @@ function computeCorners(p, viewer = null) {
         (p.stitchedWaterPano ? 1.42 : 1);
   const h =
     p.stitchedPano && p.flat
-      ? 70.54 * (dist / 16.7)
+      ? 42.5 * (dist / 16.7)
       : 2 * dist * Math.tan(toRad((p.fovVDeg || DEFAULT_FOV_V_DEG) / 2)) * tiltFactor;
   let right;
   let up;
@@ -590,9 +594,27 @@ export function loadYardFrames({ viewer }) {
       else rebuildFrame(viewer, 'yard-overview-20261012');
     };
   }
+  function updateViewDependentYardFrame() {
+    if (!yardFramesVisible || arrangeActive) return;
+    const yo = frameState.get('yard-overview-20261012');
+    if (!yo?.entity?.polygon) return;
+    const c = viewer?.camera?.positionCartographic;
+    if (!c) return;
+    const pitchDeg = Cesium.Math.toDegrees(viewer.camera.pitch || 0);
+    const hdgDeg = ((Cesium.Math.toDegrees(viewer.camera.heading || 0) % 360) + 360) % 360;
+    const altM = c.height;
+    // Oblique balcony composite is physically valid from low/oblique southward viewpoints (pitch > -48°, alt < 52m, heading ~105°..285°).
+    // From straight-down overhead views (like ALT 71m / pitch -75°) or looking backwards from the street, hide oblique projection so the map stays 100% unwarped!
+    const hdgDiff = Math.abs((((hdgDeg - 194) + 540) % 360) - 180);
+    const validPOV = pitchDeg > -48 && altM < 54 && hdgDiff < 92;
+    yo.entity.show = validPOV;
+  }
+
   if (viewer?.camera?.changed?.addEventListener) {
     let lastPitchDeg = null;
+    setTimeout(updateViewDependentYardFrame, 120);
     viewTiltUnsub = viewer.camera.changed.addEventListener(() => {
+      updateViewDependentYardFrame();
       const pitchRad = viewer.camera.pitch;
       const pitchDeg = Math.abs(Cesium.Math.toDegrees(pitchRad));
       if (lastPitchDeg !== null && Math.abs(pitchDeg - lastPitchDeg) < 1.2) return;

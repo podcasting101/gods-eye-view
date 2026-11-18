@@ -88,9 +88,13 @@ export function createNavigation({
       return CCTV_FOCUS_RESULT.TRACKING_HOLDS_VIEW;
     }
     const { camera } = record;
-    const range = Math.max(280, camera.rangeM * 1.18);
+    const isLocalYard = camera.source === 'pfl-go2rtc-local';
+    const range = Math.max(isLocalYard ? 22 : 280, camera.rangeM * 1.18);
     cameraOf(viewer).flyToBounds(
-      { center: record.position, radius: Math.max(40, camera.rangeM * 0.36) },
+      {
+        center: record.position,
+        radius: Math.max(isLocalYard ? 6 : 40, camera.rangeM * 0.36),
+      },
       {
         offset: {
           heading: parts.model.toRad(camera.headingDeg),

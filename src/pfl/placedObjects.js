@@ -112,7 +112,12 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
   signal?.throwIfAborted();
 
   const { lat, lon } = FRONT_YARD;
-  const groundHeight = STORED_GROUND_HEIGHT_M + PLACEMENT_LIFT_M;
+  let baseGrade = STORED_GROUND_HEIGHT_M;
+  if (viewer?.scene?.globe?.show) {
+    const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
+    baseGrade = Number.isFinite(gh) ? gh : 0.0;
+  }
+  const groundHeight = baseGrade + PLACEMENT_LIFT_M;
   console.info(
     `[PlacedObjects] front-yard ground height: ${groundHeight.toFixed(2)} m`,
   );

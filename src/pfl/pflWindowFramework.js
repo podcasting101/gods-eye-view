@@ -527,7 +527,7 @@ export function loadPflWindowFramework({ viewer }) {
       if (Math.hypot(mx - t.sx, my - t.sy) <= 12) {
         const c = viewer.camera.positionCartographic;
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, Math.max(15, c.height)),
+          destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, c.height),
           orientation: {
             heading: Cesium.Math.toRadians(t.snapH),
             pitch: Cesium.Math.toRadians(t.snapP),
@@ -540,7 +540,140 @@ export function loadPflWindowFramework({ viewer }) {
     }
   });
 
-  const timer = setInterval(paintGlobe, 350);
+  // Add Vertical Elevator (Up/Down without backing through photos) + Walk Steps + Save/Undo Spot in 3D Compass Box:
+  const walkBar = document.createElement('div');
+  walkBar.style.cssText = 'margin-top:6px;padding-top:6px;border-top:1px solid rgba(56,189,248,0.25);display:flex;flex-direction:column;gap:4px';
+  walkBar.innerHTML = `
+    <div style="display:flex;gap:3px;flex-wrap:wrap">
+      <button type="button" class="pfl-std-cbtn" data-pfl-elev="+2" title="Raise camera straight UP +2m without moving forward/back">⬆️ Up +2m</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-elev="-2" title="Lower camera straight DOWN -2m without pushing through photos">⬇️ Down -2m</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-elev="eye" title="Drop straight to 1.8m walking eye level at this exact spot">👁️ Eye 1.8m</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-elev="balcony" title="Set height to 6.2m balcony level">🏠 6.2m</button>
+    </div>
+    <div style="display:flex;gap:3px;flex-wrap:wrap">
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="fwd">⬆️ Step Fwd</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="back">⬇️ Back</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="left">⬅️ Left</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="right">➡️ Right</button>
+      <button type="button" class="pfl-std-cbtn" id="pfl-wasd-toggle" title="Walk horizontally at constant altitude with WASD">🚶 WASD: OFF</button>
+    </div>
+    <div style="display:flex;gap:3px;flex-wrap:wrap">
+      <button type="button" class="pfl-std-cbtn" id="pfl-save-spot" title="Bookmark this exact camera position & angle">📌 Save Spot</button>
+      <button type="button" class="pfl-std-cbtn" id="pfl-go-spot" title="Return to your saved spot">🎯 Go Spot</button>
+      <button type="button" class="pfl-std-cbtn" id="pfl-undo-jump" title="Undo accidental sky ejection">⏪ Undo Jump</button>
+    </div>
+  `;
+  compassWin.body.appendChild(walkBar);
+
+  function stepHorizontal(fwdM, rightM) {
+    const c = viewer.camera.positionCartographic;
+    if (!c) return;
+    enforceZeroAltitudeKickGuard();
+    const hdg = viewer.camera.heading || 0;
+    const eastM = Math.sin(hdg) * fwdM + Math.cos(hdg) * rightM;
+    const northM = Math.cos(hdg) * fwdM - Math.sin(hdg) * rightM;
+    const newLat = Cesium.Math.toDegrees(c.latitude) + northM / 111320;
+    const newLon = Cesium.Math.toDegrees(c.longitude) + eastM / (111320 * Math.cos(c.latitude));
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(newLon, newLat, c.height),
+      orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
+    });
+    governorRequestRender('pfl-walk-step');
+  }
+
+  walkBar.querySelectorAll('[data-pfl-elev]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const c = viewer.camera.positionCartographic;
+      if (!c) return;
+      enforceZeroAltitudeKickGuard();
+      const mode = btn.getAttribute('data-pfl-elev');
+      let gBase = 0;
+      try {
+        if (viewer.scene?.globe?.show !== false) {
+          const gh = viewer.scene.globe.getHeight(c);
+          if (Number.isFinite(gh)) gBase = gh;
+        } else {
+          gBase = -26.19;
+        }
+      } catch {}
+      const nextH =
+        mode === 'eye' ? gBase + 1.8 :
+        mode === 'balcony' ? gBase + 6.2 :
+        Math.max(gBase + 0.4, c.height + Number(mode));
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, nextH),
+        orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
+      });
+      governorRequestRender('pfl-elev-step');
+    });
+  });
+
+  walkBar.querySelectorAll('[data-pfl-step]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const dir = btn.getAttribute('data-pfl-step');
+      if (dir === 'fwd') stepHorizontal(2.5, 0);
+      else if (dir === 'back') stepHorizontal(-2.5, 0);
+      else if (dir === 'left') stepHorizontal(0, -2.5);
+      else if (dir === 'right') stepHorizontal(0, 2.5);
+    });
+  });
+
+  let wasdWalkOn = false;
+  const wasdBtn = walkBar.querySelector('#pfl-wasd-toggle');
+  wasdBtn?.addEventListener('click', () => {
+    wasdWalkOn = !wasdWalkOn;
+    wasdBtn.textContent = wasdWalkOn ? '🚶 WASD: ON' : '🚶 WASD: OFF';
+    wasdBtn.style.borderColor = wasdWalkOn ? '#4ade80' : '';
+  });
+  window.addEventListener('keydown', (e) => {
+    if (!wasdWalkOn) return;
+    const tag = (e.target?.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    const k = e.key.toLowerCase();
+    if (k === 'w') { e.preventDefault(); stepHorizontal(2.0, 0); }
+    else if (k === 's') { e.preventDefault(); stepHorizontal(-2.0, 0); }
+    else if (k === 'a') { e.preventDefault(); stepHorizontal(0, -2.0); }
+    else if (k === 'd') { e.preventDefault(); stepHorizontal(0, 2.0); }
+    else if (k === 'e') { e.preventDefault(); walkBar.querySelector('[data-pfl-elev="+2"]')?.click(); }
+    else if (k === 'q') { e.preventDefault(); walkBar.querySelector('[data-pfl-elev="-2"]')?.click(); }
+  });
+
+  const SAVED_SPOT_KEY = 'pfl_saved_sweet_spot_v1';
+  walkBar.querySelector('#pfl-save-spot')?.addEventListener('click', (e) => {
+    const c = viewer.camera.positionCartographic;
+    if (!c) return;
+    localStorage.setItem(SAVED_SPOT_KEY, JSON.stringify({
+      lon: c.longitude, lat: c.latitude, height: c.height,
+      heading: viewer.camera.heading, pitch: viewer.camera.pitch,
+    }));
+    e.currentTarget.textContent = '✅ Saved!';
+    setTimeout(() => { e.currentTarget.textContent = '📌 Save Spot'; }, 1200);
+  });
+  walkBar.querySelector('#pfl-go-spot')?.addEventListener('click', () => {
+    try {
+      const sp = JSON.parse(localStorage.getItem(SAVED_SPOT_KEY) || 'null');
+      if (!sp) return;
+      enforceZeroAltitudeKickGuard();
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromRadians(sp.lon, sp.lat, sp.height),
+        orientation: { heading: sp.heading, pitch: sp.pitch, roll: 0 },
+        duration: 0.8,
+      });
+    } catch {}
+  });
+  walkBar.querySelector('#pfl-undo-jump')?.addEventListener('click', () => {
+    if (!lastSafeYardPose) return;
+    enforceZeroAltitudeKickGuard();
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromRadians(lastSafeYardPose.lon, lastSafeYardPose.lat, lastSafeYardPose.height),
+      orientation: { heading: lastSafeYardPose.heading, pitch: lastSafeYardPose.pitch, roll: 0 },
+    });
+  });
+
+  const timer = setInterval(() => {
+    paintGlobe();
+    syncAlways3dVisibility();
+  }, 350);
 
   // 3) Movable / Sizable Embedded Kalshi & Schwab Paper-Trading Box (Live Server Ledger + Weather Contracts)
   const kalshiWin = createStandardBox({
@@ -1310,58 +1443,94 @@ export function loadPflWindowFramework({ viewer }) {
 
   // 7) Sovereign Always-On 3D Camera Projections (Independent of Native CCTV Layer!)
   //    Lets Paul turn Bilawal's single-camera CCTV panel OFF completely while keeping Cam2 Dock, V4 Front, and/or Cam1 RV projected 24/7 in 3D space!
-  const ALWAYS3D_KEY = 'pfl_always3d_cams_v1';
+  // Zero-Altitude-Bounce Guard near Liverpool & Bird Pond: never kick Paul back into the sky!
+  let lastSafeYardPose = null;
+  function enforceZeroAltitudeKickGuard() {
+    try {
+      const ctrl = viewer?.scene?.screenSpaceCameraController;
+      const c = viewer?.camera?.positionCartographic;
+      if (!ctrl || !c) return;
+      const lat = Cesium.Math.toDegrees(c.latitude);
+      const lon = Cesium.Math.toDegrees(c.longitude);
+      const nearYard =
+        Math.hypot(lat - 29.24755, lon - -95.23140) < 0.02 ||
+        Math.hypot(lat - 29.13910, lon - -95.80480) < 0.02;
+      if (nearYard) {
+        ctrl.enableCollisionDetection = false;
+        ctrl.minimumZoomDistance = 0.25;
+        if (c.height < 180) {
+          lastSafeYardPose = {
+            lon: c.longitude,
+            lat: c.latitude,
+            height: c.height,
+            heading: viewer.camera.heading,
+            pitch: viewer.camera.pitch,
+            roll: viewer.camera.roll,
+          };
+        }
+      }
+    } catch {}
+  }
+  enforceZeroAltitudeKickGuard();
+
+  const ALWAYS3D_KEY = 'pfl_always3d_cams_v3';
   const SOVEREIGN_3D_CAMS = [
     {
       src: 'back-yard-cam2',
       cctvId: 'pfl-back-yard-cam2',
-      label: 'Cam2 Dock (Backyard Water)',
-      lat: 29.247640,
+      label: 'Cam2 Dock (Draped on Bayou & Lawn)',
+      // Starts just north of the back porch (29.24768) and drapes flat (-86° ground skin, 0% drive-in movie billboard!) across the lawn, dock & bayou viewable from ALL 360° angles!
+      lat: 29.247775,
       lon: -95.231385,
       headingDeg: 7.5,
-      pitchDeg: -56,
-      fovDeg: 103,
-      rangeM: 21.0,
-      mountHeightM: 5.2,
+      pitchDeg: -86,
+      fovDeg: 96,
+      rangeM: 13.5,
+      mountHeightM: 0.35,
+      groundDrape: true,
       defaultOn: true,
     },
     {
       src: 'wyze-cam-v4',
       cctvId: 'pfl-wyze-cam-v4',
-      label: 'V4 Front Yard',
-      lat: 29.24753,
-      lon: -95.23144,
-      headingDeg: 223,
-      pitchDeg: -46,
-      fovDeg: 103,
-      rangeM: 20.5,
-      mountHeightM: 7.67,
-      defaultOn: true,
+      label: 'V4 Front Yard (Ground Drape)',
+      lat: 29.247415,
+      lon: -95.231525,
+      headingDeg: 215,
+      pitchDeg: -86,
+      fovDeg: 98,
+      rangeM: 15.5,
+      mountHeightM: 0.32,
+      groundDrape: true,
+      defaultOn: false, // Merged live ground splat covers V4+Cam1 seamlessly; check anytime for raw live drape!
     },
     {
       src: 'back-yard-cam1',
       cctvId: 'pfl-back-yard-cam1',
-      label: 'Cam1 East RV',
-      lat: 29.24751,
-      lon: -95.23130,
-      headingDeg: 172,
-      pitchDeg: -50,
-      fovDeg: 103,
-      rangeM: 17.5,
-      mountHeightM: 6.2,
-      defaultOn: true,
+      label: 'Cam1 East RV (Ground Drape)',
+      lat: 29.247435,
+      lon: -95.231275,
+      headingDeg: 175,
+      pitchDeg: -86,
+      fovDeg: 96,
+      rangeM: 13.0,
+      mountHeightM: 0.34,
+      groundDrape: true,
+      defaultOn: false,
     },
     {
       src: 'hd',
       cctvId: 'pfl-house-hd-cam',
-      label: 'HD Monaco & Lamp (~70W)',
-      lat: 29.247485,
-      lon: -95.231355,
+      label: 'HD Monaco RV & ~70W Lamp (View-Locked)',
+      lat: 29.247515,
+      lon: -95.231315,
       headingDeg: 108,
-      pitchDeg: -18,
-      fovDeg: 100,
-      rangeM: 16.5,
+      pitchDeg: -26,
+      fovDeg: 92,
+      rangeM: 8.2,
       mountHeightM: 3.1,
+      groundDrape: false,
+      viewDependent: true,
       defaultOn: true,
     },
   ];
@@ -1408,6 +1577,21 @@ export function loadPflWindowFramework({ viewer }) {
     const upVert = Math.cos(pitch) * halfH;
     const hdgRad = Cesium.Math.toRadians(cam.headingDeg);
 
+    if (cam.groundDrape) {
+      const center = Cesium.Cartesian3.fromDegrees(cam.lon, cam.lat, gBase + cam.mountHeightM);
+      const hpr = new Cesium.HeadingPitchRoll(hdgRad, 0, 0);
+      // In Cesium ENU, PlaneGeometry lies in local X-Y (+X East, +Y North, +Z Up). Rotating around Z by `-hdgRad` aligns +Y (top of image) with `headingDeg` and +X (right of image) with `headingDeg + 90°`!
+      const enu = Cesium.Transforms.eastNorthUpToFixedFrame(center);
+      const rotZ = Cesium.Matrix3.fromRotationZ(-hdgRad);
+      const worldRot = Cesium.Matrix4.getMatrix3(enu, new Cesium.Matrix3());
+      Cesium.Matrix3.multiply(worldRot, rotZ, worldRot);
+      const quat = Cesium.Quaternion.fromRotationMatrix(worldRot);
+      return Cesium.Matrix4.fromTranslationQuaternionRotationScale(
+        center,
+        quat,
+        new Cesium.Cartesian3(halfW * 1.65, halfH * 2.15, 1),
+      );
+    }
     const mountAlt = gBase + cam.mountHeightM;
     const dLat = (Math.cos(hdgRad) * horiz) / 110800;
     const dLon = (Math.sin(hdgRad) * horiz) / (111320 * Math.cos(Cesium.Math.toRadians(cam.lat)));
@@ -1532,25 +1716,86 @@ export function loadPflWindowFramework({ viewer }) {
         const nextCanvas = document.createElement('canvas');
         nextCanvas.width = 960;
         nextCanvas.height = 540;
-        nextCanvas.getContext('2d').drawImage(bmp, 0, 0, 960, 540);
+        const nctx = nextCanvas.getContext('2d');
+        nctx.filter = 'contrast(1.16) saturate(1.12) brightness(1.03)';
+        nctx.drawImage(bmp, 0, 0, 960, 540);
+        nctx.filter = 'none';
+        // Soft vignette alpha feathering around edges so live Wyze pixels blend organically into the satellite map instead of hard rectangular borders!
+        nctx.globalCompositeOperation = 'destination-in';
+        const gX = nctx.createLinearGradient(0, 0, 960, 0);
+        gX.addColorStop(0, 'rgba(0,0,0,0)');
+        gX.addColorStop(0.06, 'rgba(0,0,0,1)');
+        gX.addColorStop(0.94, 'rgba(0,0,0,1)');
+        gX.addColorStop(1, 'rgba(0,0,0,0)');
+        nctx.fillStyle = gX;
+        nctx.fillRect(0, 0, 960, 540);
+        const gY = nctx.createLinearGradient(0, 0, 0, 540);
+        gY.addColorStop(0, 'rgba(0,0,0,0)');
+        gY.addColorStop(0.08, 'rgba(0,0,0,1)');
+        gY.addColorStop(0.93, 'rgba(0,0,0,1)');
+        gY.addColorStop(1, 'rgba(0,0,0,0)');
+        nctx.fillStyle = gY;
+        nctx.fillRect(0, 0, 960, 540);
         bmp.close?.();
         rt.material.uniforms.image = nextCanvas;
+        // Also texture the two 3D Backyard Live Oak canopies with the live Cam2 upper-canopy pixels so the 3D ellipsoids carry live Wyze lighting & color from all 360°!
+        if (rt.cam.src === 'back-yard-cam2') {
+          for (const cid of ['pfl-oak-west-crown', 'pfl-oak-east-crown']) {
+            const ent = viewer?.entities?.getById?.(cid);
+            if (ent?.ellipsoid) {
+              ent.ellipsoid.material = new Cesium.ImageMaterialProperty({
+                image: nextCanvas,
+                color: Cesium.Color.WHITE.withAlpha(0.82),
+                transparent: true,
+              });
+            }
+          }
+        }
         governorRequestRender('pfl-always3d-frame');
       }
     } catch {}
     rt.busy = false;
   }
 
+  function viewAngleWeight(cam) {
+    if (!cam.viewDependent || cam.groundDrape) return 0.96;
+    try {
+      const c = viewer?.camera?.positionCartographic;
+      if (!c || c.height > 85) return 0;
+      const eyeH = viewer.camera.heading || 0;
+      const eyeP = viewer.camera.pitch || 0;
+      const camH = Cesium.Math.toRadians(cam.headingDeg || 0);
+      const camP = Cesium.Math.toRadians(cam.pitchDeg || -22);
+      const vx = Math.sin(eyeH) * Math.cos(eyeP);
+      const vy = Math.cos(eyeH) * Math.cos(eyeP);
+      const vz = Math.sin(eyeP);
+      const cx = Math.sin(camH) * Math.cos(camP);
+      const cy = Math.cos(camH) * Math.cos(camP);
+      const cz = Math.sin(camP);
+      const dot = vx * cx + vy * cy + vz * cz;
+      if (dot < 0.72) return 0;
+      return Math.min(0.96, Math.pow((dot - 0.72) / 0.28, 1.35) * 0.96);
+    } catch {
+      return 0.92;
+    }
+  }
+
   function syncAlways3dVisibility() {
+    enforceZeroAltitudeKickGuard();
     for (const cam of SOVEREIGN_3D_CAMS) {
-      const want = always3dMasterOn && Boolean(always3dSelected[cam.src]);
-      if (!want && !always3dRuntimes.has(cam.src)) continue;
+      const baseWant = always3dMasterOn && Boolean(always3dSelected[cam.src]);
+      if (!baseWant && !always3dRuntimes.has(cam.src)) continue;
       const rt = ensureAlways3dRuntime(cam);
+      const alpha = baseWant ? viewAngleWeight(cam) : 0;
+      const want = baseWant && alpha > 0.04;
       const m = computePflQuadPose(cam);
       Cesium.Matrix4.clone(m, rt.prim.modelMatrix);
       Cesium.Matrix4.clone(m, rt.outlinePrim.modelMatrix);
+      if (rt.material?.uniforms?.color) {
+        rt.material.uniforms.color = Cesium.Color.WHITE.withAlpha(alpha);
+      }
       rt.prim.show = want;
-      rt.outlinePrim.show = want;
+      rt.outlinePrim.show = want && !cam.groundDrape;
       if (want) pumpAlways3dFrame(rt);
     }
     const dockBtn = document.getElementById('pfl-btn-always3d');

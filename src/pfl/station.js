@@ -30,12 +30,24 @@ export function sovereignAnchorHeight() {
   );
 }
 
+function resolveAnchorGroundM(viewer) {
+  if (viewer?.scene?.globe?.show) {
+    const gh = viewer.scene.globe.getHeight(
+      Cesium.Cartographic.fromDegrees(SOVEREIGN_ANCHOR.longitude, SOVEREIGN_ANCHOR.latitude),
+    );
+    return Number.isFinite(gh) ? gh : 0.0;
+  }
+  return STORED_GROUND_HEIGHT_M;
+}
+
 function addSovereignAnchor(viewer) {
-  const position = Cesium.Cartesian3.fromDegrees(
-    SOVEREIGN_ANCHOR.longitude,
-    SOVEREIGN_ANCHOR.latitude,
-    sovereignAnchorHeight(),
-  );
+  const computePos = () =>
+    Cesium.Cartesian3.fromDegrees(
+      SOVEREIGN_ANCHOR.longitude,
+      SOVEREIGN_ANCHOR.latitude,
+      resolveAnchorGroundM(viewer) + PLACEMENT_LIFT_M + SOVEREIGN_ANCHOR.modelOriginLiftM,
+    );
+  const position = computePos();
   const orientation = Cesium.Transforms.headingPitchRollQuaternion(
     position,
     new Cesium.HeadingPitchRoll(0, 0, 0),
@@ -114,6 +126,21 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
   try {
     try {
       anchor = addSovereignAnchor(viewer);
+      if (typeof window !== 'undefined' && anchor) {
+        window.addEventListener('gev:map-stack-changed', () => {
+          setTimeout(() => {
+            if (!anchor || destroyed) return;
+            const p = Cesium.Cartesian3.fromDegrees(
+              SOVEREIGN_ANCHOR.longitude,
+              SOVEREIGN_ANCHOR.latitude,
+              resolveAnchorGroundM(viewer) + PLACEMENT_LIFT_M + SOVEREIGN_ANCHOR.modelOriginLiftM,
+            );
+            anchor.position = p;
+            anchor.orientation = Cesium.Transforms.headingPitchRollQuaternion(p, new Cesium.HeadingPitchRoll(0, 0, 0));
+            governorRequestRender('lisa-muse-datum-sync');
+          }, 400);
+        });
+      }
     } catch (error) {
       rethrowAbort(signal, error);
       console.warn('[PFL Station] Sovereign Anchor unavailable:', error);
