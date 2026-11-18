@@ -57,25 +57,6 @@
     "license": "Sovereign Operator Feed (Paul Prime)"
   },
   {
-    "id": "pfl-front-yard-cam",
-    "name": "PFL Wyze Front Yard Cam \u2014 Palm Dr Approach (LIVE)",
-    "city": "Liverpool, TX",
-    "cityId": "pfl-liverpool",
-    "provider": "Project Free Life Sovereign Wyze Node (go2rtc)",
-    "lat": 29.24748,
-    "lon": -95.2315,
-    "headingDeg": 210,
-    "pitchDeg": -15,
-    "fovDeg": 100,
-    "mountHeightM": 4.5,
-    "frameRefreshMs": 15000,
-    "feedType": "image",
-    "sourceKind": "pfl-go2rtc-local",
-    "url": "http://127.0.0.1:1984/api/frame.jpeg?src=front-yard-cam",
-    "snapshotUrl": "http://127.0.0.1:1984/api/frame.jpeg?src=front-yard-cam",
-    "license": "Sovereign Operator Feed (Paul Prime)"
-  },
-  {
     "id": "pfl-house-hd-cam",
     "name": "PFL Wyze HD Cam \u2014 West House Side & Bayou Corridor (LIVE)",
     "city": "Liverpool, TX",
@@ -92,25 +73,6 @@
     "sourceKind": "pfl-go2rtc-local",
     "url": "http://127.0.0.1:1984/api/frame.jpeg?src=hd",
     "snapshotUrl": "http://127.0.0.1:1984/api/frame.jpeg?src=hd",
-    "license": "Sovereign Operator Feed (Paul Prime)"
-  },
-  {
-    "id": "pfl-owl-cam",
-    "name": "PFL Wyze Owl & Yard Watch Cam (LIVE)",
-    "city": "Liverpool, TX",
-    "cityId": "pfl-liverpool",
-    "provider": "Project Free Life Sovereign Wyze Node (go2rtc)",
-    "lat": 29.24762,
-    "lon": -95.23136,
-    "headingDeg": 90,
-    "pitchDeg": -12,
-    "fovDeg": 100,
-    "mountHeightM": 4.0,
-    "frameRefreshMs": 15000,
-    "feedType": "image",
-    "sourceKind": "pfl-go2rtc-local",
-    "url": "http://127.0.0.1:1984/api/frame.jpeg?src=owl-cam",
-    "snapshotUrl": "http://127.0.0.1:1984/api/frame.jpeg?src=owl-cam",
     "license": "Sovereign Operator Feed (Paul Prime)"
   }
 ]
