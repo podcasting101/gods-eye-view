@@ -12,6 +12,7 @@ const LIVERPOOL_CAMS = new Set([
   'pan3',
   's788',
   'mining-cave',
+  'garage',
 ]);
 
 const CAMERA_GEO = {
@@ -61,7 +62,24 @@ const CAMERA_GEO = {
     pitchDeg: null,
   },
   downstairs: { site: 'shared-mertz', cctvId: null, label: 'Shared Node — Downstairs', lat: null, lon: null },
-  garage: { site: 'shared-mertz', cctvId: null, label: 'Shared Node — Garage', lat: null, lon: null },
+  garage: {
+    site: 'liverpool',
+    cctvId: 'pfl-garage-cam',
+    label: 'Garage / Carport Cam (Corvette, Roadster & Monaco Nose)',
+    lat: 29.247545,
+    lon: -95.231280,
+    headingDeg: 172,
+    pitchDeg: -16,
+  },
+  'mining-cave': {
+    site: 'liverpool',
+    cctvId: 'pfl-mining-cave-cam',
+    label: 'Mining Cave / Front Door Cam (B&W Night Mode)',
+    lat: 29.247535,
+    lon: -95.231395,
+    headingDeg: 194,
+    pitchDeg: -15,
+  },
   laundry: { site: 'shared-mertz', cctvId: null, label: 'Shared Node — Laundry', lat: null, lon: null },
   'backyard-cam': { site: 'shared-mertz', cctvId: null, label: 'Shared Node — Backyard', lat: null, lon: null },
 };

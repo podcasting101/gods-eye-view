@@ -382,69 +382,147 @@ export function loadPflWindowFramework({ viewer }) {
       <canvas id="pfl-axis-globe" width="136" height="136" style="cursor:pointer;border-radius:50%" title="Click N/S/E/W/UP or drag to orbit camera"></canvas>
       <div id="pfl-cam-readout" style="text-align:center;font-size:10px;color:#94a3b8;line-height:1.35">CAM READY</div>
       <div style="width:100%;border-top:1px solid rgba(56,189,248,0.25);padding-top:6px">
-        <div style="color:#fbbf24;font-weight:700;margin-bottom:4px">🎯 Click Any 3D Photo / Object:</div>
-        <div id="pfl-sel-name" style="color:#e2e8f0;margin-bottom:4px;font-size:10px">None selected (click Gate photo)</div>
-        <label style="display:flex;justify-content:space-between"><span>Heading (°)</span><span id="pfl-hdg-val">107°</span></label>
-        <input type="range" id="pfl-hdg-slider" min="0" max="360" step="1" value="107" style="width:100%" />
-        <label style="display:flex;justify-content:space-between;margin-top:4px"><span>Elevation Offset (m)</span><span id="pfl-alt-val">0.0m</span></label>
-        <input type="range" id="pfl-alt-slider" min="-10" max="25" step="0.5" value="0" style="width:100%" />
+        <div style="color:#fbbf24;font-weight:700;margin-bottom:4px">🎯 Move Object / Memory Photo:</div>
+        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px">
+          <button type="button" class="pfl-std-cbtn" data-pfl-pick="lisa" title="Select Lisa Muse avatar">👑 Lisa</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-pick="chair" title="Select Wooden Chair & Sign">🪑 Chair</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-pick="bed-station-20261012" title="Select Paul & Lisa Bed Photo">🛏️ Bed</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-pick="garage-carport-20261117" title="Select Garage Carport Photo">🚗 Garage</button>
+        </div>
+        <div id="pfl-sel-name" style="color:#4ade80;margin-bottom:4px;font-size:10px">Click 3D avatar/chair/photo or chip above</div>
+        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px">
+          <button type="button" class="pfl-std-cbtn" id="pfl-drag-place-btn" title="When ON, click anywhere on the ground/roof to place selected object there!">✋ Click-to-Place: OFF</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="0,0.6">⬆️N</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="0,-0.6">⬇️S</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="-0.6,0">⬅️W</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="0.6,0">➡️E</button>
+        </div>
+        <label style="display:flex;justify-content:space-between"><span>Heading (°)</span><span id="pfl-hdg-val">154°</span></label>
+        <input type="range" id="pfl-hdg-slider" min="0" max="360" step="1" value="154" style="width:100%" />
+        <label style="display:flex;justify-content:space-between;margin-top:4px"><span>Height / Lift (m)</span><span id="pfl-alt-val">0.0m</span></label>
+        <input type="range" id="pfl-alt-slider" min="-5" max="18" step="0.25" value="0" style="width:100%" />
       </div>
     </div>
   `;
 
-  // Wire click-to-select & live rotation on ANY Bird Pond wall or 3D entity
-  let selectedWall = null;
+  let activeMovable = null;
+  let clickToPlaceMode = false;
+
+  function bindMovable(mov) {
+    if (!mov) return;
+    activeMovable = mov;
+    const st = mov.getState();
+    compassWin.body.querySelector('#pfl-sel-name').textContent = `Selected: ${mov.label}`;
+    compassWin.body.querySelector('#pfl-hdg-slider').value = String(Math.round(st.heading || 0));
+    compassWin.body.querySelector('#pfl-hdg-val').textContent = `${Math.round(st.heading || 0)}°`;
+    compassWin.body.querySelector('#pfl-alt-slider').value = String(st.lift || 0);
+    compassWin.body.querySelector('#pfl-alt-val').textContent = `${Number(st.lift || 0).toFixed(2)}m`;
+  }
+
+  compassWin.body.querySelectorAll('[data-pfl-pick]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.getAttribute('data-pfl-pick');
+      const mov = window.__pflMovables?.[key];
+      if (mov) bindMovable(mov);
+    });
+  });
+
+  const placeBtn = compassWin.body.querySelector('#pfl-drag-place-btn');
+  placeBtn?.addEventListener('click', () => {
+    clickToPlaceMode = !clickToPlaceMode;
+    placeBtn.textContent = clickToPlaceMode ? '🎯 Click Ground to Drop!' : '✋ Click-to-Place: OFF';
+    placeBtn.style.borderColor = clickToPlaceMode ? '#facc15' : '';
+  });
+
+  compassWin.body.querySelectorAll('[data-pfl-obj-nudge]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!activeMovable) return;
+      const [dE, dN] = btn.getAttribute('data-pfl-obj-nudge').split(',').map(Number);
+      const st = activeMovable.getState();
+      const newLat = st.lat + dN / 111320;
+      const newLon = st.lon + dE / (111320 * Math.cos(Cesium.Math.toRadians(st.lat)));
+      activeMovable.update({ lat: newLat, lon: newLon });
+    });
+  });
+
   const pickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
   pickHandler.setInputAction((movement) => {
+    if (clickToPlaceMode && activeMovable) {
+      let cart = null;
+      try {
+        cart = viewer.scene.pickPositionSupported ? viewer.scene.pickPosition(movement.position) : null;
+      } catch {}
+      if (!cart) {
+        const ray = viewer.camera.getPickRay(movement.position);
+        cart = ray && viewer.scene.globe ? viewer.scene.globe.pick(ray, viewer.scene) : null;
+      }
+      if (!cart) {
+        cart = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe?.ellipsoid);
+      }
+      if (cart) {
+        const cg = Cesium.Cartographic.fromCartesian(cart);
+        activeMovable.update({
+          lat: Cesium.Math.toDegrees(cg.latitude),
+          lon: Cesium.Math.toDegrees(cg.longitude),
+        });
+        clickToPlaceMode = false;
+        if (placeBtn) {
+          placeBtn.textContent = '✋ Click-to-Place: OFF';
+          placeBtn.style.borderColor = '';
+        }
+        return;
+      }
+    }
+
     const picked = viewer.scene.pick(movement.position);
     const ent = picked?.id;
+    if (ent && String(ent.id || '') === 'yardframe:yard-overview-20261012') return;
+    if (ent?._pflMovable) {
+      bindMovable(ent._pflMovable);
+      return;
+    }
+    if (picked?.primitive && window.__pflMovables?.chair?.tileset && picked.primitive === window.__pflMovables.chair.tileset) {
+      bindMovable(window.__pflMovables.chair);
+      return;
+    }
     if (ent && ent.wall && String(ent.id || '').startsWith('birdpond_')) {
-      selectedWall = ent;
       const st = ent._pflWallMeta || { lat: 29.139116, lon: -95.804794, width: 13.93, height: 9.23, heading: 107, baseAlt: -17.5, lift: 0 };
       ent._pflWallMeta = st;
-      compassWin.body.querySelector('#pfl-sel-name').textContent = ent.name || ent.id;
-      compassWin.body.querySelector('#pfl-hdg-slider').value = String(Math.round(st.heading));
-      compassWin.body.querySelector('#pfl-hdg-val').textContent = `${Math.round(st.heading)}°`;
-      compassWin.body.querySelector('#pfl-alt-slider').value = String(st.lift || 0);
-      compassWin.body.querySelector('#pfl-alt-val').textContent = `${(st.lift || 0).toFixed(1)}m`;
+      bindMovable({
+        kind: ent.id,
+        label: ent.name || ent.id,
+        getState: () => ({ lat: st.lat, lon: st.lon, heading: st.heading, lift: st.lift || 0 }),
+        update: (patch) => {
+          Object.assign(st, patch);
+          const halfW = (st.width || 13.93) * 0.5;
+          const rad = (st.heading * Math.PI) / 180.0;
+          const dN = Math.cos(rad) * halfW;
+          const dE = Math.sin(rad) * halfW;
+          const mLat = 111320.0;
+          const mLon = 111320.0 * Math.cos((st.lat * Math.PI) / 180.0);
+          const bAlt = (st.baseAlt ?? -17.5) + (st.lift || 0);
+          const tAlt = bAlt + (st.height || 9.23);
+          ent.wall.positions = Cesium.Cartesian3.fromDegreesArrayHeights([
+            st.lon - dE / mLon, st.lat - dN / mLat, tAlt,
+            st.lon + dE / mLon, st.lat + dN / mLat, tAlt,
+          ]);
+          ent.wall.minimumHeights = [bAlt, bAlt];
+          governorRequestRender('pfl-wall-rotate');
+        },
+      });
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-  function updateSelectedWall() {
-    if (!selectedWall || !selectedWall._pflWallMeta) return;
-    const st = selectedWall._pflWallMeta;
-    const halfW = (st.width || 13.93) * 0.5;
-    const rad = (st.heading * Math.PI) / 180.0;
-    const dN = Math.cos(rad) * halfW;
-    const dE = Math.sin(rad) * halfW;
-    const mLat = 111320.0;
-    const mLon = 111320.0 * Math.cos((st.lat * Math.PI) / 180.0);
-    const bAlt = (st.baseAlt ?? -17.5) + (st.lift || 0);
-    const tAlt = bAlt + (st.height || 9.23);
-    selectedWall.wall.positions = Cesium.Cartesian3.fromDegreesArrayHeights([
-      st.lon - dE / mLon, st.lat - dN / mLat, tAlt,
-      st.lon + dE / mLon, st.lat + dN / mLat, tAlt,
-    ]);
-    selectedWall.wall.minimumHeights = [bAlt, bAlt];
-    governorRequestRender('pfl-wall-rotate');
-  }
 
   compassWin.body.querySelector('#pfl-hdg-slider')?.addEventListener('input', (e) => {
     const v = Number(e.target.value);
     compassWin.body.querySelector('#pfl-hdg-val').textContent = `${v}°`;
-    if (selectedWall?._pflWallMeta) {
-      selectedWall._pflWallMeta.heading = v;
-      updateSelectedWall();
-    }
+    activeMovable?.update({ heading: v });
   });
 
   compassWin.body.querySelector('#pfl-alt-slider')?.addEventListener('input', (e) => {
     const v = Number(e.target.value);
-    compassWin.body.querySelector('#pfl-alt-val').textContent = `${v.toFixed(1)}m`;
-    if (selectedWall?._pflWallMeta) {
-      selectedWall._pflWallMeta.lift = v;
-      updateSelectedWall();
-    }
+    compassWin.body.querySelector('#pfl-alt-val').textContent = `${v.toFixed(2)}m`;
+    activeMovable?.update({ lift: v });
   });
 
   // Render the 3D Axis Compass Ball (ported directly from Bird Pond adventure.html)

@@ -40,30 +40,67 @@ function resolveAnchorGroundM(viewer) {
   return STORED_GROUND_HEIGHT_M;
 }
 
+const CUSTOM_OBJ_KEY = 'pfl_custom_objects_v1';
+function readCustomObj(key, fallback) {
+  try {
+    if (typeof localStorage === 'undefined') return { ...fallback };
+    const all = JSON.parse(localStorage.getItem(CUSTOM_OBJ_KEY) || '{}');
+    return { ...fallback, ...(all[key] || {}) };
+  } catch {
+    return { ...fallback };
+  }
+}
+function writeCustomObj(key, val) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const all = JSON.parse(localStorage.getItem(CUSTOM_OBJ_KEY) || '{}');
+    all[key] = val;
+    localStorage.setItem(CUSTOM_OBJ_KEY, JSON.stringify(all));
+  } catch {}
+}
+
 function addSovereignAnchor(viewer) {
-  const computePos = () =>
-    Cesium.Cartesian3.fromDegrees(
-      SOVEREIGN_ANCHOR.longitude,
-      SOVEREIGN_ANCHOR.latitude,
-      resolveAnchorGroundM(viewer) + PLACEMENT_LIFT_M + SOVEREIGN_ANCHOR.modelOriginLiftM,
+  const state = readCustomObj('lisa', {
+    lat: 29.247436,
+    lon: -95.231445,
+    heading: 192,
+    lift: 0,
+  });
+  const applyEntityPose = (ent) => {
+    const gM = viewer?.scene?.globe?.show
+      ? (viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(state.lon, state.lat)) || 0)
+      : STORED_GROUND_HEIGHT_M;
+    const pos = Cesium.Cartesian3.fromDegrees(
+      state.lon,
+      state.lat,
+      gM + PLACEMENT_LIFT_M + SOVEREIGN_ANCHOR.modelOriginLiftM + (state.lift || 0),
     );
-  const position = computePos();
-  const orientation = Cesium.Transforms.headingPitchRollQuaternion(
-    position,
-    new Cesium.HeadingPitchRoll(0, 0, 0),
-  );
-  return viewer.entities.add({
+    const ori = Cesium.Transforms.headingPitchRollQuaternion(
+      pos,
+      new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(state.heading || 0), 0, 0),
+    );
+    if (ent) {
+      ent.position = pos;
+      ent.orientation = ori;
+    }
+    return { pos, ori };
+  };
+  const { pos: position, ori: orientation } = applyEntityPose(null);
+  const ent = viewer.entities.add({
     id: SOVEREIGN_ANCHOR.id,
     name: `👑 ${SOVEREIGN_ANCHOR.name} (Liverpool)`,
     position,
     orientation,
     model: {
       uri: '/models/lisa_muse.glb',
-      scale: 1,
+      scale: 1.05,
       heightReference: Cesium.HeightReference.NONE,
       minimumPixelSize: 0,
       maximumScale: 50,
-      imageBasedLightingFactor: new Cesium.Cartesian2(1, 1),
+      lightColor: new Cesium.Cartesian3(4.8, 4.4, 3.9),
+      imageBasedLightingFactor: new Cesium.Cartesian2(1.6, 1.6),
+      silhouetteColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.28),
+      silhouetteSize: 1.0,
     },
     point: {
       pixelSize: 9,
@@ -83,6 +120,22 @@ function addSovereignAnchor(viewer) {
         <p style="margin:0;font-size:13px"><strong>Coordinates:</strong> ${SOVEREIGN_ANCHOR.latitude.toFixed(4)}° N, ${Math.abs(SOVEREIGN_ANCHOR.longitude).toFixed(4)}° W</p>
       </div>`,
   });
+  ent._pflMovable = {
+    kind: 'lisa',
+    label: '👑 Lisa Muse (Avatar)',
+    getState: () => ({ ...state }),
+    update: (patch) => {
+      Object.assign(state, patch);
+      writeCustomObj('lisa', state);
+      applyEntityPose(ent);
+      governorRequestRender('pfl-move-lisa');
+    },
+  };
+  if (typeof window !== 'undefined') {
+    window.__pflMovables = window.__pflMovables || {};
+    window.__pflMovables.lisa = ent._pflMovable;
+  }
+  return ent;
 }
 
 function rethrowAbort(signal, error) {
@@ -130,13 +183,7 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
         window.addEventListener('gev:map-stack-changed', () => {
           setTimeout(() => {
             if (!anchor || destroyed) return;
-            const p = Cesium.Cartesian3.fromDegrees(
-              SOVEREIGN_ANCHOR.longitude,
-              SOVEREIGN_ANCHOR.latitude,
-              resolveAnchorGroundM(viewer) + PLACEMENT_LIFT_M + SOVEREIGN_ANCHOR.modelOriginLiftM,
-            );
-            anchor.position = p;
-            anchor.orientation = Cesium.Transforms.headingPitchRollQuaternion(p, new Cesium.HeadingPitchRoll(0, 0, 0));
+            anchor._pflMovable?.update({});
             governorRequestRender('lisa-muse-datum-sync');
           }, 400);
         });

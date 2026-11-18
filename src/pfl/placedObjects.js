@@ -111,13 +111,20 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
   const token = String(cesiumToken || '').trim();
   signal?.throwIfAborted();
 
-  const { lat, lon } = FRONT_YARD;
+  let chairState = { lat: 29.247434, lon: -95.231426, heading: 192, lift: 0 };
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const all = JSON.parse(localStorage.getItem('pfl_custom_objects_v1') || '{}');
+      if (all.chair) chairState = { ...chairState, ...all.chair };
+    }
+  } catch {}
+  const { lat, lon } = chairState;
   let baseGrade = STORED_GROUND_HEIGHT_M;
   if (viewer?.scene?.globe?.show) {
     const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
     baseGrade = Number.isFinite(gh) ? gh : 0.0;
   }
-  const groundHeight = baseGrade + PLACEMENT_LIFT_M;
+  const groundHeight = baseGrade + PLACEMENT_LIFT_M + (chairState.lift || 0);
   console.info(
     `[PlacedObjects] front-yard ground height: ${groundHeight.toFixed(2)} m`,
   );
@@ -248,6 +255,49 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
       throw err;
     }
     console.warn('[PlacedObjects] splat failed to load:', err?.message || err);
+  }
+
+  if (typeof window !== 'undefined') {
+    const recomputeChairPose = (patch) => {
+      Object.assign(chairState, patch);
+      try {
+        const all = JSON.parse(localStorage.getItem('pfl_custom_objects_v1') || '{}');
+        all.chair = chairState;
+        localStorage.setItem('pfl_custom_objects_v1', JSON.stringify(all));
+      } catch {}
+      const bg = viewer?.scene?.globe?.show
+        ? (viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(chairState.lon, chairState.lat)) || 0)
+        : STORED_GROUND_HEIGHT_M;
+      const gh = bg + PLACEMENT_LIFT_M + (chairState.lift || 0);
+      const gCart = Cesium.Cartesian3.fromDegrees(chairState.lon, chairState.lat, gh);
+      const cEnu = Cesium.Transforms.eastNorthUpToFixedFrame(gCart);
+      const rotZ = Cesium.Matrix4.fromRotationTranslation(
+        Cesium.Matrix3.fromRotationZ(-Cesium.Math.toRadians(chairState.heading || 0))
+      );
+      const mLocal = Cesium.Matrix4.multiply(
+        rotZ,
+        Cesium.Matrix4.multiply(lift, scale, new Cesium.Matrix4()),
+        new Cesium.Matrix4(),
+      );
+      if (chair && !chair.isDestroyed()) {
+        chair.modelMatrix = Cesium.Matrix4.multiply(cEnu, mLocal, new Cesium.Matrix4());
+      }
+      if (billboards && !billboards.isDestroyed() && billboards.length >= 2) {
+        const sLon = chairState.lon + 1.5 / (111320 * Math.cos(Cesium.Math.toRadians(chairState.lat)));
+        const sEnu = Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.fromDegrees(sLon, chairState.lat, gh));
+        billboards.get(0).position = Cesium.Matrix4.multiplyByPoint(sEnu, new Cesium.Cartesian3(0, 0, postHeight / 2), new Cesium.Cartesian3());
+        billboards.get(1).position = Cesium.Matrix4.multiplyByPoint(sEnu, new Cesium.Cartesian3(0, 0, postHeight + 0.19), new Cesium.Cartesian3());
+      }
+      viewer?.scene?.requestRender?.();
+    };
+    window.__pflMovables = window.__pflMovables || {};
+    window.__pflMovables.chair = {
+      kind: 'chair',
+      label: '🪑 Wooden Chair & Sign',
+      tileset: chair,
+      getState: () => ({ ...chairState }),
+      update: recomputeChairPose,
+    };
   }
 
   let destroyed = false;

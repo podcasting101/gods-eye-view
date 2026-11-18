@@ -90,14 +90,30 @@ export const YARD_FRAMES = [
     // i18n-ignore: Paul's private camera title is source data.
     title: 'Wyze Bed Cam — Solar-Locked (243.95° WSW Sunbeam @ +6.33° El)',
     takenAt: '2026-11-17 16:49:58 CST',
-    camLat: 29.24758,
-    camLon: -95.23140,
-    camHeightM: 4.15,
-    headingDeg: 185,
+    camLat: 29.247568,
+    camLon: -95.231368,
+    camHeightM: 4.35,
+    headingDeg: 154,
     pitchDeg: -5,
-    distanceM: 2.8,
+    distanceM: 2.75,
     fovHDeg: 68,
     fovVDeg: 38,
+  },
+  {
+    id: 'garage-carport-20261117',
+    image: '/yard-frames/latest-garage.jpg',
+    // i18n-ignore: Paul's private camera title is source data.
+    title: 'East Carport / Garage Cam — Corvette, Roadster & Monaco RV Nose',
+    takenAt: '2026-11-17 00:09:55 CST',
+    camLat: 29.247535,
+    camLon: -95.231272,
+    camHeightM: 1.4,
+    headingDeg: 172,
+    pitchDeg: -14,
+    distanceM: 3.4,
+    fovHDeg: 88,
+    fovVDeg: 52,
+    flat: true,
   },
 ];
 
@@ -176,16 +192,30 @@ const CALIBRATED_HOUSE_SURVEY = {
     stitchedWaterPano: true,
   },
   'bed-station-20261012': {
-    hiddenByStitch: true,
-    // Grounded inside yellow house bedroom footprint (29.247585, -95.231390) at surface height and hidden outside Arrange mode so it never floats over the yard!
-    camLat: 29.247585,
-    camLon: -95.231390,
-    camHeightM: 0.35,
-    headingDeg: 158,
+    hiddenByStitch: false,
+    camLat: 29.247568,
+    camLon: -95.231368,
+    camHeightM: 4.35,
+    headingDeg: 154,
     pitchDeg: -5,
-    distanceM: 2.4,
+    distanceM: 2.75,
     fovHDeg: 68,
     fovVDeg: 38,
+    widthScale: 1.0,
+    rollDeg: 0,
+    flat: true,
+    texRot: 0,
+  },
+  'garage-carport-20261117': {
+    hiddenByStitch: false,
+    camLat: 29.247535,
+    camLon: -95.231272,
+    camHeightM: 1.25,
+    headingDeg: 172,
+    pitchDeg: -14,
+    distanceM: 3.3,
+    fovHDeg: 88,
+    fovVDeg: 52,
     widthScale: 1.0,
     rollDeg: 0,
     flat: true,
@@ -295,7 +325,7 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedHideFloatingBedSideV18) {
+    if (parsed && !parsed.fixedBedOnRoofAndGarageV19) {
       for (const id of Object.keys(CALIBRATED_HOUSE_SURVEY)) {
         frames[id] = {
           ...(frames[id] || {}),
@@ -307,6 +337,7 @@ function loadSavedLayout() {
       parsed.fixedCrispSurveyV16 = true;
       parsed.fixedYardBoundedPOV_V17 = true;
       parsed.fixedHideFloatingBedSideV18 = true;
+      parsed.fixedBedOnRoofAndGarageV19 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -589,6 +620,34 @@ export function loadYardFrames({ viewer }) {
       entity.show = yardFramesVisible && !hiddenStitch;
     }
     frameState.set(f.id, { def: f, params, entity });
+    if (entity && f.id !== 'yard-overview-20261012') {
+      const mov = {
+        kind: 'yardframe:' + f.id,
+        label: f.id === 'bed-station-20261012' ? '🛏️ Paul & Lisa Bed Photo' : f.id === 'garage-carport-20261117' ? '🚗 Garage Carport Photo' : `🖼️ ${f.id}`,
+        getState: () => ({
+          lat: params.camLat,
+          lon: params.camLon,
+          heading: params.headingDeg || 0,
+          lift: params.camHeightM || 0,
+        }),
+        update: (patch) => {
+          if (typeof patch.lat === 'number') params.camLat = patch.lat;
+          if (typeof patch.lon === 'number') params.camLon = patch.lon;
+          if (typeof patch.heading === 'number') params.headingDeg = patch.heading;
+          if (typeof patch.lift === 'number') params.camHeightM = patch.lift;
+          params.hiddenByStitch = false;
+          const rebuilt = rebuildFrame(viewer, f.id);
+          if (rebuilt) rebuilt._pflMovable = mov;
+          saveLayout();
+          governorRequestRender('pfl-move-yardframe');
+        },
+      };
+      entity._pflMovable = mov;
+      if (typeof window !== 'undefined') {
+        window.__pflMovables = window.__pflMovables || {};
+        window.__pflMovables[f.id] = mov;
+      }
+    }
   }
   if (typeof window !== 'undefined') {
     window.__pflSetYardFramesVisible = (v) => setYardFramesVisible(viewer, v);
