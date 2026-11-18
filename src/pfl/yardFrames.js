@@ -105,14 +105,14 @@ export const YARD_FRAMES = [
     // i18n-ignore: Paul's private camera title is source data.
     title: 'East Carport / Garage Cam — Corvette, Roadster & Monaco RV Nose',
     takenAt: '2026-11-17 00:09:55 CST',
-    camLat: 29.247555,
-    camLon: -95.231288,
-    camHeightM: 1.55,
+    camLat: 29.247560,
+    camLon: -95.231292,
+    camHeightM: 1.48,
     headingDeg: 175,
-    pitchDeg: -6,
-    distanceM: 2.8,
-    fovHDeg: 82,
-    fovVDeg: 48,
+    pitchDeg: -5,
+    distanceM: 2.45,
+    fovHDeg: 78,
+    fovVDeg: 45,
     flat: false,
   },
 ];
@@ -210,14 +210,14 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'garage-carport-20261117': {
     hiddenByStitch: false,
-    camLat: 29.247555,
-    camLon: -95.231288,
-    camHeightM: 1.55,
+    camLat: 29.247560,
+    camLon: -95.231292,
+    camHeightM: 1.48,
     headingDeg: 175,
-    pitchDeg: -6,
-    distanceM: 2.8,
-    fovHDeg: 82,
-    fovVDeg: 48,
+    pitchDeg: -5,
+    distanceM: 2.45,
+    fovHDeg: 78,
+    fovVDeg: 45,
     widthScale: 1.0,
     rollDeg: 0,
     flat: false,
@@ -322,6 +322,7 @@ function loadSavedLayout() {
         fixedRoofGluedNoParallaxV20: true,
         fixedFeetDueWestAndGarageV21: true,
         fixedBedQueenDueWestV22: true,
+        fixedGarageCleanBayV23: true,
         savedAt: new Date().toISOString(),
         frames: { ...CALIBRATED_HOUSE_SURVEY },
       };
@@ -364,6 +365,15 @@ function loadSavedLayout() {
         ...CALIBRATED_HOUSE_SURVEY['bed-station-20261012'],
       };
       parsed.fixedBedQueenDueWestV22 = true;
+      parsed.frames = frames;
+      window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
+    }
+    if (parsed && !parsed.fixedGarageCleanBayV23) {
+      frames['garage-carport-20261117'] = {
+        ...(frames['garage-carport-20261117'] || {}),
+        ...CALIBRATED_HOUSE_SURVEY['garage-carport-20261117'],
+      };
+      parsed.fixedGarageCleanBayV23 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -504,6 +514,62 @@ export function computeCorners(p, viewer = null) {
   };
 }
 
+let _cleanGarageCanvas = null;
+let _cleanGarageLoading = false;
+const _cleanGarageCallbacks = [];
+
+function scrubWyzeGreenBoxToCanvas(img) {
+  const w = img.naturalWidth || img.width || 640;
+  const h = img.naturalHeight || img.height || 360;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+  try {
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const px = imgData.data;
+    const isGreenOsd = (idx) => {
+      const r = px[idx];
+      const g = px[idx + 1];
+      const b = px[idx + 2];
+      return g > 88 && g - Math.max(r, b) > 32;
+    };
+    for (let pass = 0; pass < 2; pass++) {
+      for (let y = 0; y < h; y++) {
+        const rowOff = y * w * 4;
+        for (let x = 0; x < w; x++) {
+          const i = rowOff + x * 4;
+          if (!isGreenOsd(i)) continue;
+          let sr = 0, sg = 0, sb = 0, cnt = 0;
+          for (const [dx, dy] of [[-7, 0], [7, 0], [0, -7], [0, 7], [-12, 0], [12, 0]]) {
+            const nx = Math.max(0, Math.min(w - 1, x + dx));
+            const ny = Math.max(0, Math.min(h - 1, y + dy));
+            const ni = (ny * w + nx) * 4;
+            if (!isGreenOsd(ni)) {
+              sr += px[ni];
+              sg += px[ni + 1];
+              sb += px[ni + 2];
+              cnt++;
+            }
+          }
+          if (cnt > 0) {
+            px[i] = Math.round(sr / cnt);
+            px[i + 1] = Math.round(sg / cnt);
+            px[i + 2] = Math.round(sb / cnt);
+          } else {
+            px[i] = px[i + 2];
+            px[i + 1] = px[i + 2];
+          }
+        }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  } catch {}
+  if (typeof window !== 'undefined') window.__pflCleanGarageCanvas = c;
+  return c;
+}
+
 /** Build (or rebuild) the Cesium entity for one frame. */
 function buildFrameEntity(viewer, def, params) {
   const { positions, widthM, heightM, distanceM } = computeCorners(params, viewer);
@@ -511,21 +577,15 @@ function buildFrameEntity(viewer, def, params) {
   const stale = viewer.entities.getById(entityId);
   if (stale) viewer.entities.remove(stale);
   const opacity = typeof params.opacity === 'number' ? params.opacity : 1.0;
+  const isCleanGarage = def.id === 'garage-carport-20261117';
   const imgUrl =
     def.id === 'yard-overview-20261012' && params.stitchedPano
       ? (window.__pflLiveStitchUrl || '/yard-frames/front-yard-stitched-live.png?v=18')
       : def.id === 'back-yard-cam2-water' && params.stitchedWaterPano
         ? '/yard-frames/back-yard-cam2-stitched-2026-10-26.png'
         : def.image;
-  if (typeof Image !== 'undefined' && typeof imgUrl === 'string') {
-    const pre = new Image();
-    pre.onload = () => {
-      governorRequestRender('yardframe-tex-ready');
-      setTimeout(() => governorRequestRender('yardframe-tex-ready-2'), 120);
-    };
-    pre.src = imgUrl;
-  }
-  const matProps = { image: imgUrl };
+  const initialImageSource = isCleanGarage && _cleanGarageCanvas ? _cleanGarageCanvas : imgUrl;
+  const matProps = { image: initialImageSource };
   if (opacity < 0.99 || params.stitchedPano || params.stitchedWaterPano) {
     matProps.color = Cesium.Color.WHITE.withAlpha(opacity);
     matProps.transparent = true;
@@ -553,6 +613,44 @@ function buildFrameEntity(viewer, def, params) {
     name: 'Yard frame: ' + def.id,
     polygon,
   });
+  entity._pflSourceImageUrl = imgUrl;
+  if (typeof Image !== 'undefined' && typeof imgUrl === 'string') {
+    if (isCleanGarage && !_cleanGarageCanvas && typeof document !== 'undefined') {
+      _cleanGarageCallbacks.push((cleanCanvas) => {
+        const cur = viewer?.entities?.getById?.(entityId);
+        if (cur?.polygon) {
+          const nextProps = { image: cleanCanvas };
+          if (opacity < 0.99) {
+            nextProps.color = Cesium.Color.WHITE.withAlpha(opacity);
+            nextProps.transparent = true;
+          }
+          cur.polygon.material = new Cesium.ImageMaterialProperty(nextProps);
+          governorRequestRender('yardframe-garage-clean');
+        }
+      });
+      if (!_cleanGarageLoading) {
+        _cleanGarageLoading = true;
+        const gImg = new Image();
+        gImg.onload = () => {
+          _cleanGarageCanvas = scrubWyzeGreenBoxToCanvas(gImg);
+          _cleanGarageLoading = false;
+          while (_cleanGarageCallbacks.length) {
+            const cb = _cleanGarageCallbacks.shift();
+            try { cb(_cleanGarageCanvas); } catch {}
+          }
+        };
+        gImg.onerror = () => { _cleanGarageLoading = false; };
+        gImg.src = imgUrl;
+      }
+    } else if (!isCleanGarage) {
+      const pre = new Image();
+      pre.onload = () => {
+        governorRequestRender('yardframe-tex-ready');
+        setTimeout(() => governorRequestRender('yardframe-tex-ready-2'), 120);
+      };
+      pre.src = imgUrl;
+    }
+  }
   console.info(
     '[YardFrames] ' +
       def.id +
@@ -615,6 +713,7 @@ function saveLayout() {
         fixedRoofGluedNoParallaxV20: true,
         fixedFeetDueWestAndGarageV21: true,
         fixedBedQueenDueWestV22: true,
+        fixedGarageCleanBayV23: true,
         savedAt: new Date().toISOString(),
         frames,
       }),

@@ -1,5 +1,9 @@
 import * as Cesium from 'cesium';
-import { governorRequestRender } from '../renderGovernor.js';
+import {
+  holdContinuousRender,
+  releaseContinuousRender,
+  governorRequestRender,
+} from '../renderGovernor.js';
 import { activeYardDatumM } from './yardFrames.js';
 
 const STORAGE_KEY = 'pfl_gev_windows_v1';
@@ -234,6 +238,8 @@ export function loadPflWindowFramework({ viewer }) {
     try { viewer?.camera?.lookAtTransform?.(Cesium.Matrix4.IDENTITY); } catch {}
   };
   let openHolodeckHallway = () => {};
+  let openMlsWalkthrough = () => {};
+  let toggleMarineVhfPanel = () => {};
 
   const cmdWin = createStandardBox({
     id: 'pfl-win-command-dock',
@@ -310,6 +316,8 @@ export function loadPflWindowFramework({ viewer }) {
     const extraRow = document.createElement('div');
     extraRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(56,189,248,0.22);';
     extraRow.innerHTML = `
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-walk-inside-house" style="border-color:#fbbf24;color:#fde047;font-weight:700" title="Open interactive 32-photo 2-story floor plan &amp; guided room-by-room 3D walkthrough of 417 Palm Drive">🏠 Walk Inside 417 Palm Dr (32-Photo Floor Plan &amp; ▶ Auto-Tour)</button>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-marine-vhf" style="border-color:#22d3ee;color:#67e8f9;font-weight:700" title="Open USCG Houston-Galveston / Chocolate Bayou Marine VHF &amp; Live AIS / Radio Browser Scanner">📻 Marine VHF &amp; Chocolate Bayou Scanner</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-kalshi-inline" style="border-color:#22c55e;color:#4ade80;font-weight:700">📈 Kalshi Paper Arena (Show / Hide)</button>
       <a href="/kalshi-paper.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-kalshi-tab" style="border-color:#38bdf8;color:#38bdf8;text-decoration:none;display:inline-flex;align-items:center">↗ Full TradingView &amp; Kalshi Tab</a>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-wyze-patrol" style="border-color:#f97316;color:#fdba74;font-weight:700">🎥 Live Wyze Patrol &amp; 4D Scrubber</button>
@@ -427,6 +435,12 @@ export function loadPflWindowFramework({ viewer }) {
       if (typeof window.__pflOpenFireModal === 'function') window.__pflOpenFireModal();
       else document.getElementById('gev-fire-video-btn')?.click();
     });
+    extraRow.querySelector('#pfl-btn-walk-inside-house')?.addEventListener('click', () => {
+      openMlsWalkthrough();
+    });
+    extraRow.querySelector('#pfl-btn-marine-vhf')?.addEventListener('click', () => {
+      toggleMarineVhfPanel();
+    });
     extraRow.querySelector('#pfl-btn-kalshi-inline')?.addEventListener('click', () => {
       const isHidden = kalshiWin.box.style.display === 'none' || kalshiWin.box.classList.contains('pfl-minimized');
       kalshiWin.box.style.display = isHidden ? 'flex' : 'none';
@@ -479,6 +493,7 @@ export function loadPflWindowFramework({ viewer }) {
         <input type="range" id="pfl-scale-slider" min="0.4" max="2.5" step="0.05" value="1" style="width:100%;accent-color:#fbbf24" title="Resize the selected photo / 3D model (0.4× – 2.5×)" />
         <div id="pfl-hotspot-actions" style="display:none;gap:3px;flex-wrap:wrap;margin-top:6px;padding:5px;border:1px solid rgba(250,204,21,0.6);border-radius:7px;background:rgba(250,204,21,0.08)">
           <span style="width:100%;color:#fde047;font-weight:700;font-size:10px">✨ Hotspot Actions</span>
+          <button type="button" class="pfl-std-cbtn" id="pfl-hs-walk-house" style="display:none;border-color:#fbbf24;color:#fde047" title="Open interactive 32-photo 2-story floor plan &amp; ▶ Auto-Tour inside 417 Palm Drive">🏠 Walk Inside 417 Palm Dr (32-Photo Floor Plan &amp; ▶ Auto-Tour)</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-hs-play" title="Open the selected photo's source frame / live feed">🎬 Action / Play</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-hs-orbit" title="Send the telepresence drone to orbit this object">🚁 Orbit</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-hs-spin" title="Rotate the selected object 90°">🔄 Spin 90°</button>
@@ -683,7 +698,7 @@ export function loadPflWindowFramework({ viewer }) {
       };
     }
     if (targetKey === 'monaco') {
-      const st = window.__pflMovables?.monaco?.getState?.() || { lat: 29.247485, lon: -95.231315, heading: 175, lift: 0 };
+      const st = window.__pflMovables?.monaco?.getState?.() || { lat: 29.247510, lon: -95.231268, heading: 175, lift: 0 };
       const alt = resolveLocalGroundM(st.lon, st.lat) + Number(st.lift || 0) + 0.8;
       return {
         key: 'monaco',
@@ -1047,6 +1062,8 @@ export function loadPflWindowFramework({ viewer }) {
     syncScaleUi(mov);
     const bar = compassWin.body.querySelector('#pfl-hotspot-actions');
     if (bar) bar.style.display = 'flex';
+    const walkHouseBtn = compassWin.body.querySelector('#pfl-hs-walk-house');
+    if (walkHouseBtn) walkHouseBtn.style.display = mov.kind === 'house' ? 'inline-block' : 'none';
     syncActiveMovableGizmo();
   }
 
@@ -1140,6 +1157,9 @@ export function loadPflWindowFramework({ viewer }) {
       if (eid === 'pfl-holodeck-portal-1s788') {
         return { type: 'portal' };
       }
+      if (eid.startsWith('pfl-mls-pin-')) {
+        return { type: 'mls-room', roomId: ent._pflMlsRoomId || eid.slice('pfl-mls-pin-'.length) };
+      }
       if (ent?._pflMovable) {
         return { type: 'movable', mov: ent._pflMovable };
       }
@@ -1156,6 +1176,40 @@ export function loadPflWindowFramework({ viewer }) {
   let dragMovableSession = null;
   let lastDragReleaseMs = 0;
 
+  function computeDampedEnuRayPoint(screenPos, invEnu) {
+    const ray = viewer?.camera?.getPickRay?.(screenPos);
+    if (!ray) return null;
+    const origL = Cesium.Matrix4.multiplyByPoint(invEnu, ray.origin, new Cesium.Cartesian3());
+    const dirL = Cesium.Matrix4.multiplyByPointAsVector(invEnu, ray.direction, new Cesium.Cartesian3());
+    Cesium.Cartesian3.normalize(dirL, dirL);
+    const absZ = Math.abs(dirL.z);
+    if (absZ < 1e-4) return null;
+    // Clamp shallow ray-plane denominator to >= 0.24 so street-level vertical mouse movement never explodes 40m-85m
+    const safeZ = dirL.z < 0 ? Math.min(-0.24, dirL.z) : Math.max(0.24, dirL.z);
+    const t = -origL.z / safeZ;
+    if (!Number.isFinite(t) || t <= 0 || t > 220) return null;
+    return {
+      x: origL.x + dirL.x * t,
+      y: origL.y + dirL.y * t,
+      absZ,
+    };
+  }
+
+  function endDragMovableSession() {
+    if (!dragMovableSession) return;
+    const wasMoved = dragMovableSession.moved;
+    dragMovableSession = null;
+    releaseContinuousRender('pfl-drag-movable');
+    if (wasMoved) lastDragReleaseMs = Date.now();
+    const ctrl = viewer?.scene?.screenSpaceCameraController;
+    if (ctrl) {
+      ctrl.enableRotate = true;
+      ctrl.enableTranslate = true;
+      ctrl.enableTilt = true;
+    }
+    governorRequestRender('pfl-drag-movable-end');
+  }
+
   const pickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
   pickHandler.setInputAction((downEv) => {
     if (clickToPlaceMode) return;
@@ -1167,6 +1221,16 @@ export function loadPflWindowFramework({ viewer }) {
     const anchorCart = Cesium.Cartesian3.fromDegrees(st.lon, st.lat, planeAlt);
     const enu = Cesium.Transforms.eastNorthUpToFixedFrame(anchorCart);
     const invEnu = Cesium.Matrix4.inverseTransformation(enu, new Cesium.Matrix4());
+    const camLocal = Cesium.Matrix4.multiplyByPoint(invEnu, viewer.camera.positionWC, new Cesium.Cartesian3());
+    const camDistM = Math.max(2.5, Math.min(35, Cesium.Cartesian3.magnitude(camLocal) || 10));
+    const rightLocal = Cesium.Matrix4.multiplyByPointAsVector(invEnu, viewer.camera.rightWC, new Cesium.Cartesian3());
+    const rLen = Math.hypot(rightLocal.x, rightLocal.y) || 1;
+    const rx = rightLocal.x / rLen;
+    const ry = rightLocal.y / rLen;
+    const fovyRad = Number(viewer.camera.frustum?.fovy) || Cesium.Math.toRadians(45);
+    const canvasH = Math.max(280, viewer.scene.canvas?.clientHeight || 720);
+    const metersPerPx = (2 * camDistM * Math.tan(fovyRad * 0.5)) / canvasH;
+    const hit0 = computeDampedEnuRayPoint(downEv.position, invEnu);
     dragMovableSession = {
       mov: hit.mov,
       startX: downEv.position.x,
@@ -1174,7 +1238,16 @@ export function loadPflWindowFramework({ viewer }) {
       moved: false,
       enu,
       invEnu,
+      useRayDelta: Boolean(hit0 && hit0.absZ >= 0.28),
+      grabLocalX: hit0 ? hit0.x : 0,
+      grabLocalY: hit0 ? hit0.y : 0,
+      camRightX: rx,
+      camRightY: ry,
+      camFwdX: -ry,
+      camFwdY: rx,
+      metersPerPx,
     };
+    holdContinuousRender('pfl-drag-movable');
     const ctrl = viewer?.scene?.screenSpaceCameraController;
     if (ctrl) {
       ctrl.enableRotate = false;
@@ -1187,8 +1260,10 @@ export function loadPflWindowFramework({ viewer }) {
   let lookDragSession = null;
   let lastHoverCheckMs = 0;
   let lastHoverKey = null;
-  let pointerButtonsDown = 0;
-  let lastPointerActivityMs = 0;
+  let leftOrMiddleButtonsDown = 0;
+  let activeMouseButtonsMask = 0;
+  let rightButtonDown = false;
+  let lastZoomActivityMs = 0;
 
   function applyInPlaceLook(dxPx, dyPx) {
     try {
@@ -1223,7 +1298,7 @@ export function loadPflWindowFramework({ viewer }) {
   pickHandler.setInputAction(endLookDrag, Cesium.ScreenSpaceEventType.MIDDLE_UP);
   pickHandler.setInputAction(handleLookMove, Cesium.ScreenSpaceEventType.MOUSE_MOVE, Cesium.KeyboardEventModifier.CTRL);
 
-  // Tilt on the ellipsoid is what ejects the camera to space near the yard: remove Ctrl/Middle tilt there and use in-place look instead.
+  // Tilt on the ellipsoid is what ejects the camera to space near the yard: touch ONLY tiltEventTypes (keep zoomEventTypes 100% untouched for RIGHT_DRAG, WHEEL & PINCH!)
   const defaultTiltTypes = (() => {
     try { return viewer.scene.screenSpaceCameraController.tiltEventTypes; } catch { return undefined; }
   })();
@@ -1238,7 +1313,7 @@ export function loadPflWindowFramework({ viewer }) {
         Math.hypot(lat - 29.24755, lon - -95.23140) < 0.02 ||
         Math.hypot(lat - 29.13910, lon - -95.80480) < 0.02;
       const agl = c.height - resolveLocalGroundM(lon, lat);
-      const wantLocked = nearYard && agl < 160;
+      const wantLocked = nearYard && agl < 220;
       if (wantLocked && !ctrl._pflTiltLocked) {
         ctrl._pflTiltLocked = true;
         ctrl.tiltEventTypes = [Cesium.CameraEventType.PINCH];
@@ -1249,13 +1324,55 @@ export function loadPflWindowFramework({ viewer }) {
     } catch {}
   }
 
-  // ---- Anti-Space-Ejection clamp: a >500 m jump inside 400 ms while the mouse is active snaps back to the last safe pose ----
+  // ---- Anti-Space-Ejection clamp: ONLY guard sudden >2,500m single-frame spikes during LEFT/MIDDLE drag; NEVER interfere with RIGHT-DRAG or WHEEL/PINCH zoom! ----
   const canvasEl = viewer.scene.canvas;
-  const onPtrDown = () => { pointerButtonsDown += 1; lastPointerActivityMs = Date.now(); };
-  const onPtrUp = () => { pointerButtonsDown = Math.max(0, pointerButtonsDown - 1); lastPointerActivityMs = Date.now(); };
+  const onPtrDown = (e) => {
+    activeMouseButtonsMask = typeof e?.buttons === 'number' ? e.buttons : 0;
+    if (e?.button === 2 || (activeMouseButtonsMask & 2)) {
+      rightButtonDown = true;
+      lastZoomActivityMs = Date.now();
+    } else if (e?.button === 0 || e?.button === 1) {
+      leftOrMiddleButtonsDown += 1;
+    }
+  };
+  const onPtrMove = (e) => {
+    if (typeof e?.buttons !== 'number') return;
+    activeMouseButtonsMask = e.buttons;
+    if (e.buttons & 2) {
+      rightButtonDown = true;
+      lastZoomActivityMs = Date.now();
+    } else if (rightButtonDown) {
+      rightButtonDown = false;
+      lastZoomActivityMs = Date.now();
+    }
+  };
+  const onPtrUp = (e) => {
+    activeMouseButtonsMask = typeof e?.buttons === 'number' ? e.buttons : 0;
+    if (e?.button === 2 || !(activeMouseButtonsMask & 2)) {
+      if (rightButtonDown) lastZoomActivityMs = Date.now();
+      rightButtonDown = false;
+    }
+    if (e?.button === 0 || e?.button === 1 || activeMouseButtonsMask === 0) {
+      leftOrMiddleButtonsDown = activeMouseButtonsMask === 0 ? 0 : Math.max(0, leftOrMiddleButtonsDown - 1);
+    }
+    if (activeMouseButtonsMask === 0 && dragMovableSession) {
+      endDragMovableSession();
+    }
+  };
+  const onWheelZoomTrack = (e) => {
+    if (!e?.altKey) lastZoomActivityMs = Date.now();
+  };
+  const onTouchZoomTrack = (e) => {
+    if ((e?.touches?.length || 0) >= 2) lastZoomActivityMs = Date.now();
+  };
   canvasEl.addEventListener('pointerdown', onPtrDown, true);
+  window.addEventListener('pointermove', onPtrMove, { capture: true, passive: true });
   window.addEventListener('pointerup', onPtrUp, true);
   window.addEventListener('pointercancel', onPtrUp, true);
+  canvasEl.addEventListener('wheel', onWheelZoomTrack, { capture: true, passive: true });
+  canvasEl.addEventListener('touchstart', onTouchZoomTrack, { capture: true, passive: true });
+  canvasEl.addEventListener('touchmove', onTouchZoomTrack, { capture: true, passive: true });
+
   let ejectGuard = { t: 0, h: null, agl: null };
   function antiEjectionTick() {
     try {
@@ -1265,13 +1382,21 @@ export function loadPflWindowFramework({ viewer }) {
       const lat = Cesium.Math.toDegrees(c.latitude);
       const lon = Cesium.Math.toDegrees(c.longitude);
       const agl = c.height - resolveLocalGroundM(lon, lat);
-      const mouseActive = pointerButtonsDown > 0 || now - lastPointerActivityMs < 600;
+      const isZooming =
+        rightButtonDown ||
+        Boolean(activeMouseButtonsMask & 2) ||
+        now - lastZoomActivityMs < 850;
+      const leftOrMiddleActive =
+        !isZooming &&
+        (leftOrMiddleButtonsDown > 0 ||
+          Boolean(activeMouseButtonsMask & 1) ||
+          Boolean(activeMouseButtonsMask & 4));
       if (
         ejectGuard.h !== null &&
-        now - ejectGuard.t < 400 &&
-        ejectGuard.agl < 120 &&
-        c.height - ejectGuard.h > 500 &&
-        mouseActive &&
+        now - ejectGuard.t < 1600 &&
+        ejectGuard.agl < 160 &&
+        c.height - ejectGuard.h > 2500 &&
+        leftOrMiddleActive &&
         !droneOrbitState.active
       ) {
         viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
@@ -1284,9 +1409,7 @@ export function loadPflWindowFramework({ viewer }) {
         ejectGuard = { t: now, h: lastSafeYardPose.height, agl: 1 };
         return;
       }
-      if (ejectGuard.h === null || now - ejectGuard.t >= 400 || agl < 120) {
-        ejectGuard = { t: now, h: c.height, agl };
-      }
+      ejectGuard = { t: now, h: c.height, agl };
     } catch {}
   }
   const antiEjectionUnsub = viewer.scene.preRender.addEventListener(antiEjectionTick);
@@ -1296,11 +1419,13 @@ export function loadPflWindowFramework({ viewer }) {
     if (!dragMovableSession) {
       // Hover hotspot: pointer cursor + cyan outline over any clickable object
       const nowMs = Date.now();
-      if (pointerButtonsDown > 0 || nowMs - lastHoverCheckMs < 110 || !moveEv?.endPosition) return;
+      if (activeMouseButtonsMask > 0 || leftOrMiddleButtonsDown > 0 || rightButtonDown || nowMs - lastHoverCheckMs < 95 || !moveEv?.endPosition) return;
       lastHoverCheckMs = nowMs;
       let hit = null;
       try { hit = drillFindTarget(moveEv.endPosition); } catch {}
-      const hoverKey = hit ? (hit.type === 'portal' ? 'portal' : String(hit.mov?.kind || '')) : null;
+      const hoverKey = hit
+        ? (hit.type === 'portal' ? 'portal' : hit.type === 'mls-room' ? `mls:${hit.roomId}` : String(hit.mov?.kind || ''))
+        : null;
       if (hoverKey === lastHoverKey) return;
       lastHoverKey = hoverKey;
       viewer.scene.canvas.style.cursor = hit ? 'pointer' : '';
@@ -1318,45 +1443,42 @@ export function loadPflWindowFramework({ viewer }) {
     if (!dragMovableSession.moved && Math.hypot(dx, dy) < 4) return;
     dragMovableSession.moved = true;
     try {
-      const ray = viewer.camera.getPickRay(moveEv.endPosition);
-      if (!ray) return;
-      const origL = Cesium.Matrix4.multiplyByPoint(dragMovableSession.invEnu, ray.origin, new Cesium.Cartesian3());
-      const dirL = Cesium.Matrix4.multiplyByPointAsVector(dragMovableSession.invEnu, ray.direction, new Cesium.Cartesian3());
-      if (Math.abs(dirL.z) > 1e-4) {
-        const t = -origL.z / dirL.z;
-        if (t > 0 && t < 450) {
-          const hitLocal = new Cesium.Cartesian3(
-            Math.max(-85, Math.min(85, origL.x + dirL.x * t)),
-            Math.max(-85, Math.min(85, origL.y + dirL.y * t)),
-            0,
-          );
-          const hitWorld = Cesium.Matrix4.multiplyByPoint(dragMovableSession.enu, hitLocal, new Cesium.Cartesian3());
-          const cg = Cesium.Cartographic.fromCartesian(hitWorld);
-          dragMovableSession.mov.update({
-            lat: Cesium.Math.toDegrees(cg.latitude),
-            lon: Cesium.Math.toDegrees(cg.longitude),
-          });
-          syncActiveMovableGizmo();
-          if (droneOrbitState.active && dragMovableSession.mov.kind === droneOrbitState.targetKey) {
-            applyDroneOrbit();
-          }
-        }
+      let deltaX = 0;
+      let deltaY = 0;
+      if (dragMovableSession.useRayDelta) {
+        const curHit = computeDampedEnuRayPoint(moveEv.endPosition, dragMovableSession.invEnu);
+        if (!curHit) return;
+        deltaX = curHit.x - dragMovableSession.grabLocalX;
+        deltaY = curHit.y - dragMovableSession.grabLocalY;
+      } else {
+        const rightM = dx * dragMovableSession.metersPerPx;
+        const fwdM = -dy * dragMovableSession.metersPerPx * 1.35;
+        deltaX = dragMovableSession.camRightX * rightM + dragMovableSession.camFwdX * fwdM;
+        deltaY = dragMovableSession.camRightY * rightM + dragMovableSession.camFwdY * fwdM;
+      }
+      const distMove = Math.hypot(deltaX, deltaY);
+      if (distMove > 25) {
+        const clampScale = 25 / distMove;
+        deltaX *= clampScale;
+        deltaY *= clampScale;
+      }
+      const hitLocal = new Cesium.Cartesian3(deltaX, deltaY, 0);
+      const hitWorld = Cesium.Matrix4.multiplyByPoint(dragMovableSession.enu, hitLocal, new Cesium.Cartesian3());
+      const cg = Cesium.Cartographic.fromCartesian(hitWorld);
+      dragMovableSession.mov.update({
+        lat: Cesium.Math.toDegrees(cg.latitude),
+        lon: Cesium.Math.toDegrees(cg.longitude),
+      });
+      syncActiveMovableGizmo();
+      if (droneOrbitState.active && dragMovableSession.mov.kind === droneOrbitState.targetKey) {
+        applyDroneOrbit();
       }
     } catch {}
   }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
   pickHandler.setInputAction(() => {
     endLookDrag();
-    if (!dragMovableSession) return;
-    const wasMoved = dragMovableSession.moved;
-    dragMovableSession = null;
-    if (wasMoved) lastDragReleaseMs = Date.now();
-    const ctrl = viewer?.scene?.screenSpaceCameraController;
-    if (ctrl) {
-      ctrl.enableRotate = true;
-      ctrl.enableTranslate = true;
-      ctrl.enableTilt = true;
-    }
+    endDragMovableSession();
   }, Cesium.ScreenSpaceEventType.LEFT_UP);
 
   pickHandler.setInputAction((movement) => {
@@ -1393,6 +1515,10 @@ export function loadPflWindowFramework({ viewer }) {
     if (!hit) return;
     if (hit.type === 'portal') {
       openHolodeckHallway();
+      return;
+    }
+    if (hit.type === 'mls-room') {
+      openMlsWalkthrough(hit.roomId);
       return;
     }
     if (hit.type === 'movable' && hit.mov) {
@@ -1449,14 +1575,23 @@ export function loadPflWindowFramework({ viewer }) {
     sl?.scrollIntoView?.({ block: 'center' });
     sl?.focus?.();
   });
+  compassWin.body.querySelector('#pfl-hs-walk-house')?.addEventListener('click', () => {
+    openMlsWalkthrough();
+  });
   compassWin.body.querySelector('#pfl-hs-play')?.addEventListener('click', () => {
     if (!activeMovable) return;
     const kind = String(activeMovable.kind || '');
+    if (kind === 'house') {
+      openMlsWalkthrough();
+      return;
+    }
     if (kind.startsWith('yardframe:')) {
       const fe = viewer.entities.getById(`yardframe:${kind.slice('yardframe:'.length)}`);
-      let url = null;
-      try { url = fe?.polygon?.material?.image?.getValue?.(Cesium.JulianDate.now()); } catch {}
-      if (url && typeof url === 'object') url = url.url || url.src || null;
+      let url = fe?._pflSourceImageUrl || null;
+      if (!url) {
+        try { url = fe?.polygon?.material?.image?.getValue?.(Cesium.JulianDate.now()); } catch {}
+        if (url && typeof url === 'object') url = url.url || url.src || null;
+      }
       if (typeof url === 'string' && url) {
         window.open(url, '_blank', 'noopener');
         return;
@@ -2317,10 +2452,56 @@ export function loadPflWindowFramework({ viewer }) {
     });
     refreshInlineKalshi();
   });
+  function toggleGevLayerById(layerId) {
+    if (layerId === 'radio') {
+      const rBtn =
+        document.querySelector('[data-layer-id="radio"] .data-toggle-btn') ||
+        document.getElementById('radio-enable-btn');
+      if (rBtn) {
+        rBtn.click();
+        return true;
+      }
+    }
+    const btn =
+      document.querySelector(`[data-layer-id="${layerId}"] .data-toggle-btn`) ||
+      document.querySelector(`[data-layer="${layerId}"] .data-toggle-btn`) ||
+      document.querySelector(`[data-layer-id="${layerId}"], [data-layer="${layerId}"]`);
+    if (btn) btn.click();
+    return Boolean(btn);
+  }
+  function getGevLayerStatus(layerId) {
+    const btn =
+      document.querySelector(`[data-layer-id="${layerId}"] .data-toggle-btn`) ||
+      document.querySelector(`[data-layer="${layerId}"] .data-toggle-btn`) ||
+      (layerId === 'radio' ? document.getElementById('radio-enable-btn') : null);
+    if (!btn) return { active: false, disabled: false, label: 'OFF' };
+    const disabled = btn.getAttribute('aria-disabled') === 'true' || btn.disabled;
+    const fs = String(btn.getAttribute('data-feed-state') || '').toLowerCase();
+    const cls = String(btn.className || '');
+    const txt = String(btn.textContent || '').trim().toUpperCase();
+    const pressed = btn.getAttribute('aria-pressed') === 'true';
+    const active =
+      pressed ||
+      cls.includes('active') ||
+      cls.includes('is-on') ||
+      fs === 'active' ||
+      fs === 'live' ||
+      fs === 'loading' ||
+      txt === 'ON' ||
+      txt === 'LIVE';
+    return {
+      active,
+      disabled,
+      label: active ? 'ON' : (disabled ? 'SETUP KEY' : 'OFF'),
+    };
+  }
+  function isGevLayerActive(layerId) {
+    return getGevLayerStatus(layerId).active;
+  }
+
   kalshiWin.body.querySelector('#pfl-kalshi-wx-btn')?.addEventListener('click', () => {
     for (const id of ['weather', 'wind', 'cyclones']) {
-      const toggle = document.querySelector(`[data-layer-id="${id}"], [data-layer="${id}"]`);
-      if (toggle) toggle.click();
+      toggleGevLayerById(id);
     }
   });
   refreshInlineKalshi();
@@ -3113,9 +3294,9 @@ export function loadPflWindowFramework({ viewer }) {
       yardLandmarkIds.push(canopyId);
     }
 
-    // 3D Monaco 40ft Class-A Diesel Pusher Coach RV in East Driveway (12.2m L × 2.59m W × 3.65m H)
-    const MONACO_POSE_KEY = 'pfl_monaco_pose_v1';
-    let monacoState = { lat: 29.247485, lon: -95.231315, heading: 175, lift: 0 };
+    // 3D Monaco 40ft Class-A Diesel Pusher Coach RV in East Driveway beside Fleetwood RV (12.2m L × 2.59m W × 3.65m H)
+    const MONACO_POSE_KEY = 'pfl_monaco_pose_v2';
+    let monacoState = { lat: 29.247510, lon: -95.231268, heading: 175, lift: 0 };
     try {
       const savedMon = JSON.parse(localStorage.getItem(MONACO_POSE_KEY) || 'null');
       if (savedMon && Number.isFinite(savedMon.lat) && Number.isFinite(savedMon.lon)) {
@@ -3130,38 +3311,44 @@ export function loadPflWindowFramework({ viewer }) {
       lc.width = 512;
       lc.height = 256;
       const lctx = lc.getContext('2d');
-      lctx.fillStyle = '#e7dfd3';
-      lctx.fillRect(0, 0, 512, 256);
-      // Champagne lower basement bays
-      lctx.fillStyle = '#cbbba4';
-      lctx.fillRect(0, 174, 512, 82);
-      // Burgundy & Gold Monaco signature swoosh stripes
-      lctx.fillStyle = '#7f1d1d';
+      // Executive Pearl-Ivory & Brushed Warm Champagne Coach Finish
+      const upperGrad = lctx.createLinearGradient(0, 0, 0, 176);
+      upperGrad.addColorStop(0, '#f7f3eb');
+      upperGrad.addColorStop(0.65, '#efe8dc');
+      upperGrad.addColorStop(1, '#e5dccb');
+      lctx.fillStyle = upperGrad;
+      lctx.fillRect(0, 0, 512, 176);
+      // Brushed champagne metallic lower basement skirt
+      const skirtGrad = lctx.createLinearGradient(0, 170, 0, 256);
+      skirtGrad.addColorStop(0, '#d8cab6');
+      skirtGrad.addColorStop(1, '#c7b69e');
+      lctx.fillStyle = skirtGrad;
+      lctx.fillRect(0, 170, 512, 86);
+      // Subtle executive champagne-gold & warm taupe coach accent lines (soft, clean, non-garish)
+      lctx.strokeStyle = 'rgba(180, 146, 90, 0.62)';
+      lctx.lineWidth = 3;
       lctx.beginPath();
-      lctx.moveTo(0, 148);
-      lctx.quadraticCurveTo(220, 122, 512, 158);
-      lctx.lineTo(512, 176);
-      lctx.quadraticCurveTo(220, 142, 0, 166);
-      lctx.closePath();
-      lctx.fill();
-      lctx.strokeStyle = '#d97706';
-      lctx.lineWidth = 4;
-      lctx.beginPath();
-      lctx.moveTo(0, 142);
-      lctx.quadraticCurveTo(220, 116, 512, 152);
+      lctx.moveTo(0, 156);
+      lctx.bezierCurveTo(170, 146, 340, 150, 512, 160);
       lctx.stroke();
-      // Tinted coach salon windows
-      lctx.fillStyle = '#0f172a';
+      lctx.strokeStyle = 'rgba(120, 108, 92, 0.45)';
+      lctx.lineWidth = 2;
+      lctx.beginPath();
+      lctx.moveTo(0, 165);
+      lctx.bezierCurveTo(170, 155, 340, 159, 512, 168);
+      lctx.stroke();
+      // Frameless flush tinted salon windows
+      lctx.fillStyle = '#1e293b';
       for (const [wx, ww] of [[38, 110], [168, 96], [284, 88], [392, 82]]) {
         lctx.beginPath();
-        lctx.roundRect(wx, 48, ww, 58, 6);
+        lctx.roundRect(wx, 48, ww, 56, 6);
         lctx.fill();
       }
-      // Storage bay doors lines
-      lctx.strokeStyle = 'rgba(71, 85, 105, 0.55)';
-      lctx.lineWidth = 2;
+      // Subtle storage bay door seams
+      lctx.strokeStyle = 'rgba(100, 90, 78, 0.38)';
+      lctx.lineWidth = 1.5;
       for (let bx = 42; bx < 470; bx += 72) {
-        lctx.strokeRect(bx, 184, 64, 58);
+        lctx.strokeRect(bx, 182, 64, 58);
       }
       viewer._pflMonacoLiveryCanvas = lc;
     }
@@ -3256,14 +3443,14 @@ export function loadPflWindowFramework({ viewer }) {
           Cesium.Color.fromCssColorString('#f8fafc').withAlpha(0.95),
           Cesium.Color.fromCssColorString('#94a3b8').withAlpha(0.7),
         ),
-        // Passenger-Side Burgundy/Gold Patio Awning Cassette (+X right side)
+        // Passenger-Side Champagne Patio Awning Cassette (+X right side)
         placeMonacoPart(
           'pfl-monaco-rv-awning',
           '🚌 Monaco Patio Awning',
           1.34, 0.85, 3.42,
           new Cesium.Cartesian3(0.16, 6.80, 0.20),
-          Cesium.Color.fromCssColorString('#7f1d1d').withAlpha(0.94),
-          Cesium.Color.fromCssColorString('#f59e0b').withAlpha(0.9),
+          Cesium.Color.fromCssColorString('#d6c7b2').withAlpha(0.95),
+          Cesium.Color.fromCssColorString('#b4925a').withAlpha(0.85),
         ),
       ];
       return parts;
@@ -3869,24 +4056,539 @@ export function loadPflWindowFramework({ viewer }) {
   }, 2200);
   window.addEventListener('gev:map-stack-changed', () => setTimeout(syncAlways3dVisibility, 400));
 
+  // 8) 32 MLS Interior Photos Interactive 2-Floor + Waterfront Walkthrough & Guided Auto-Tour + 3D Room Hotspot Pins
+  const MLS_ROOMS = [
+    { id: 'boathouse-wf', floor: 'waterfront', title: '⚓ Boathouse, Boat Lift & Bayou Gazebo', shortTag: '⚓ BOATHOUSE & GAZEBO', codes: ['m00', 'm27', 'm28', 'm29', 'm30', 'm31'], lat: 29.247770, lon: -95.231390, altOff: 1.9, az: 175, pitch: -18, range: 17.5 },
+    { id: 'porch-2f', floor: '2f', title: '🌅 2F Screened Bayou Porch (1,470 sf Level)', shortTag: '🌅 2F BAYOU PORCH', codes: ['m04', 'm05', 'm26'], lat: 29.247635, lon: -95.231385, altOff: 5.8, az: 10, pitch: -16, range: 11.5 },
+    { id: 'living-2f', floor: '2f', title: '🛋️ 2F Living Room (Bayou View)', shortTag: '🛋️ 2F LIVING RM', codes: ['m06', 'm07'], lat: 29.247605, lon: -95.231390, altOff: 5.8, az: 20, pitch: -20, range: 12.5 },
+    { id: 'kitchen-2f', floor: '2f', title: '🍳 2F Chef Kitchen (East Wing)', shortTag: '🍳 2F KITCHEN', codes: ['m08', 'm10'], lat: 29.247595, lon: -95.231345, altOff: 5.8, az: 265, pitch: -20, range: 12.0 },
+    { id: 'dining-2f', floor: '2f', title: '🍽️ 2F Dining Area (NE Bayou Corner)', shortTag: '🍽️ 2F DINING', codes: ['m09', 'm11'], lat: 29.247618, lon: -95.231348, altOff: 5.8, az: 235, pitch: -20, range: 12.0 },
+    { id: 'master-sw-2f', floor: '2f', title: '🛏️ 2F Master SW & Guest Bedrooms', shortTag: '🛏️ 2F MASTER SW', codes: ['m12', 'm15'], lat: 29.247568, lon: -95.231425, altOff: 5.9, az: 55, pitch: -20, range: 11.5 },
+    { id: 'office-nw-2f', floor: '2f', title: '💻 2F Waterfront Office (NW Wing)', shortTag: '💻 2F OFFICE', codes: ['m14'], lat: 29.247622, lon: -95.231425, altOff: 5.9, az: 125, pitch: -18, range: 11.5 },
+    { id: 'baths-2f', floor: '2f', title: '🚿 2F Primary & Hall Baths', shortTag: '🚿 2F BATHS', codes: ['m13', 'm16'], lat: 29.247585, lon: -95.231408, altOff: 5.8, az: 90, pitch: -22, range: 11.5 },
+    { id: 'balcony-2f', floor: '2f', title: '☀️ 2F Front Balcony (Palm Dr View)', shortTag: '☀️ 2F BALCONY', codes: ['m02', 'm03', 'm17'], lat: 29.247548, lon: -95.231385, altOff: 5.6, az: 185, pitch: -16, range: 13.0 },
+    { id: 'patio-1f', floor: '1f', title: '🌿 1F Covered Waterfront Patio (1,570 sf Level)', shortTag: '🌿 1F PATIO', codes: ['m01', 'm19'], lat: 29.247642, lon: -95.231385, altOff: 1.8, az: 180, pitch: -14, range: 11.5 },
+    { id: 'gameroom-1f', floor: '1f', title: '🎱 1F Cedar Gameroom & Great Room (1,570 sf)', shortTag: '🎱 1F GAMEROOM', codes: ['m18', 'm19', 'm20', 'm21'], lat: 29.247598, lon: -95.231388, altOff: 2.2, az: 15, pitch: -16, range: 12.5 },
+    { id: 'galley-1f', floor: '1f', title: '☕ 1F Galley Kitchenette', shortTag: '☕ 1F GALLEY', codes: ['m22', 'm23'], lat: 29.247582, lon: -95.231348, altOff: 2.2, az: 260, pitch: -16, range: 11.5 },
+    { id: 'utility-1f', floor: '1f', title: '🧺 1F Utility & Laundry Room', shortTag: '🧺 1F UTILITY', codes: ['m24'], lat: 29.247566, lon: -95.231355, altOff: 2.2, az: 295, pitch: -18, range: 11.5 },
+    { id: 'bath3-1f', floor: '1f', title: '🚿 1F Full Bath #3', shortTag: '🚿 1F BATH 3', codes: ['m25'], lat: 29.247570, lon: -95.231415, altOff: 2.2, az: 75, pitch: -18, range: 11.5 },
+  ];
+
+  const MLS_PHOTO_CAPTIONS = {
+    m00: 'Chocolate Bayou Waterfront Hero — 2-Story House, Covered Boat Lift & Pier Gazebo',
+    m01: '1st Floor Covered Waterfront Patio & Screened Upstairs Porch',
+    m02: '2nd Floor South Front Facade, Elevated Balcony & Driveway Approach',
+    m03: '2nd Floor Front Sun Deck & Coastal Yellow Siding Detail',
+    m04: '2nd Floor Screened Bayou Porch — Porch Swing & Panoramic Water View',
+    m05: '2nd Floor Screened Bayou Porch — Full-Width Screened Breezeway',
+    m06: '2nd Floor Living Room (1,470 sf Level) — Bayou Windows & Dining Arch',
+    m07: '2nd Floor Living Room — Open Concept Seating & Ceiling Fan',
+    m08: '2nd Floor Main Kitchen — Custom Wood Cabinetry & Prep Island',
+    m09: '2nd Floor Dining Room — Bayou-Side Windows & Built-In Hutch',
+    m10: '2nd Floor Kitchen — Appliances, Countertops & Pass-Through',
+    m11: '2nd Floor Dining & Kitchen Flow Looking Toward Living Room',
+    m12: '2nd Floor Master SW Bedroom — Palm Drive & West Yard View (Below Roof Bed)',
+    m13: '2nd Floor Primary En-Suite Bathroom',
+    m14: '2nd Floor Waterfront Office / NW Bedroom Overlooking Chocolate Bayou',
+    m15: '2nd Floor SE Guest Bedroom / Studio Overlooking Front Lawn',
+    m16: '2nd Floor Hall Full Bathroom #2',
+    m17: '2nd Floor Front Balcony Deck Looking Across Palm Drive',
+    m18: '1st Floor Cedar-Paneled Gameroom (1,570 sf Level) — Ship Model & Interior Stairs',
+    m19: '1st Floor Gameroom Looking Toward Waterfront French Doors & Patio',
+    m20: '1st Floor Gameroom — Expansive Entertaining & Fitness Floor',
+    m21: '1st Floor Gameroom — Wet Bar / Galley Entry & Wood Beam Ceiling',
+    m22: '1st Floor Galley Kitchen — Guest / Entertaining Prep Counter',
+    m23: '1st Floor Galley Kitchen — Cabinetry & Appliance Nook',
+    m24: '1st Floor Full-Size Utility, Washer/Dryer & Storage Room',
+    m25: '1st Floor Full Bathroom #3',
+    m26: '2nd Floor Screened Porch Looking Down Onto Backyard Oaks & Bayou',
+    m27: 'Backyard Live Oaks, Bulkhead Lawn & Chocolate Bayou Waterfront',
+    m28: 'Covered Pier Gazebo, White Dock Benches & Fishing Lights',
+    m29: 'Covered Boathouse, Boat Lift & Detached Yellow Workshop/Garage',
+    m30: 'Chocolate Bayou Deep-Water Channel Looking Toward GIWW / Galveston Bay',
+    m31: 'Waterfront Dock & 417 Palm Drive Estate From the Bayou',
+  };
+
+  // Ordered 32-photo guided sequence m00 -> m31
+  const MLS_PHOTOS = Array.from({ length: 32 }, (_, idx) => {
+    const code = `m${String(idx).padStart(2, '0')}`;
+    const room = MLS_ROOMS.find((r) => r.codes.includes(code)) || MLS_ROOMS[0];
+    return {
+      idx,
+      code,
+      url: `/palm-drive-mls/${code}.webp`,
+      caption: MLS_PHOTO_CAPTIONS[code] || `${room.title} (${code})`,
+      roomId: room.id,
+      floor: room.floor,
+      roomTitle: room.title,
+    };
+  });
+
+  const mlsWin = createStandardBox({
+    id: 'pfl-win-mls-walkthrough',
+    title: '🏠 417 PALM DR — 32-PHOTO 2-FLOOR + WATERFRONT WALKTHROUGH & AUTO-TOUR',
+    defaultLeft: Math.max(24, Math.round((window.innerWidth - 780) * 0.5)),
+    defaultTop: 72,
+    defaultWidth: 780,
+  });
+  mlsWin.box.style.display = 'none';
+  mlsWin.body.innerHTML = `
+    <div id="pfl-mls-walkthrough-root" style="font-family:'Inter',system-ui,sans-serif;font-size:11.5px;color:#e2e8f0;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
+        <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="pfl-std-cbtn" id="pfl-mls-autotour-btn" style="background:rgba(250,204,21,0.18);border-color:#facc15;color:#fde047;padding:4px 10px;font-size:11px">▶ Play Guided Room-by-Room Walkthrough</button>
+          <button type="button" class="pfl-std-cbtn" data-mls-floor="all" style="border-color:#38bdf8;color:#7dd3fc">All 32</button>
+          <button type="button" class="pfl-std-cbtn" data-mls-floor="2f">2nd Floor (1,470 sf)</button>
+          <button type="button" class="pfl-std-cbtn" data-mls-floor="1f">1st Floor (1,570 sf)</button>
+          <button type="button" class="pfl-std-cbtn" data-mls-floor="waterfront">⚓ Boathouse/Gazebo</button>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center">
+          <button type="button" class="pfl-std-cbtn" id="pfl-mls-pins-toggle" style="border-color:#4ade80;color:#86efac" title="Show/hide clickable 3D room hotspot pins around 417 Palm Drive">📍 3D Room Pins: ON</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-mls-close-btn" style="border-color:#f43f5e;color:#fda4af">✕ Close</button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:minmax(255px, 1fr) minmax(320px, 1.35fr);gap:10px;align-items:start">
+        <div id="pfl-mls-floorplan-pane" style="display:flex;flex-direction:column;gap:6px;background:rgba(15,23,42,0.82);border:1px solid rgba(56,189,248,0.32);border-radius:8px;padding:7px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#7dd3fc;display:flex;justify-content:space-between">
+            <span>⬆️ NORTH = CHOCOLATE BAYOU</span>
+            <span>CLICK ANY ROOM</span>
+          </div>
+
+          <div data-mls-plan-sec="waterfront" style="border:1px dashed rgba(34,211,238,0.45);border-radius:6px;padding:4px;background:rgba(8,47,73,0.32)">
+            <div style="font-size:9.5px;font-weight:700;color:#67e8f9;margin-bottom:3px">⚓ WATERFRONT SHORELINE</div>
+            <button type="button" class="pfl-std-cbtn" data-mls-room="boathouse-wf" style="width:100%;text-align:left;padding:4px 6px">⚓ Boathouse, Lift &amp; Gazebo <span style="color:#94a3b8">(m00,m27–m31)</span></button>
+          </div>
+
+          <div data-mls-plan-sec="2f" style="border:1px solid rgba(250,204,21,0.45);border-radius:6px;padding:5px;background:rgba(30,41,59,0.55)">
+            <div style="font-size:9.5px;font-weight:700;color:#fde047;margin-bottom:4px">🏠 2ND FLOOR — 1,470 SF (MAIN ELEVATED LIVING)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
+              <button type="button" class="pfl-std-cbtn" data-mls-room="porch-2f" style="grid-column:1 / -1;text-align:left;padding:3px 5px">🌅 Screened Bayou Porch <span style="color:#94a3b8">(m04,m05,m26)</span></button>
+              <button type="button" class="pfl-std-cbtn" data-mls-room="office-nw-2f" style="text-align:left;padding:3px 5px">💻 NW Office <span style="color:#94a3b8">(m14)</span></button>
+              <button type="button" class="pfl-std-cbtn" data-mls-room="dining-2f" style="text-align:left;padding:3px 5px">🍽️ Dining <span style="color:#94a3b8">(m09,m11)</span></button>
+              <button type="button" class="pfl-std-cbtn" data-mls-room="living-2f" style="text-align:left;padding:3px 5px">🛋️ Living Rm <span style="color:#94a3b8">(m06,m07)</span></button>
+              <button type="button" class="pfl-std-cbtn" data-mls-room="kitchen-2f" style="text-align:left;padding:3px 5px">🍳 Kitchen <span style="color:#94a3b8">(m08,m10)</span></button>
+              <button type="button" class="pfl-std-cbtn" data-mls-room="master-sw-2f" style="text-align:left;padding:3px 5px">🛏️ Master SW <span style="color:#94a3b8">(m12,m15)</span></button>
+              <button type="button" class="pfl-std-cbtn" data-mls-room="baths-2f" style="text-align:left;padding:3px 5px">🚿 Baths 1–2 <span style="color:#94a3b8">(m13,m16)</span></button>
+              <button type="button" class="pfl-std-cbtn" data-mls-room="balcony-2f" style="grid-column:1 / -1;text-align:left;padding:3px 5px">☀️ South Front Balcony <span style="color:#94a3b8">(m02,m03,m17)</span></button>
+            </div>
+          </div>
+
+          <div data-mls-plan-sec="1f" style="border:1px solid rgba(74,222,128,0.42);border-radius:6px;padding:5px;background:rgba(15,23,42,0.68)">
+            <div style="font-size:9.5px;font-weight:700;color:#86efac;margin-bottom:4px">🎱 1ST FLOOR — 1,570 SF (GROUND / ENTERTAINING)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
+              <button type="button" class="pfl-std-cbtn" data-mls-room="patio-1f" style="grid-column:1 / -1;text-align:left;padding:3px 5px">🌿 Covered Bayou Patio <span style="color:#94a3b8">(m01,m19)</span></button>
+              <button type="button" class="pfl-std-cbtn" data-mls-room="gameroom-1f" style="text-align:left;padding:3px 5px">🎱 Gameroom <span style="color:#94a3b8">(m18–m21)</span></button>
+              <button type="button" class="pfl-std-cbtn" data-mls-room="galley-1f" style="text-align:left;padding:3px 5px">☕ Galley Kit <span style="color:#94a3b8">(m22,m23)</span></button>
+              <button type="button" class="pfl-std-cbtn" data-mls-room="bath3-1f" style="text-align:left;padding:3px 5px">🚿 Bath 3 <span style="color:#94a3b8">(m25)</span></button>
+              <button type="button" class="pfl-std-cbtn" data-mls-room="utility-1f" style="text-align:left;padding:3px 5px">🧺 Utility <span style="color:#94a3b8">(m24)</span></button>
+            </div>
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#94a3b8;text-align:center">⬇️ SOUTH = PALM DRIVE &amp; EAST CARPORT</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="position:relative;background:#020617;border:1.5px solid rgba(250,204,21,0.5);border-radius:8px;overflow:hidden;min-height:230px;display:flex;align-items:center;justify-content:center">
+            <img id="pfl-mls-photo-img" src="/palm-drive-mls/m00.webp" alt="417 Palm Drive MLS Interior Walkthrough" style="width:100%;max-height:310px;object-fit:contain;display:block;background:#020617" />
+            <div id="pfl-mls-photo-badge" style="position:absolute;top:6px;left:6px;background:rgba(9,14,26,0.88);border:1px solid rgba(56,189,248,0.65);border-radius:5px;padding:2px 7px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#7dd3fc">1 / 32 · m00</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+            <button type="button" class="pfl-std-cbtn" id="pfl-mls-prev" style="padding:3px 9px">◀ Prev</button>
+            <div style="flex:1;text-align:center;min-width:0">
+              <div id="pfl-mls-room-heading" style="font-weight:700;color:#fde047;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">⚓ Boathouse, Boat Lift &amp; Bayou Gazebo</div>
+              <div id="pfl-mls-photo-caption" style="color:#cbd5e1;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Chocolate Bayou Waterfront Hero</div>
+            </div>
+            <button type="button" class="pfl-std-cbtn" id="pfl-mls-next" style="padding:3px 9px">Next ▶</button>
+          </div>
+          <div id="pfl-mls-thumbs" style="display:flex;gap:4px;overflow-x:auto;padding:4px;background:rgba(9,14,26,0.75);border:1px solid #1e293b;border-radius:6px"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  let currentMlsIdx = 0;
+  let mlsFloorFilter = 'all';
+  let mlsAutoTourPlaying = false;
+  let mlsAutoTourTimer = 0;
+  let mlsRoomPinsOn = true;
+  const mlsPinEntityIds = [];
+
+  function makeMlsPinCanvas(text, active = false) {
+    const c = document.createElement('canvas');
+    c.width = 236;
+    c.height = 34;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = active ? 'rgba(66, 32, 6, 0.94)' : 'rgba(9, 14, 26, 0.88)';
+    ctx.strokeStyle = active ? '#facc15' : '#38bdf8';
+    ctx.lineWidth = active ? 2.6 : 1.8;
+    ctx.beginPath();
+    ctx.roundRect(2, 2, 232, 30, 7);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = active ? '#fef08a' : '#e0f2fe';
+    ctx.font = '700 11.5px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text.slice(0, 24), 118, 17);
+    return c;
+  }
+
+  function syncMlsRoomPins(activeRoomId = null) {
+    if (!viewer?.entities) return;
+    for (const pid of mlsPinEntityIds) {
+      try { viewer.entities.removeById(pid); } catch {}
+    }
+    mlsPinEntityIds.length = 0;
+    if (!mlsRoomPinsOn) {
+      governorRequestRender('pfl-mls-pins-off');
+      return;
+    }
+    for (const r of MLS_ROOMS) {
+      const pid = `pfl-mls-pin-${r.id}`;
+      const gAlt = resolveLocalGroundM(r.lon, r.lat);
+      const isAct = r.id === activeRoomId;
+      const ent = viewer.entities.add({
+        id: pid,
+        name: `🏠 ${r.title}`,
+        position: Cesium.Cartesian3.fromDegrees(r.lon, r.lat, gAlt + r.altOff),
+        billboard: {
+          image: makeMlsPinCanvas(r.shortTag, isAct),
+          width: isAct ? 132 : 114,
+          height: isAct ? 19 : 16,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 95),
+          disableDepthTestDistance: 55,
+        },
+      });
+      ent._pflMlsRoomId = r.id;
+      mlsPinEntityIds.push(pid);
+    }
+    governorRequestRender('pfl-mls-pins-sync');
+  }
+
+  function flyCameraToMlsRoom(room) {
+    if (!room || !viewer?.camera) return;
+    unlockDroneCamera();
+    enforceZeroAltitudeKickGuard();
+    try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
+    const gAlt = resolveLocalGroundM(room.lon, room.lat);
+    const targetAlt = gAlt + room.altOff;
+    const azRad = Cesium.Math.toRadians(room.az);
+    const pitchRad = Cesium.Math.toRadians(room.pitch);
+    const horizM = Math.cos(pitchRad) * room.range;
+    const eyeLat = room.lat - (Math.cos(azRad) * horizM) / 111320;
+    const eyeLon = room.lon - (Math.sin(azRad) * horizM) / (111320 * Math.cos(Cesium.Math.toRadians(room.lat)));
+    const eyeAlt = targetAlt - Math.sin(pitchRad) * room.range;
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(eyeLon, eyeLat, eyeAlt),
+      orientation: {
+        heading: azRad,
+        pitch: pitchRad,
+        roll: 0,
+      },
+      duration: 0.9,
+    });
+  }
+
+  const mlsThumbsEl = mlsWin.body.querySelector('#pfl-mls-thumbs');
+  if (mlsThumbsEl) {
+    mlsThumbsEl.innerHTML = MLS_PHOTOS.map((p) => `
+      <button type="button" class="pfl-std-cbtn" data-mls-idx="${p.idx}" style="flex:0 0 auto;padding:2px;display:flex;flex-direction:column;align-items:center;gap:1px" title="${p.code}: ${p.caption}">
+        <img src="${p.url}" alt="${p.code}" loading="lazy" style="width:46px;height:32px;object-fit:cover;border-radius:3px;display:block" />
+        <span style="font-size:9px">${p.code}</span>
+      </button>
+    `).join('');
+    mlsThumbsEl.querySelectorAll('[data-mls-idx]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        showMlsPhotoIndex(Number(btn.getAttribute('data-mls-idx')), true);
+      });
+    });
+  }
+
+  function showMlsPhotoIndex(idx, fly3d = true) {
+    const p = MLS_PHOTOS[((idx % MLS_PHOTOS.length) + MLS_PHOTOS.length) % MLS_PHOTOS.length];
+    if (!p) return;
+    currentMlsIdx = p.idx;
+    const imgEl = mlsWin.body.querySelector('#pfl-mls-photo-img');
+    const badgeEl = mlsWin.body.querySelector('#pfl-mls-photo-badge');
+    const headEl = mlsWin.body.querySelector('#pfl-mls-room-heading');
+    const capEl = mlsWin.body.querySelector('#pfl-mls-photo-caption');
+    if (imgEl) imgEl.src = p.url;
+    if (badgeEl) badgeEl.textContent = `${p.idx + 1} / 32 · ${p.code}`;
+    if (headEl) headEl.textContent = p.roomTitle;
+    if (capEl) capEl.textContent = p.caption;
+    mlsWin.body.querySelectorAll('[data-mls-room]').forEach((b) => {
+      const match = b.getAttribute('data-mls-room') === p.roomId;
+      b.style.borderColor = match ? '#facc15' : '';
+      b.style.color = match ? '#fef08a' : '';
+      b.style.background = match ? 'rgba(250,204,21,0.16)' : '';
+    });
+    mlsWin.body.querySelectorAll('[data-mls-idx]').forEach((b) => {
+      const match = Number(b.getAttribute('data-mls-idx')) === p.idx;
+      b.style.borderColor = match ? '#facc15' : '';
+      if (match) b.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+    });
+    if (mlsRoomPinsOn) syncMlsRoomPins(p.roomId);
+    if (fly3d) {
+      const room = MLS_ROOMS.find((r) => r.id === p.roomId);
+      if (room) flyCameraToMlsRoom(room);
+    }
+  }
+
+  function stopMlsAutoTour() {
+    mlsAutoTourPlaying = false;
+    clearInterval(mlsAutoTourTimer);
+    const btn = mlsWin.body.querySelector('#pfl-mls-autotour-btn');
+    if (btn) {
+      btn.textContent = '▶ Play Guided Room-by-Room Walkthrough';
+      btn.style.borderColor = '#facc15';
+      btn.style.color = '#fde047';
+    }
+  }
+
+  function startMlsAutoTour(fromStart = false) {
+    clearInterval(mlsAutoTourTimer);
+    mlsAutoTourPlaying = true;
+    const btn = mlsWin.body.querySelector('#pfl-mls-autotour-btn');
+    if (btn) {
+      btn.textContent = '⏸ Pause Guided Walkthrough (m00 → m31)';
+      btn.style.borderColor = '#4ade80';
+      btn.style.color = '#86efac';
+    }
+    if (fromStart) showMlsPhotoIndex(0, true);
+    else showMlsPhotoIndex(currentMlsIdx, true);
+    mlsAutoTourTimer = window.setInterval(() => {
+      if (!mlsAutoTourPlaying) return;
+      const pool = mlsFloorFilter === 'all' ? MLS_PHOTOS : MLS_PHOTOS.filter((x) => x.floor === mlsFloorFilter);
+      if (!pool.length) return;
+      const curPoolPos = pool.findIndex((x) => x.idx === currentMlsIdx);
+      const nextPhoto = pool[(curPoolPos + 1) % pool.length];
+      showMlsPhotoIndex(nextPhoto.idx, true);
+    }, 2600);
+  }
+
+  openMlsWalkthrough = (roomId = null, autoPlay = false) => {
+    mlsWin.box.style.display = 'flex';
+    mlsWin.box.classList.remove('pfl-minimized');
+    const mb = mlsWin.box.querySelector('[data-act="min"]');
+    if (mb) mb.textContent = '—';
+    mlsWin.box.style.zIndex = '9760';
+    if (roomId) {
+      const room = MLS_ROOMS.find((r) => r.id === roomId);
+      const firstCode = room?.codes?.[0];
+      const photo = MLS_PHOTOS.find((x) => x.code === firstCode);
+      if (photo) showMlsPhotoIndex(photo.idx, true);
+    } else {
+      showMlsPhotoIndex(currentMlsIdx, false);
+    }
+    if (autoPlay) startMlsAutoTour(true);
+  };
+  window.__pflOpenMlsWalkthrough = openMlsWalkthrough;
+
+  mlsWin.body.querySelector('#pfl-mls-autotour-btn')?.addEventListener('click', () => {
+    if (mlsAutoTourPlaying) stopMlsAutoTour();
+    else startMlsAutoTour(false);
+  });
+  mlsWin.body.querySelector('#pfl-mls-prev')?.addEventListener('click', () => {
+    stopMlsAutoTour();
+    showMlsPhotoIndex(currentMlsIdx - 1, true);
+  });
+  mlsWin.body.querySelector('#pfl-mls-next')?.addEventListener('click', () => {
+    stopMlsAutoTour();
+    showMlsPhotoIndex(currentMlsIdx + 1, true);
+  });
+  mlsWin.body.querySelectorAll('[data-mls-room]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      stopMlsAutoTour();
+      const rid = btn.getAttribute('data-mls-room');
+      const room = MLS_ROOMS.find((r) => r.id === rid);
+      const firstPhoto = MLS_PHOTOS.find((x) => x.code === room?.codes?.[0]);
+      if (firstPhoto) showMlsPhotoIndex(firstPhoto.idx, true);
+    });
+  });
+  mlsWin.body.querySelectorAll('[data-mls-floor]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      mlsFloorFilter = btn.getAttribute('data-mls-floor') || 'all';
+      mlsWin.body.querySelectorAll('[data-mls-floor]').forEach((b) => {
+        const on = b.getAttribute('data-mls-floor') === mlsFloorFilter;
+        b.style.borderColor = on ? '#38bdf8' : '';
+        b.style.color = on ? '#7dd3fc' : '';
+      });
+      mlsWin.body.querySelectorAll('[data-mls-plan-sec]').forEach((sec) => {
+        const f = sec.getAttribute('data-mls-plan-sec');
+        sec.style.opacity = (mlsFloorFilter === 'all' || mlsFloorFilter === f) ? '1' : '0.42';
+      });
+      if (mlsFloorFilter !== 'all') {
+        const firstInFloor = MLS_PHOTOS.find((x) => x.floor === mlsFloorFilter);
+        if (firstInFloor) showMlsPhotoIndex(firstInFloor.idx, true);
+      }
+    });
+  });
+  mlsWin.body.querySelector('#pfl-mls-pins-toggle')?.addEventListener('click', (e) => {
+    mlsRoomPinsOn = !mlsRoomPinsOn;
+    e.currentTarget.textContent = mlsRoomPinsOn ? '📍 3D Room Pins: ON' : '📍 3D Room Pins: OFF';
+    e.currentTarget.style.borderColor = mlsRoomPinsOn ? '#4ade80' : 'rgba(148,163,184,0.35)';
+    e.currentTarget.style.color = mlsRoomPinsOn ? '#86efac' : '#94a3b8';
+    syncMlsRoomPins(MLS_PHOTOS[currentMlsIdx]?.roomId || null);
+  });
+  mlsWin.body.querySelector('#pfl-mls-close-btn')?.addEventListener('click', () => {
+    stopMlsAutoTour();
+    mlsWin.box.style.display = 'none';
+  });
+  syncMlsRoomPins(null);
+  window.addEventListener('gev:map-stack-changed', () => setTimeout(() => syncMlsRoomPins(MLS_PHOTOS[currentMlsIdx]?.roomId || null), 450));
+
+
+  // 9) Marine VHF Radio & Chocolate Bayou / USCG Houston-Galveston AIS Scanner Card
+  const MARINE_VHF_CHANNELS = [
+    { ch: 'Ch 16', mhz: '156.800 MHz', role: 'International Distress, Safety & Hailing', agency: 'USCG Sector Houston-Galveston (24/7 Guard)', accent: '#f87171' },
+    { ch: 'Ch 22A', mhz: '157.100 MHz', role: 'USCG Marine Safety Broadcasts & Notices', agency: 'USCG Sector Houston-Galveston Liaison', accent: '#fbbf24' },
+    { ch: 'Ch 13', mhz: '156.650 MHz', role: 'Bridge-to-Bridge Navigation (1W)', agency: 'Chocolate Bayou / GIWW Towboats, Barges & Bridges', accent: '#38bdf8' },
+    { ch: 'Ch 12', mhz: '156.600 MHz', role: 'Houston-Galveston VTS (Lower Bay)', agency: 'Vessel Traffic Service — Bolivar / Galveston / Texas City', accent: '#67e8f9' },
+    { ch: 'Ch 73 / 74', mhz: '156.675 / 156.725 MHz', role: 'Galveston-Houston Pilots & Port Ops', agency: 'Galveston / Freeport Ship Channel Pilots & Tugs', accent: '#c084fc' },
+    { ch: 'WX KHB-40', mhz: '162.550 MHz', role: 'NOAA Weather Radio — Galveston', agency: 'NWS Houston/Galveston Coastal & Bay Marine Forecast', accent: '#4ade80' },
+    { ch: 'WX WWG-40', mhz: '162.425 MHz', role: 'NOAA Weather Radio — Bay City', agency: 'Brazoria County / Liverpool / Chocolate Bayou Alerts', accent: '#86efac' },
+    { ch: 'AIS 87B/88B', mhz: '161.975 / 162.025 MHz', role: 'Live AIS Class A & B Vessel Transponders', agency: 'MMSI Position, SOG/COG & Barge Tow Telemetry', accent: '#22d3ee' },
+  ];
+
+  const vhfWin = createStandardBox({
+    id: 'pfl-win-marine-vhf',
+    title: '📻 MARINE VHF & CHOCOLATE BAYOU / USCG AIS SCANNER',
+    defaultLeft: Math.max(30, window.innerWidth - 520),
+    defaultTop: 140,
+    defaultWidth: 485,
+  });
+  vhfWin.box.style.display = 'none';
+  vhfWin.body.innerHTML = `
+    <div id="pfl-marine-vhf-root" style="font-family:'Inter',system-ui,sans-serif;font-size:11px;color:#e2e8f0;display:flex;flex-direction:column;gap:7px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 8px;background:rgba(8,47,73,0.48);border:1px solid rgba(34,211,238,0.5);border-radius:7px">
+        <div style="font-family:'JetBrains Mono',monospace">
+          <div style="font-size:9.5px;color:#67e8f9">USCG SECTOR HOUSTON-GALVESTON · BRAZORIA / CHOCOLATE BAYOU</div>
+          <div id="pfl-vhf-active-freq" style="font-size:12px;font-weight:800;color:#fde047">TUNED: Ch 13 · 156.650 MHz — Chocolate Bayou / GIWW Barges</div>
+        </div>
+        <button type="button" class="pfl-std-cbtn" id="pfl-vhf-close-btn" style="border-color:#f43f5e;color:#fda4af">✕ Close</button>
+      </div>
+
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button type="button" class="pfl-std-cbtn" id="pfl-vhf-toggle-ais" style="border-color:#22d3ee;color:#67e8f9;padding:4px 8px" title="Toggle God's Eye View's built-in Live AIS Marine Vessels layer (161.975 / 162.025 MHz)">🚢 Live AIS Vessels (161.975/162.025): OFF</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-vhf-toggle-radio" style="border-color:#c084fc;color:#e9d5ff;padding:4px 8px" title="Toggle God's Eye View's built-in Global Radio Browser audio layer">📻 Radio Browser Layer: OFF</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-vhf-fly-bayou" style="border-color:#4ade80;color:#86efac;padding:4px 8px" title="Fly over Chocolate Bayou, GIWW &amp; Galveston Bay barge corridor to watch Live AIS vessels">⚓ Fly Bayou / GIWW AIS Corridor</button>
+      </div>
+
+      <div style="border:1px solid #1e293b;border-radius:7px;overflow:hidden;background:rgba(9,14,26,0.86)">
+        ${MARINE_VHF_CHANNELS.map((c, idx) => `
+          <div class="pfl-vhf-row" data-vhf-idx="${idx}" style="display:grid;grid-template-columns:84px 128px 1fr;gap:6px;align-items:center;padding:5px 7px;border-bottom:1px solid rgba(30,41,59,0.75);cursor:pointer" title="Click to lock scanner readout &amp; copy frequency (${c.mhz})">
+            <strong style="font-family:'JetBrains Mono',monospace;color:${c.accent}">${c.ch}</strong>
+            <code style="color:#f8fafc;font-weight:700;font-size:10.5px">${c.mhz}</code>
+            <div style="min-width:0">
+              <div style="font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.role}</div>
+              <div style="font-size:9.5px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.agency}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  function syncMarineVhfLayerBadges() {
+    const aisBtn = vhfWin.body.querySelector('#pfl-vhf-toggle-ais');
+    const radBtn = vhfWin.body.querySelector('#pfl-vhf-toggle-radio');
+    const aisSt = getGevLayerStatus('vessels');
+    const radSt = getGevLayerStatus('radio');
+    if (aisBtn) {
+      aisBtn.textContent = `🚢 Live AIS Vessels (161.975/162.025): ${aisSt.label}`;
+      aisBtn.style.background = aisSt.active ? 'rgba(34,211,238,0.18)' : '';
+    }
+    if (radBtn) {
+      radBtn.textContent = `📻 Radio Browser Layer: ${radSt.label}`;
+      radBtn.style.background = radSt.active ? 'rgba(192,132,252,0.18)' : '';
+    }
+  }
+
+  toggleMarineVhfPanel = (forceOpen = null) => {
+    const currentlyHidden = vhfWin.box.style.display === 'none' || vhfWin.box.classList.contains('pfl-minimized');
+    const showNext = forceOpen !== null ? Boolean(forceOpen) : currentlyHidden;
+    vhfWin.box.style.display = showNext ? 'flex' : 'none';
+    if (showNext) {
+      vhfWin.box.classList.remove('pfl-minimized');
+      const mb = vhfWin.box.querySelector('[data-act="min"]');
+      if (mb) mb.textContent = '—';
+      vhfWin.box.style.zIndex = '9755';
+      syncMarineVhfLayerBadges();
+    }
+  };
+  window.__pflToggleMarineVhf = toggleMarineVhfPanel;
+
+  vhfWin.body.querySelector('#pfl-vhf-close-btn')?.addEventListener('click', () => {
+    vhfWin.box.style.display = 'none';
+  });
+  vhfWin.body.querySelector('#pfl-vhf-toggle-ais')?.addEventListener('click', () => {
+    toggleGevLayerById('vessels');
+    setTimeout(syncMarineVhfLayerBadges, 120);
+  });
+  vhfWin.body.querySelector('#pfl-vhf-toggle-radio')?.addEventListener('click', () => {
+    toggleGevLayerById('radio');
+    setTimeout(syncMarineVhfLayerBadges, 120);
+  });
+  vhfWin.body.querySelector('#pfl-vhf-fly-bayou')?.addEventListener('click', () => {
+    if (!isGevLayerActive('vessels')) {
+      toggleGevLayerById('vessels');
+      setTimeout(syncMarineVhfLayerBadges, 150);
+    }
+    unlockDroneCamera();
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(-95.215, 29.165, 18500),
+      orientation: {
+        heading: Cesium.Math.toRadians(145),
+        pitch: Cesium.Math.toRadians(-42),
+        roll: 0,
+      },
+      duration: 1.25,
+    });
+  });
+  vhfWin.body.querySelectorAll('.pfl-vhf-row').forEach((row) => {
+    row.addEventListener('click', () => {
+      const ch = MARINE_VHF_CHANNELS[Number(row.getAttribute('data-vhf-idx'))];
+      if (!ch) return;
+      const rd = vhfWin.body.querySelector('#pfl-vhf-active-freq');
+      if (rd) rd.textContent = `TUNED: ${ch.ch} · ${ch.mhz} — ${ch.role}`;
+      try { navigator.clipboard?.writeText?.(ch.mhz); } catch {}
+      if (ch.ch.startsWith('AIS') && !isGevLayerActive('vessels')) {
+        toggleGevLayerById('vessels');
+        setTimeout(syncMarineVhfLayerBadges, 150);
+      }
+    });
+  });
+  const vhfBadgeTimer = setInterval(() => {
+    if (vhfWin.box.style.display !== 'none') syncMarineVhfLayerBadges();
+  }, 1500);
+
   return {
     destroy() {
       unlockDroneCamera();
+      stopMlsAutoTour();
+      endDragMovableSession();
       clearInterval(timer);
       clearInterval(kalshiPoll);
       clearInterval(patrolCycleTimer);
       clearTimeout(scrubTimeout);
       clearInterval(always3dTimer);
       clearInterval(alarmPollTimer);
+      clearInterval(vhfBadgeTimer);
       window.removeEventListener('keydown', wasdKeydownHandler);
       try { viewer?.scene?.canvas?.removeEventListener?.('wheel', altWheelLensHandler, { capture: true }); } catch {}
       try { viewer?.entities?.removeById?.(GIZMO_ENTITY_ID); } catch {}
       try { viewer?.entities?.removeById?.(BORDER_ENTITY_ID); viewer?.entities?.removeById?.(HOVER_ENTITY_ID); } catch {}
+      try { for (const pid of mlsPinEntityIds) viewer?.entities?.removeById?.(pid); } catch {}
       try { antiEjectionUnsub?.(); } catch {}
       try {
         canvasEl.removeEventListener('pointerdown', onPtrDown, true);
+        window.removeEventListener('pointermove', onPtrMove, { capture: true });
         window.removeEventListener('pointerup', onPtrUp, true);
         window.removeEventListener('pointercancel', onPtrUp, true);
+        canvasEl.removeEventListener('wheel', onWheelZoomTrack, { capture: true });
+        canvasEl.removeEventListener('touchstart', onTouchZoomTrack, { capture: true });
+        canvasEl.removeEventListener('touchmove', onTouchZoomTrack, { capture: true });
       } catch {}
       try {
         const sc = viewer?.scene?.screenSpaceCameraController;
