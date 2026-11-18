@@ -236,7 +236,7 @@ export function createModel({ state: layerState, services, parts, source }) {
         headingDeg: normalizeHeading(safeNumber(camera.headingDeg, 0)),
         pitchDeg: clamp(safeNumber(camera.pitchDeg, -17), -70, 10),
         fovDeg: clamp(safeNumber(camera.fovDeg, 74), 20, 130),
-        rangeM: clamp(safeNumber(camera.rangeM, 700), 120, 5000),
+        rangeM: clamp(safeNumber(camera.rangeM, 700), camera.sourceKind === 'pfl-go2rtc-local' ? 8 : 120, 5000),
         mountHeightM: clamp(safeNumber(camera.mountHeightM, 24), 2, 240),
       };
     }
@@ -259,7 +259,7 @@ export function createModel({ state: layerState, services, parts, source }) {
     );
     camera.pitchDeg = clamp(base.pitchDeg + nextCalibration.pitchDeg, -70, 10);
     camera.fovDeg = clamp(base.fovDeg + nextCalibration.fovDeg, 20, 130);
-    camera.rangeM = clamp(base.rangeM * nextCalibration.rangeScale, 120, 5000);
+    camera.rangeM = clamp(base.rangeM * nextCalibration.rangeScale, camera.sourceKind === 'pfl-go2rtc-local' ? 8 : 120, 5000);
     camera.mountHeightM = clamp(
       base.mountHeightM + nextCalibration.heightM,
       2,

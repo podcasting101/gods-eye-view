@@ -561,6 +561,32 @@ let viewTiltUnsub = null;
 /**
  * Frustum-true v2 renderer. Saved Arrange-mode params merge over the built-in values.
  */
+
+const YARD_FRAMES_VIS_KEY = 'pfl_yard_frames_visible_v1';
+let yardFramesVisible = false;
+try {
+  const rawVis = typeof localStorage !== 'undefined' ? localStorage.getItem(YARD_FRAMES_VIS_KEY) : null;
+  yardFramesVisible = rawVis === '1';
+} catch {}
+
+export function setYardFramesVisible(viewer, visible) {
+  yardFramesVisible = Boolean(visible);
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(YARD_FRAMES_VIS_KEY, yardFramesVisible ? '1' : '0');
+    }
+  } catch {}
+  for (const [, st] of frameState) {
+    if (st.entity) {
+      const hiddenStitch = Boolean(st.params?.hiddenByStitch) && !(editor && editor.on);
+      st.entity.show = yardFramesVisible && !hiddenStitch;
+    }
+  }
+  if (!yardFramesVisible) clearOutline(viewer);
+  governorRequestRender('yardframes-visibility');
+  return yardFramesVisible;
+}
+
 export function loadYardFrames({ viewer }) {
   destroyYardFrames(viewer);
   const saved = loadSavedLayout();
@@ -568,7 +594,15 @@ export function loadYardFrames({ viewer }) {
   for (const f of YARD_FRAMES) {
     const params = { ...defaultParams(f), ...(saved[f.id] || {}) };
     const entity = buildFrameEntity(viewer, f, params);
+    if (entity) {
+      const hiddenStitch = Boolean(params.hiddenByStitch);
+      entity.show = yardFramesVisible && !hiddenStitch;
+    }
     frameState.set(f.id, { def: f, params, entity });
+  }
+  if (typeof window !== 'undefined') {
+    window.__pflSetYardFramesVisible = (v) => setYardFramesVisible(viewer, v);
+    window.__pflGetYardFramesVisible = () => yardFramesVisible;
   }
   if (viewer?.camera?.changed?.addEventListener) {
     let lastPitchDeg = null;
@@ -1471,6 +1505,7 @@ function installArrangeToggle(viewer) {
   };
   toggle.addEventListener('click', () => setArrange(viewer, !editor.on));
   window.__pflToggleArrangeYard = () => {
+    if (!editor.on && !yardFramesVisible) setYardFramesVisible(viewer, true);
     setArrange(viewer, !editor.on);
     return editor.on;
   };

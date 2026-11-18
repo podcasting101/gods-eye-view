@@ -229,6 +229,8 @@ export function loadPflWindowFramework({ viewer }) {
     extraRow.innerHTML = `
       <button type="button" class="pfl-f15-btn" id="pfl-btn-kalshi-inline" style="border-color:#22c55e;color:#4ade80;font-weight:700">📈 Kalshi Paper Arena (Show / Hide)</button>
       <a href="/kalshi-paper.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-kalshi-tab" style="border-color:#38bdf8;color:#38bdf8;text-decoration:none;display:inline-flex;align-items:center">↗ Full TradingView &amp; Kalshi Tab</a>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-wyze-patrol" style="border-color:#f97316;color:#fdba74;font-weight:700">🎥 Live Wyze Patrol &amp; Events</button>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-static-yard" title="Show/hide the old static seamed yard photo splat vs live 3D camera feeds">🧩 Static Yard Splat: OFF</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-arrange">🖼️ Arrange Yard Photos</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-fire">🔥 Yard Fire &amp; Legs</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-vault-inline" style="border-color:#a855f7;color:#d8b4fe;font-weight:700">🏛️ Local Palace &amp; Wyze Vault</button>
@@ -238,11 +240,37 @@ export function loadPflWindowFramework({ viewer }) {
     `;
     cmdWin.body.appendChild(extraRow);
 
+    const staticYardBtn = extraRow.querySelector('#pfl-btn-static-yard');
+    const syncStaticBtn = () => {
+      const vis = typeof window.__pflGetYardFramesVisible === 'function' ? window.__pflGetYardFramesVisible() : false;
+      if (staticYardBtn) {
+        staticYardBtn.textContent = vis ? '🧩 Static Yard Splat: ON' : '🧩 Static Yard Splat: OFF';
+        staticYardBtn.classList.toggle('active', vis);
+      }
+    };
+    syncStaticBtn();
+    staticYardBtn?.addEventListener('click', () => {
+      const cur = typeof window.__pflGetYardFramesVisible === 'function' ? window.__pflGetYardFramesVisible() : false;
+      if (typeof window.__pflSetYardFramesVisible === 'function') window.__pflSetYardFramesVisible(!cur);
+      syncStaticBtn();
+    });
+    extraRow.querySelector('#pfl-btn-wyze-patrol')?.addEventListener('click', () => {
+      const isHidden = patrolWin.box.style.display === 'none' || patrolWin.box.classList.contains('pfl-minimized');
+      patrolWin.box.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) {
+        patrolWin.box.classList.remove('pfl-minimized');
+        const mb = patrolWin.box.querySelector('[data-act="min"]');
+        if (mb) mb.textContent = '—';
+        patrolWin.box.style.zIndex = '9695';
+        refreshWyzePatrol();
+      }
+    });
     extraRow.querySelector('#pfl-btn-arrange')?.addEventListener('click', (ev) => {
       const on = typeof window.__pflToggleArrangeYard === 'function'
         ? window.__pflToggleArrangeYard()
         : ((document.getElementById('gev-arrange-toggle')?.click()), true);
       ev.currentTarget.classList.toggle('active', Boolean(on));
+      syncStaticBtn();
     });
     extraRow.querySelector('#pfl-btn-fire')?.addEventListener('click', () => {
       if (typeof window.__pflOpenFireModal === 'function') window.__pflOpenFireModal();
@@ -660,20 +688,290 @@ export function loadPflWindowFramework({ viewer }) {
   });
   setTimeout(() => {
     document.getElementById('pfl-btn-vault-inline')?.addEventListener('click', () => {
-      vaultWin.box.style.display = 'flex';
-      vaultWin.box.classList.remove('pfl-minimized');
-      const mb = vaultWin.box.querySelector('[data-act="min"]');
-      if (mb) mb.textContent = '—';
-      vaultWin.box.style.zIndex = '9690';
-      refreshLocalVault();
+      const isHidden = vaultWin.box.style.display === 'none' || vaultWin.box.classList.contains('pfl-minimized');
+      vaultWin.box.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) {
+        vaultWin.box.classList.remove('pfl-minimized');
+        const mb = vaultWin.box.querySelector('[data-act="min"]');
+        if (mb) mb.textContent = '—';
+        vaultWin.box.style.zIndex = '9690';
+        refreshLocalVault();
+      }
     });
   }, 450);
   refreshLocalVault();
+
+
+  // 5) Movable / Sizable Live Wyze Video Patrol, Camera ON/OFF Rotation & Person/Vehicle Events
+  const patrolWin = createStandardBox({
+    id: 'pfl-win-wyze-patrol',
+    title: '🎥 PFL LIVE WYZE VIDEO PATROL & MOTION EVENTS',
+    defaultLeft: Math.max(40, window.innerWidth - 495),
+    defaultTop: 110,
+    defaultWidth: 465,
+  });
+  if (!saved['pfl-win-wyze-patrol']) {
+    patrolWin.box.classList.add('pfl-minimized');
+    const mb = patrolWin.box.querySelector('[data-act="min"]');
+    if (mb) mb.textContent = '▢';
+  }
+  patrolWin.body.innerHTML = `
+    <div style="font-family:'Inter',system-ui,sans-serif;font-size:11.5px;color:#e2e8f0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+        <span style="color:#4ade80;font-weight:700" id="pfl-patrol-status">● Live H.264 Stream Ready (wyze-cam-v4)</span>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button type="button" class="pfl-std-cbtn" id="pfl-patrol-cycle" style="border-color:#22c55e;color:#4ade80">⟳ Auto-Cycle: OFF</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-patrol-pins" style="border-color:#fbbf24;color:#fde047">📍 3D Event Pins: ON</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-patrol-sync" title="Pull latest Wyze cloud Person/Vehicle clips now">↻ Sync Events</button>
+        </div>
+      </div>
+      <div style="position:relative;background:#020617;border:1px solid rgba(56,189,248,0.4);border-radius:8px;overflow:hidden;margin-bottom:6px">
+        <video id="pfl-patrol-video" autoplay muted playsinline controls style="width:100%;max-height:215px;display:block;background:#000"></video>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px" id="pfl-patrol-cam-btns">
+        <button type="button" class="pfl-std-cbtn" data-live-src="wyze-cam-v4" data-fly-lat="29.24753" data-fly-lon="-95.23146" data-fly-hdg="223" style="border-color:#38bdf8;color:#38bdf8">▶ V4 Front Yard</button>
+        <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam1" data-fly-lat="29.24756" data-fly-lon="-95.23134" data-fly-hdg="175">▶ Cam1 East Driveway &amp; RV</button>
+        <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam2" data-fly-lat="29.24768" data-fly-lon="-95.23146" data-fly-hdg="352">▶ Cam2 Bayou Dock</button>
+        <button type="button" class="pfl-std-cbtn" data-live-src="hd" data-fly-lat="29.24756" data-fly-lon="-95.23136" data-fly-hdg="92" title="Standby until remounted on Monaco">▶ HD (Standby)</button>
+      </div>
+      <div style="font-weight:700;color:#cbd5e1;font-size:10.5px;margin-bottom:3px">Active 3D CCTV Rotation Checkboxes (Uncheck Sky/Idle Cams):</div>
+      <div id="pfl-patrol-checks" style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 6px;background:rgba(15,23,42,0.75);border:1px solid #1e293b;border-radius:6px;margin-bottom:6px;font-size:10.5px"></div>
+      <div style="font-weight:700;color:#fbbf24;margin-bottom:3px">Captured Person &amp; Vehicle Events (Click to Play Clip &amp; Fly to Camera):</div>
+      <div id="pfl-patrol-events" style="max-height:135px;overflow:auto;border:1px solid #1e293b;border-radius:6px;padding:4px;font-size:10.5px">Loading archived Wyze events...</div>
+    </div>
+  `;
+
+  let activeLiveSrc = 'wyze-cam-v4';
+  let patrolCycleOn = false;
+  let patrolPinsOn = true;
+  let enabledLiveSrcs = ['wyze-cam-v4', 'back-yard-cam1', 'back-yard-cam2'];
+  const eventPinIds = [];
+
+  function makeEventPinCanvas(label, sub) {
+    const c = document.createElement('canvas');
+    c.width = 220;
+    c.height = 44;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(9, 14, 26, 0.88)';
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(2, 2, 216, 40, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#fde047';
+    ctx.font = '700 12px "JetBrains Mono", monospace';
+    ctx.fillText(label.slice(0, 24), 10, 18);
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '600 10px "Inter", sans-serif';
+    ctx.fillText(sub.slice(0, 30), 10, 34);
+    return c;
+  }
+
+  function playPatrolStream(src, labelText, mediaOverrideUrl = null) {
+    const vid = patrolWin.body.querySelector('#pfl-patrol-video');
+    const stEl = patrolWin.body.querySelector('#pfl-patrol-status');
+    if (!vid) return;
+    if (mediaOverrideUrl) {
+      vid.src = mediaOverrideUrl;
+      vid.play().catch(() => {});
+      if (stEl) stEl.textContent = `🎬 Event Clip: ${labelText}`;
+      return;
+    }
+    activeLiveSrc = src;
+    vid.src = `/api/pfl/local-vault/wyze-live/${encodeURIComponent(src)}?t=${Date.now()}`;
+    vid.play().catch(() => {});
+    if (stEl) stEl.textContent = `● LIVE H.264: ${labelText || src}`;
+    patrolWin.body.querySelectorAll('[data-live-src]').forEach((b) => {
+      const match = b.getAttribute('data-live-src') === src;
+      b.style.borderColor = match ? '#38bdf8' : 'rgba(148,163,184,0.35)';
+      b.style.color = match ? '#38bdf8' : '#e2e8f0';
+    });
+  }
+
+  function syncEventPinsToGlobe(events) {
+    for (const id of eventPinIds) viewer?.entities?.removeById?.(id);
+    eventPinIds.length = 0;
+    if (!patrolPinsOn || !viewer?.entities) return;
+    // Group latest event per camera with slight offset so pins never stack identically
+    const seenPerCam = new Map();
+    for (const ev of (events || []).slice(0, 10)) {
+      const n = seenPerCam.get(ev.camera) || 0;
+      seenPerCam.set(ev.camera, n + 1);
+      if (n >= 3) continue;
+      const pid = `pfl-wyze-ev-${ev.id}`;
+      const tagStr = (ev.tags || ['EVENT']).join('+');
+      const timeShort = String(ev.occurredAt || '').slice(11, 19) || ev.day;
+      const lat = Number(ev.lat || 29.24753) + n * 0.000018;
+      const lon = Number(ev.lon || -95.23146) + n * 0.000018;
+      let groundBase = -26.19;
+      try {
+        if (viewer.scene?.globe?.show !== false) {
+          const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
+          if (Number.isFinite(h)) groundBase = h;
+        }
+      } catch {}
+      viewer.entities.add({
+        id: pid,
+        name: `🚨 ${tagStr} · ${ev.cameraLabel}`,
+        position: Cesium.Cartesian3.fromDegrees(lon, lat, groundBase + 3.2 + n * 1.4),
+        billboard: {
+          image: makeEventPinCanvas(`🚨 ${tagStr} (${timeShort})`, ev.camera),
+          width: 155,
+          height: 31,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          disableDepthTestDistance: 800,
+        },
+      });
+      eventPinIds.push(pid);
+    }
+    governorRequestRender('pfl-wyze-event-pins');
+  }
+
+  async function refreshWyzePatrol(triggerHarvest = false) {
+    try {
+      const r = await fetch('/api/pfl/local-vault/wyze-events', {
+        method: triggerHarvest ? 'POST' : 'GET',
+      });
+      const d = await r.json();
+      if (!d.ok) return;
+      const checksEl = patrolWin.body.querySelector('#pfl-patrol-checks');
+      if (checksEl && Array.isArray(d.allCameras)) {
+        enabledLiveSrcs = d.allCameras.filter((c) => c.enabled).map((c) => c.src);
+        checksEl.innerHTML = d.allCameras.map((c) => `
+          <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" class="pfl-cam-chk" value="${c.id}" ${c.enabled ? 'checked' : ''} />
+            <span>${c.src === 'hd' ? 'HD (Sky/Monaco Standby)' : c.src}</span>
+          </label>
+        `).join('');
+        checksEl.querySelectorAll('.pfl-cam-chk').forEach((chk) => {
+          chk.addEventListener('change', async () => {
+            const enabledIds = [...checksEl.querySelectorAll('.pfl-cam-chk:checked')].map((el) => el.value);
+            if (!enabledIds.length) {
+              chk.checked = true;
+              return;
+            }
+            await fetch('/api/pfl/local-vault/wyze-cameras', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ enabledIds }),
+            });
+            refreshWyzePatrol(false);
+          });
+        });
+      }
+      const evEl = patrolWin.body.querySelector('#pfl-patrol-events');
+      if (evEl) {
+        const list = d.events || [];
+        syncEventPinsToGlobe(list);
+        evEl.innerHTML = list.length
+          ? list.map((ev, idx) => {
+              const tShort = String(ev.occurredAt || '').replace('T', ' ').slice(0, 19);
+              const badge = (ev.tags || []).join(' · ');
+              return `
+                <div class="pfl-ev-row" data-idx="${idx}" style="display:flex;align-items:center;gap:6px;padding:4px 2px;border-bottom:1px solid rgba(30,41,59,0.7);cursor:pointer" title="Click to play captured video clip &amp; fly to camera">
+                  ${ev.thumbUrl ? `<img src="${ev.thumbUrl}" style="width:54px;height:32px;object-fit:cover;border-radius:4px;border:1px solid #334155" loading="lazy" />` : ''}
+                  <div style="flex:1;min-width:0">
+                    <div style="color:#fde047;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🚨 ${badge} — ${ev.camera}</div>
+                    <div style="color:#94a3b8;font-size:10px">${tShort}</div>
+                  </div>
+                  <span style="color:#38bdf8;font-weight:700;font-size:10px">${ev.videoUrl ? '▶ Clip' : '📷 View'}</span>
+                </div>
+              `;
+            }).join('')
+          : '<div style="color:#94a3b8;padding:4px">No exterior events found yet.</div>';
+        evEl.querySelectorAll('.pfl-ev-row').forEach((row) => {
+          row.addEventListener('click', () => {
+            const ev = (d.events || [])[Number(row.dataset.idx)];
+            if (!ev) return;
+            if (ev.videoUrl) {
+              playPatrolStream(ev.camera, `${(ev.tags || []).join('+')} @ ${String(ev.occurredAt).slice(11, 19)}`, ev.videoUrl);
+            } else if (ev.thumbUrl) {
+              window.open(ev.thumbUrl, '_blank');
+            }
+            let base = 0;
+            try {
+              if (viewer.scene?.globe?.show === false) base = -26.19;
+              else {
+                const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(ev.lon, ev.lat));
+                if (Number.isFinite(h)) base = h;
+              }
+            } catch {}
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(ev.lon, ev.lat, base + 22),
+              orientation: {
+                heading: Cesium.Math.toRadians(ev.headingDeg || 200),
+                pitch: Cesium.Math.toRadians(-24),
+                roll: 0,
+              },
+              duration: 1.2,
+            });
+          });
+        });
+      }
+    } catch {}
+  }
+
+  patrolWin.body.querySelectorAll('[data-live-src]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const src = btn.getAttribute('data-live-src');
+      playPatrolStream(src, btn.textContent.replace('▶ ', ''));
+      const lat = Number(btn.getAttribute('data-fly-lat'));
+      const lon = Number(btn.getAttribute('data-fly-lon'));
+      const hdg = Number(btn.getAttribute('data-fly-hdg'));
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        let base = 0;
+        try {
+          if (viewer.scene?.globe?.show === false) base = -26.19;
+          else {
+            const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
+            if (Number.isFinite(h)) base = h;
+          }
+        } catch {}
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(lon, lat, base + 24),
+          orientation: {
+            heading: Cesium.Math.toRadians(hdg || 200),
+            pitch: Cesium.Math.toRadians(-22),
+            roll: 0,
+          },
+          duration: 1.1,
+        });
+      }
+    });
+  });
+
+  patrolWin.body.querySelector('#pfl-patrol-cycle')?.addEventListener('click', (e) => {
+    patrolCycleOn = !patrolCycleOn;
+    e.currentTarget.textContent = patrolCycleOn ? '⟳ Auto-Cycle: ON (12s)' : '⟳ Auto-Cycle: OFF';
+  });
+  patrolWin.body.querySelector('#pfl-patrol-pins')?.addEventListener('click', (e) => {
+    patrolPinsOn = !patrolPinsOn;
+    e.currentTarget.textContent = patrolPinsOn ? '📍 3D Event Pins: ON' : '📍 3D Event Pins: OFF';
+    refreshWyzePatrol(false);
+  });
+  patrolWin.body.querySelector('#pfl-patrol-sync')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.textContent = '⏳ Syncing...';
+    await refreshWyzePatrol(true);
+    btn.textContent = '↻ Sync Events';
+  });
+
+  const patrolCycleTimer = setInterval(() => {
+    if (!patrolCycleOn || patrolWin.box.style.display === 'none' || patrolWin.box.classList.contains('pfl-minimized')) return;
+    if (!enabledLiveSrcs.length) return;
+    const idx = (enabledLiveSrcs.indexOf(activeLiveSrc) + 1) % enabledLiveSrcs.length;
+    playPatrolStream(enabledLiveSrcs[idx], enabledLiveSrcs[idx]);
+  }, 12000);
+
+  playPatrolStream('wyze-cam-v4', 'Wyze Cam V4 (Front Yard & Driveway)');
+  refreshWyzePatrol(false);
 
   return {
     destroy() {
       clearInterval(timer);
       clearInterval(kalshiPoll);
+      clearInterval(patrolCycleTimer);
       cancelAnimationFrame(rafId);
       pickHandler.destroy();
       for (const el of createdEls) el.remove();

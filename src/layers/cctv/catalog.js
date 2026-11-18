@@ -181,14 +181,15 @@ export function createCatalog({ state: layerState, services, parts, source }) {
       // Same floor as the pose model (model.js): the packs' 145/210 m ranges
       // are intentional, and inflating them to 220 m pushed the monitor
       // plane's far edge into higher ground (owner field test 2026-09-13).
+      const isPflYard = String(source.sourceKind || '').toLowerCase() === 'pfl-go2rtc-local';
       const rangeM = parts.model.clamp(
         parts.model.safeNumber(source.rangeM, seed?.rangeM ?? 700),
-        120,
+        isPflYard ? 8 : 120,
         2200,
       );
       const mountHeightM = parts.model.clamp(
         parts.model.safeNumber(source.mountHeightM, seed?.mountHeightM ?? 24),
-        6,
+        isPflYard ? 1.5 : 6,
         120,
       );
       const pitchDeg = parts.model.clamp(

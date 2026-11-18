@@ -2684,14 +2684,18 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
       });
     });
 
-    hudRoot.querySelector('[data-pfl-open-kalshi]')?.addEventListener('click', () => {
+    hudRoot.querySelector('[data-pfl-open-kalshi]')?.addEventListener('click', (ev) => {
       const box = document.getElementById('pfl-win-kalshi-arena');
       if (box) {
-        box.style.display = 'flex';
-        box.classList.remove('pfl-minimized');
-        const minBtn = box.querySelector('[data-act="min"]');
-        if (minBtn) minBtn.textContent = '—';
-        box.style.zIndex = '9680';
+        const isHidden = box.style.display === 'none' || box.classList.contains('pfl-minimized');
+        box.style.display = isHidden ? 'flex' : 'none';
+        if (isHidden) {
+          box.classList.remove('pfl-minimized');
+          const minBtn = box.querySelector('[data-act="min"]');
+          if (minBtn) minBtn.textContent = '—';
+          box.style.zIndex = '9680';
+        }
+        ev.currentTarget?.classList?.toggle('active', isHidden);
       } else {
         window.location.href = '/kalshi-paper.html';
       }

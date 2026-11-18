@@ -173,6 +173,11 @@ export function createQuadSets({
           material: entry.material,
           translucent: true,
           closed: false,
+          renderState: {
+            cull: {
+              enabled: true,
+            },
+          },
         }),
         modelMatrix,
         allowPicking,
