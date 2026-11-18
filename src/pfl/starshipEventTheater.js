@@ -2156,7 +2156,7 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
         <button type="button" class="pfl-f15-btn" data-pfl-fly="corridor">Full 3D Corridor</button>
         <button type="button" class="pfl-f15-btn" data-pfl-fly="liverpool">Liverpool</button>
         <button type="button" class="pfl-f15-btn" data-pfl-fly="birdpond">Bird Pond</button>
-        <button type="button" class="pfl-f15-btn active" data-pfl-toggle-neo4j>Neo4j 3D: ON</button>
+        <button type="button" class="pfl-f15-btn" data-pfl-toggle-neo4j>Neo4j 3D: OFF</button>
         <button type="button" class="pfl-f15-btn" data-pfl-inspect-neo4j title="Open Neo4j Dossier &amp; Original Sources">Inspect Sources</button>
         <button type="button" class="pfl-f15-btn watch" data-pfl-toggle-theater>Streams &amp; 4D</button>
         <button type="button" class="pfl-f15-btn" data-pfl-open-kalshi style="border-color:rgba(34,197,94,0.65);color:#4ade80">📈 Kalshi Arena</button>

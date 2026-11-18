@@ -294,34 +294,15 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedSolarBedV12) {
-      // 1. Preserve Paul's manual alignment of `back-yard-cam2-water` (north-lawn trees + bayou dock)
-      if (!frames['back-yard-cam2-water']) {
-        frames['back-yard-cam2-water'] = { ...CALIBRATED_HOUSE_SURVEY['back-yard-cam2-water'] };
-      }
-      // 2. Apply landmark-solved & stitched house survey placements for the front yard (`yard-overview-20261012` + `back-yard-cam1-plan`),
-      //    `house-side-20261012` (compact along W wall), and `bed-station-20261012` (centered on yellow house roof)
-      for (const id of [
-        'yard-overview-20261012',
-        'back-yard-cam1-plan',
-        'house-side-20261012',
-        'bed-station-20261012',
-      ]) {
+    if (parsed && !parsed.fixedCleanHomogV14) {
+      for (const id of Object.keys(CALIBRATED_HOUSE_SURVEY)) {
         frames[id] = {
           ...(frames[id] || {}),
           ...CALIBRATED_HOUSE_SURVEY[id],
         };
       }
-      parsed.fixedSidewaysRoadV1 = true;
-      parsed.fixedHouseSurveyV3 = true;
-      parsed.fixedHouseSurveyV4 = true;
-      parsed.fixedHouseSurveyV5 = true;
-      parsed.fixedHouseSurveyV6 = true;
-      parsed.fixedHouseSurveyV7 = true;
-      parsed.fixedHouseSurveyV8 = true;
-      parsed.fixedHouseSurveyV9 = true;
-      parsed.fixedHouseSurveyV10 = true;
-      parsed.fixedHouseSurveyV11 = true;
+      parsed.fixedSolarBedV12 = true;
+      parsed.fixedCleanHomogV14 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }

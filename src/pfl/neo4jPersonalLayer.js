@@ -1722,7 +1722,7 @@ export async function loadNeo4jPersonalLayer({
     }
   }
 
-  let visible = true;
+  let visible = false;
   let destroyed = false;
   let selectedNodeId = null;
   let drawerClusterId = 'starbase';
