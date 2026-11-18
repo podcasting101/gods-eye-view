@@ -133,7 +133,7 @@ export function loadPflWindowFramework({ viewer }) {
     box.style.left = (cfg.left ?? defaultLeft) + 'px';
     box.style.top = (cfg.top ?? defaultTop) + 'px';
     if (cfg.width || defaultWidth) box.style.width = (cfg.width ?? defaultWidth) + 'px';
-    if (cfg.height) box.style.height = cfg.height + 'px';
+    if (cfg.height && cfg.height >= 120) box.style.height = cfg.height + 'px';
     let scale = Number(cfg.scale) || 1.0;
     box.style.fontSize = Math.round(12 * scale) + 'px';
 
@@ -157,13 +157,19 @@ export function loadPflWindowFramework({ viewer }) {
     document.body.appendChild(box);
     createdEls.push(box);
 
+    let userResizedHeight = (cfg.height && cfg.height >= 120) ? cfg.height : null;
     function persist() {
+      const isMin = box.classList.contains('pfl-minimized');
+      if (!isMin && box.style.height) {
+        const h = parseInt(box.style.height, 10) || box.offsetHeight;
+        userResizedHeight = h >= 120 ? h : null;
+      }
       saved[id] = {
         left: parseInt(box.style.left, 10) || defaultLeft,
         top: parseInt(box.style.top, 10) || defaultTop,
-        width: box.offsetWidth,
-        height: box.classList.contains('pfl-minimized') ? (saved[id]?.height || null) : box.offsetHeight,
-        minimized: box.classList.contains('pfl-minimized'),
+        width: Math.max(200, box.offsetWidth || defaultWidth || 320),
+        height: userResizedHeight,
+        minimized: isMin,
         scale,
       };
       saveLayout(saved);
@@ -195,6 +201,9 @@ export function loadPflWindowFramework({ viewer }) {
         if (act === 'min') {
           const isMin = box.classList.toggle('pfl-minimized');
           btn.textContent = isMin ? '▢' : '—';
+          if (!isMin && (!userResizedHeight || userResizedHeight < 120)) {
+            box.style.height = '';
+          }
         } else if (act === 'bigger') {
           scale = Math.min(1.6, +(scale + 0.1).toFixed(2));
           box.style.transform = `scale(${scale})`;
@@ -206,7 +215,13 @@ export function loadPflWindowFramework({ viewer }) {
       });
     });
 
-    const ro = new ResizeObserver(() => persist());
+    hdr.addEventListener('dblclick', () => {
+      const minBtn = hdr.querySelector('[data-act="min"]');
+      minBtn?.click();
+    });
+    const ro = new ResizeObserver(() => {
+      if (!box.classList.contains('pfl-minimized') && box.offsetHeight >= 120) persist();
+    });
     ro.observe(box);
     return { box, body };
   }
@@ -255,10 +270,11 @@ export function loadPflWindowFramework({ viewer }) {
       syncStaticBtn();
     });
     extraRow.querySelector('#pfl-btn-wyze-patrol')?.addEventListener('click', () => {
-      const isHidden = patrolWin.box.style.display === 'none' || patrolWin.box.classList.contains('pfl-minimized');
+      const isHidden = patrolWin.box.style.display === 'none' || patrolWin.box.classList.contains('pfl-minimized') || patrolWin.box.offsetHeight < 90;
       patrolWin.box.style.display = isHidden ? 'flex' : 'none';
       if (isHidden) {
         patrolWin.box.classList.remove('pfl-minimized');
+        if (parseInt(patrolWin.box.style.height || '999', 10) < 120) patrolWin.box.style.height = '';
         const mb = patrolWin.box.querySelector('[data-act="min"]');
         if (mb) mb.textContent = '—';
         patrolWin.box.style.zIndex = '9695';
@@ -710,28 +726,26 @@ export function loadPflWindowFramework({ viewer }) {
     defaultTop: 110,
     defaultWidth: 465,
   });
-  if (!saved['pfl-win-wyze-patrol']) {
-    patrolWin.box.classList.add('pfl-minimized');
-    const mb = patrolWin.box.querySelector('[data-act="min"]');
-    if (mb) mb.textContent = '▢';
-  }
+  if (parseInt(patrolWin.box.style.height || '999', 10) < 120) patrolWin.box.style.height = '';
   patrolWin.body.innerHTML = `
     <div style="font-family:'Inter',system-ui,sans-serif;font-size:11.5px;color:#e2e8f0">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
         <span style="color:#4ade80;font-weight:700" id="pfl-patrol-status">● Live H.264 Stream Ready (wyze-cam-v4)</span>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button type="button" class="pfl-std-cbtn" id="pfl-patrol-rec20" style="border-color:#f43f5e;color:#fda4af" title="Record smooth 20fps 8-second H.264 clip directly from local go2rtc RTSP">⏺ Rec 8s (20fps)</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-patrol-site" style="border-color:#38bdf8;color:#38bdf8" title="Filter between strictly 417 Palm Dr cameras vs shared Wyze cameras (Michael Mertz)">🏠 Yard Only</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-patrol-cycle" style="border-color:#22c55e;color:#4ade80">⟳ Auto-Cycle: OFF</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-patrol-pins" style="border-color:#fbbf24;color:#fde047">📍 3D Event Pins: ON</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-patrol-sync" title="Pull latest Wyze cloud Person/Vehicle clips now">↻ Sync Events</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-patrol-pins" style="border-color:#fbbf24;color:#fde047">📍 3D Pins: ON</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-patrol-sync" title="Pull latest Wyze cloud Person/Vehicle clips now">↻ Sync</button>
         </div>
       </div>
       <div style="position:relative;background:#020617;border:1px solid rgba(56,189,248,0.4);border-radius:8px;overflow:hidden;margin-bottom:6px">
         <video id="pfl-patrol-video" autoplay muted playsinline controls style="width:100%;max-height:215px;display:block;background:#000"></video>
       </div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px" id="pfl-patrol-cam-btns">
-        <button type="button" class="pfl-std-cbtn" data-live-src="wyze-cam-v4" data-fly-lat="29.24753" data-fly-lon="-95.23146" data-fly-hdg="223" style="border-color:#38bdf8;color:#38bdf8">▶ V4 Front Yard</button>
-        <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam1" data-fly-lat="29.24756" data-fly-lon="-95.23134" data-fly-hdg="175">▶ Cam1 East Driveway &amp; RV</button>
-        <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam2" data-fly-lat="29.24768" data-fly-lon="-95.23146" data-fly-hdg="352">▶ Cam2 Bayou Dock</button>
+        <button type="button" class="pfl-std-cbtn" data-live-src="wyze-cam-v4" data-fly-lat="29.24753" data-fly-lon="-95.23144" data-fly-hdg="223" style="border-color:#38bdf8;color:#38bdf8">▶ V4 Front Yard</button>
+        <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam1" data-fly-lat="29.24751" data-fly-lon="-95.23130" data-fly-hdg="172">▶ Cam1 East Driveway &amp; RV</button>
+        <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam2" data-fly-lat="29.247640" data-fly-lon="-95.231380" data-fly-hdg="0">▶ Cam2 Bayou Dock</button>
         <button type="button" class="pfl-std-cbtn" data-live-src="hd" data-fly-lat="29.24756" data-fly-lon="-95.23136" data-fly-hdg="92" title="Standby until remounted on Monaco">▶ HD (Standby)</button>
       </div>
       <div style="font-weight:700;color:#cbd5e1;font-size:10.5px;margin-bottom:3px">Active 3D CCTV Rotation Checkboxes (Uncheck Sky/Idle Cams):</div>
@@ -795,7 +809,7 @@ export function loadPflWindowFramework({ viewer }) {
     if (!patrolPinsOn || !viewer?.entities) return;
     // Group latest event per camera with slight offset so pins never stack identically
     const seenPerCam = new Map();
-    for (const ev of (events || []).slice(0, 10)) {
+    for (const ev of (events || []).filter((x) => Number.isFinite(x.lat) && Number.isFinite(x.lon)).slice(0, 10)) {
       const n = seenPerCam.get(ev.camera) || 0;
       seenPerCam.set(ev.camera, n + 1);
       if (n >= 3) continue;
@@ -828,9 +842,10 @@ export function loadPflWindowFramework({ viewer }) {
     governorRequestRender('pfl-wyze-event-pins');
   }
 
+  let patrolSiteFilter = 'liverpool';
   async function refreshWyzePatrol(triggerHarvest = false) {
     try {
-      const r = await fetch('/api/pfl/local-vault/wyze-events', {
+      const r = await fetch(`/api/pfl/local-vault/wyze-events?site=${encodeURIComponent(patrolSiteFilter)}`, {
         method: triggerHarvest ? 'POST' : 'GET',
       });
       const d = await r.json();
@@ -889,23 +904,30 @@ export function loadPflWindowFramework({ viewer }) {
             } else if (ev.thumbUrl) {
               window.open(ev.thumbUrl, '_blank');
             }
-            let base = 0;
-            try {
-              if (viewer.scene?.globe?.show === false) base = -26.19;
-              else {
-                const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(ev.lon, ev.lat));
-                if (Number.isFinite(h)) base = h;
-              }
-            } catch {}
-            viewer.camera.flyTo({
-              destination: Cesium.Cartesian3.fromDegrees(ev.lon, ev.lat, base + 22),
-              orientation: {
-                heading: Cesium.Math.toRadians(ev.headingDeg || 200),
-                pitch: Cesium.Math.toRadians(-24),
-                roll: 0,
-              },
-              duration: 1.2,
-            });
+            if (Number.isFinite(ev.lat) && Number.isFinite(ev.lon)) {
+              try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
+              let base = 0;
+              try {
+                if (viewer.scene?.globe?.show === false) base = -26.19;
+                else {
+                  const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(ev.lon, ev.lat));
+                  if (Number.isFinite(h)) base = h;
+                }
+              } catch {}
+              const hRad = Cesium.Math.toRadians(ev.headingDeg ?? 354);
+              const backM = 16.0;
+              const eyeLat = ev.lat - (Math.cos(hRad) * backM) / 110800;
+              const eyeLon = ev.lon - (Math.sin(hRad) * backM) / (111320 * Math.cos((ev.lat * Math.PI) / 180));
+              viewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(eyeLon, eyeLat, base + 13.5),
+                orientation: {
+                  heading: hRad,
+                  pitch: Cesium.Math.toRadians(-21),
+                  roll: 0,
+                },
+                duration: 1.15,
+              });
+            }
           });
         });
       }
@@ -928,11 +950,16 @@ export function loadPflWindowFramework({ viewer }) {
             if (Number.isFinite(h)) base = h;
           }
         } catch {}
+        try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
+        const hRad = Cesium.Math.toRadians(hdg ?? 354);
+        const backM = 16.0;
+        const eyeLat = lat - (Math.cos(hRad) * backM) / 110800;
+        const eyeLon = lon - (Math.sin(hRad) * backM) / (111320 * Math.cos((lat * Math.PI) / 180));
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(lon, lat, base + 24),
+          destination: Cesium.Cartesian3.fromDegrees(eyeLon, eyeLat, base + 13.5),
           orientation: {
-            heading: Cesium.Math.toRadians(hdg || 200),
-            pitch: Cesium.Math.toRadians(-22),
+            heading: hRad,
+            pitch: Cesium.Math.toRadians(-21),
             roll: 0,
           },
           duration: 1.1,
@@ -950,6 +977,24 @@ export function loadPflWindowFramework({ viewer }) {
     e.currentTarget.textContent = patrolPinsOn ? '📍 3D Event Pins: ON' : '📍 3D Event Pins: OFF';
     refreshWyzePatrol(false);
   });
+  patrolWin.body.querySelector('#pfl-patrol-rec20')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.textContent = '⏺ Recording 20fps...';
+    try {
+      const r = await fetch(`/api/pfl/local-vault/record-clip?src=${encodeURIComponent(activeLiveSrc)}&sec=8`, { method: 'POST' });
+      const d = await r.json();
+      await refreshWyzePatrol(false);
+      if (d.ok && d.clip?.fname) {
+        playPatrolStream(activeLiveSrc, `20fps Local Capture (${activeLiveSrc})`, `/api/pfl/local-vault/local-clip/${encodeURIComponent(d.clip.fname)}`);
+      }
+    } catch {}
+    btn.textContent = '⏺ Rec 8s (20fps)';
+  });
+  patrolWin.body.querySelector('#pfl-patrol-site')?.addEventListener('click', (e) => {
+    patrolSiteFilter = patrolSiteFilter === 'liverpool' ? 'all' : 'liverpool';
+    e.currentTarget.textContent = patrolSiteFilter === 'liverpool' ? '🏠 Yard Only' : '🌐 Yard + Shared';
+    refreshWyzePatrol(false);
+  });
   patrolWin.body.querySelector('#pfl-patrol-sync')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     btn.textContent = '⏳ Syncing...';
@@ -963,6 +1008,79 @@ export function loadPflWindowFramework({ viewer }) {
     const idx = (enabledLiveSrcs.indexOf(activeLiveSrc) + 1) % enabledLiveSrcs.length;
     playPatrolStream(enabledLiveSrcs[idx], enabledLiveSrcs[idx]);
   }, 12000);
+
+
+  // 6) 3D Backyard Live Oak Trees, Wooden Bayou Dock & PID 214140 Lot Outline (Anchored to Brazoria CAD Ortho)
+  const yardLandmarkIds = [];
+  function buildYard3dLandmarks() {
+    if (!viewer?.entities) return;
+    for (const id of yardLandmarkIds) viewer.entities.removeById(id);
+    yardLandmarkIds.length = 0;
+
+    let gBase = -26.19;
+    try {
+      if (viewer.scene?.globe?.show !== false) {
+        const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(-95.23138, 29.24768));
+        if (Number.isFinite(h)) gBase = h;
+      }
+    } catch {}
+
+    const oaks = [
+      // West Live Oak (left trunk in Cam2 view, framing the left edge of dock & water)
+      { id: 'pfl-oak-west', name: '🌳 Backyard West Live Oak (Cam2 Left Frame)', lat: 29.247705, lon: -95.231430, trunkH: 4.2, crownR: 4.8, crownH: 6.4 },
+      // East Live Oak (forked foreground tree on right side of Cam2 view, right beside smoker/white box)
+      { id: 'pfl-oak-east', name: '🌳 Backyard East Forked Live Oak (Cam2 Right Frame)', lat: 29.247695, lon: -95.231325, trunkH: 4.5, crownR: 4.6, crownH: 6.8 },
+    ];
+
+    for (const t of oaks) {
+      const tid = `${t.id}-trunk`;
+      const cid = `${t.id}-crown`;
+      viewer.entities.add({
+        id: tid,
+        name: t.name,
+        position: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, gBase + t.trunkH * 0.5),
+        cylinder: {
+          length: t.trunkH,
+          topRadius: 0.28,
+          bottomRadius: 0.42,
+          material: Cesium.Color.fromCssColorString('#4a3525').withAlpha(0.92),
+        },
+      });
+      viewer.entities.add({
+        id: cid,
+        name: t.name,
+        position: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, gBase + t.trunkH + t.crownH * 0.38),
+        ellipsoid: {
+          radii: new Cesium.Cartesian3(t.crownR, t.crownR * 0.92, t.crownH * 0.52),
+          material: Cesium.Color.fromCssColorString('#1e4620').withAlpha(0.52),
+          outline: true,
+          outlineColor: Cesium.Color.fromCssColorString('#4ade80').withAlpha(0.35),
+        },
+      });
+      yardLandmarkIds.push(tid, cid);
+    }
+
+    // Wooden Bayou Dock at exact ortho shoreline (29.24779, -95.23138)
+    const dockId = 'pfl-bayou-dock-3d';
+    viewer.entities.add({
+      id: dockId,
+      name: '⚓ 417 Palm Dr Chocolate Bayou Dock',
+      position: Cesium.Cartesian3.fromDegrees(-95.231380, 29.247792, gBase + 0.35),
+      orientation: Cesium.Transforms.headingPitchRollQuaternion(
+        Cesium.Cartesian3.fromDegrees(-95.231380, 29.247792, gBase + 0.35),
+        new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(354), 0, 0),
+      ),
+      box: {
+        dimensions: new Cesium.Cartesian3(4.2, 5.4, 0.35),
+        material: Cesium.Color.fromCssColorString('#7c5c3e').withAlpha(0.85),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.75),
+      },
+    });
+    yardLandmarkIds.push(dockId);
+  }
+  buildYard3dLandmarks();
+  window.addEventListener('gev:map-stack-changed', () => setTimeout(buildYard3dLandmarks, 400));
 
   playPatrolStream('wyze-cam-v4', 'Wyze Cam V4 (Front Yard & Driveway)');
   refreshWyzePatrol(false);

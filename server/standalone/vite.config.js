@@ -22,7 +22,7 @@ export function standaloneConfig(
     if (process.env[key] === undefined) process.env[key] = value;
   }
   const tools = standaloneVoiceTools();
-  return createBrowserViteConfig({
+  const cfg = createBrowserViteConfig({
     plugins: [
       ...localProviderPlugins({
         realtime: { tools },
@@ -44,6 +44,14 @@ export function standaloneConfig(
     allowedHosts: resolveAllowedHosts(process.env.GEV_ALLOWED_HOSTS),
     command,
   });
+  if (String(process.env.GEV_DISABLE_HMR || '1') === '1') {
+    cfg.server = {
+      ...(cfg.server || {}),
+      hmr: false,
+      watch: null,
+    };
+  }
+  return cfg;
 }
 
 export default defineConfig(standaloneConfig);

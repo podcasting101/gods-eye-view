@@ -2,40 +2,48 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 
+const LIVERPOOL_CAMS = new Set([
+  'wyze-cam-v4',
+  'back-yard-cam1',
+  'back-yard-cam2',
+  'hd',
+  'front-yard-cam',
+  'owl-cam',
+  'pan3',
+  's788',
+  'mining-cave',
+]);
+
 const CAMERA_GEO = {
   'wyze-cam-v4': {
+    site: 'liverpool',
     cctvId: 'pfl-wyze-cam-v4',
-    label: 'Wyze Cam V4 (Front Yard & Driveway)',
+    label: 'Wyze Cam V4 (417 Palm Dr Front Yard & Driveway)',
     lat: 29.24753,
     lon: -95.23146,
     headingDeg: 223,
     pitchDeg: -22.5,
   },
   'back-yard-cam1': {
+    site: 'liverpool',
     cctvId: 'pfl-back-yard-cam1',
     label: 'Wyze Cam1 (East Driveway, Monaco RV & Culvert)',
-    lat: 29.24756,
-    lon: -95.23134,
-    headingDeg: 175,
-    pitchDeg: -35,
+    lat: 29.24751,
+    lon: -95.23130,
+    headingDeg: 172,
+    pitchDeg: -34,
   },
   'back-yard-cam2': {
+    site: 'liverpool',
     cctvId: 'pfl-back-yard-cam2',
     label: 'Wyze Cam2 (Chocolate Bayou Dock & Waterfront)',
-    lat: 29.24768,
-    lon: -95.23146,
-    headingDeg: 352,
-    pitchDeg: -18,
-  },
-  'front-porch': {
-    cctvId: 'pfl-wyze-cam-v4',
-    label: 'Front Porch (417 Palm Dr)',
-    lat: 29.24751,
-    lon: -95.23149,
-    headingDeg: 205,
-    pitchDeg: -15,
+    lat: 29.247640,
+    lon: -95.231380,
+    headingDeg: 0,
+    pitchDeg: -16,
   },
   hd: {
+    site: 'liverpool',
     cctvId: 'pfl-house-hd-cam',
     label: 'HD Cam (Standby / Monaco Rear Remount)',
     lat: 29.24756,
@@ -43,6 +51,19 @@ const CAMERA_GEO = {
     headingDeg: 92,
     pitchDeg: 14,
   },
+  'front-porch': {
+    site: 'shared-mertz',
+    cctvId: null,
+    label: 'Shared Node — Michael Mertz Front Porch',
+    lat: null,
+    lon: null,
+    headingDeg: null,
+    pitchDeg: null,
+  },
+  downstairs: { site: 'shared-mertz', cctvId: null, label: 'Shared Node — Downstairs', lat: null, lon: null },
+  garage: { site: 'shared-mertz', cctvId: null, label: 'Shared Node — Garage', lat: null, lon: null },
+  laundry: { site: 'shared-mertz', cctvId: null, label: 'Shared Node — Laundry', lat: null, lon: null },
+  'backyard-cam': { site: 'shared-mertz', cctvId: null, label: 'Shared Node — Backyard', lat: null, lon: null },
 };
 
 const STANDBY_HD_SPEC = {
@@ -93,10 +114,10 @@ const DEFAULT_ACTIVE_SPECS = [
     city: 'Liverpool, TX',
     cityId: 'pfl-liverpool',
     provider: 'Project Free Life Sovereign Wyze Node (go2rtc)',
-    lat: 29.24756,
-    lon: -95.23134,
-    headingDeg: 175,
-    pitchDeg: -35,
+    lat: 29.24751,
+    lon: -95.23130,
+    headingDeg: 172,
+    pitchDeg: -34,
     fovDeg: 103,
     rangeM: 15.5,
     mountHeightM: 6.2,
@@ -113,13 +134,13 @@ const DEFAULT_ACTIVE_SPECS = [
     city: 'Liverpool, TX',
     cityId: 'pfl-liverpool',
     provider: 'Project Free Life Sovereign Wyze Node (go2rtc)',
-    lat: 29.24768,
-    lon: -95.23146,
-    headingDeg: 352,
-    pitchDeg: -18,
+    lat: 29.247640,
+    lon: -95.231380,
+    headingDeg: 0,
+    pitchDeg: -16,
     fovDeg: 103,
-    rangeM: 22.0,
-    mountHeightM: 5.0,
+    rangeM: 17.0,
+    mountHeightM: 4.8,
     frameRefreshMs: 2000,
     feedType: 'mp4',
     sourceKind: 'pfl-go2rtc-local',
@@ -134,6 +155,80 @@ const ALL_SPECS_BY_ID = new Map(
 );
 
 let lastSyncMs = 0;
+
+const LOCAL_CLIPS_DIR = path.resolve(process.cwd(), '.cache', 'wyze-local-20fps');
+try { fs.mkdirSync(LOCAL_CLIPS_DIR, { recursive: true }); } catch {}
+
+function recordFullFpsClip(src, durationSec = 8, tag = 'LIVE-20FPS') {
+  return new Promise((resolve) => {
+    const allowed = new Set(['wyze-cam-v4', 'back-yard-cam1', 'back-yard-cam2', 'hd']);
+    if (!allowed.has(src)) return resolve(null);
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const fname = `${ts}_${src}_${tag}_20fps.mp4`;
+    const outPath = path.join(LOCAL_CLIPS_DIR, fname);
+    const thumbName = `${ts}_${src}_${tag}_thumb.jpg`;
+    const thumbPath = path.join(LOCAL_CLIPS_DIR, thumbName);
+    execFile(
+      'ffmpeg',
+      [
+        '-y',
+        '-rtsp_transport', 'tcp',
+        '-i', `rtsp://127.0.0.1:8554/${src}`,
+        '-t', String(Math.min(15, Math.max(3, durationSec))),
+        '-c:v', 'copy',
+        '-an',
+        '-movflags', '+faststart',
+        outPath,
+      ],
+      { timeout: 22000 },
+      (err) => {
+        if (err || !fs.existsSync(outPath) || fs.statSync(outPath).size < 2000) {
+          return resolve(null);
+        }
+        execFile(
+          'ffmpeg',
+          ['-y', '-i', outPath, '-frames:v', '1', '-q:v', '4', thumbPath],
+          { timeout: 6000 },
+          () => {
+            resolve({ fname, thumbName });
+          },
+        );
+      },
+    );
+  });
+}
+
+function readLocal20FpsClips() {
+  if (!fs.existsSync(LOCAL_CLIPS_DIR)) return [];
+  const files = fs.readdirSync(LOCAL_CLIPS_DIR).filter((f) => f.endsWith('_20fps.mp4')).sort().reverse().slice(0, 20);
+  return files.map((f) => {
+    const parts = f.split('_');
+    const isoRaw = parts[0] || '';
+    const cam = parts[1] || 'wyze-cam-v4';
+    const tag = parts[2] || 'MOTION-20FPS';
+    const geo = CAMERA_GEO[cam] || CAMERA_GEO['wyze-cam-v4'];
+    const thumb = f.replace('_20fps.mp4', '_thumb.jpg');
+    const hasThumb = fs.existsSync(path.join(LOCAL_CLIPS_DIR, thumb));
+    return {
+      id: `local20-${f}`,
+      day: isoRaw.slice(0, 10),
+      site: 'liverpool',
+      fpsMode: '20fps-local',
+      camera: cam,
+      cameraLabel: geo.label,
+      cctvId: geo.cctvId,
+      lat: geo.lat,
+      lon: geo.lon,
+      headingDeg: geo.headingDeg,
+      pitchDeg: geo.pitchDeg,
+      occurredAt: isoRaw,
+      tags: [tag, '20FPS-HD'],
+      thumbUrl: hasThumb ? `/api/pfl/local-vault/local-clip/${encodeURIComponent(thumb)}` : null,
+      videoUrl: `/api/pfl/local-vault/local-clip/${encodeURIComponent(f)}`,
+    };
+  });
+}
+
 
 function readRecentWyzeEvents(eventsRoot, limit = 30) {
   if (!fs.existsSync(eventsRoot)) return [];
@@ -168,9 +263,11 @@ function readRecentWyzeEvents(eventsRoot, limit = 30) {
         const imgFile = files.find((f) => /\.(jpg|jpeg|png)$/i.test(f.filename || ''));
         const vidFile = files.find((f) => /\.mp4$/i.test(f.filename || ''));
         const tags = (ev.tags || []).map((t) => String(t).replace('AiEventType.', ''));
+        const site = geo.site || (LIVERPOOL_CAMS.has(cam) ? 'liverpool' : 'shared-mertz');
         out.push({
           id: String(ev.event_id || `${day}-${i}`),
           day,
+          site,
           camera: cam,
           cameraLabel: geo.label,
           cctvId: geo.cctvId,
@@ -264,6 +361,34 @@ export function pflLocalVaultProxy() {
         return;
       }
 
+
+      // 1b) Serve local 20fps full-framerate go2rtc MP4 clips & thumbs
+      if (url.pathname.startsWith('/local-clip/')) {
+        const fname = path.basename(decodeURIComponent(url.pathname.slice('/local-clip/'.length)));
+        const full = path.join(LOCAL_CLIPS_DIR, fname);
+        if (!fs.existsSync(full) || !fs.statSync(full).isFile()) {
+          res.writeHead(404);
+          res.end('Not found');
+          return;
+        }
+        const ext = path.extname(fname).toLowerCase();
+        const mime = ext === '.mp4' ? 'video/mp4' : 'image/jpeg';
+        const st = fs.statSync(full);
+        res.writeHead(200, { 'Content-Type': mime, 'Content-Length': st.size, 'Cache-Control': 'public, max-age=3600' });
+        fs.createReadStream(full).pipe(res);
+        return;
+      }
+
+      // 1c) POST /record-clip?src=wyze-cam-v4&sec=8 — captures a smooth 20fps H.264 clip directly from local go2rtc RTSP!
+      if (url.pathname === '/record-clip' && req.method === 'POST') {
+        const src = url.searchParams.get('src') || 'wyze-cam-v4';
+        const sec = Number(url.searchParams.get('sec') || 8);
+        const rec = await recordFullFpsClip(src, sec, 'CAP');
+        res.writeHead(rec ? 200 : 502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: Boolean(rec), clip: rec }));
+        return;
+      }
+
       // 2) Live H.264/MP4 stream relay directly from local go2rtc (closes immediately on client disconnect!)
       if (url.pathname.startsWith('/wyze-live/')) {
         const src = path.basename(decodeURIComponent(url.pathname.slice('/wyze-live/'.length)));
@@ -318,7 +443,9 @@ export function pflLocalVaultProxy() {
             });
           }
         }
-        const events = readRecentWyzeEvents(eventsRoot, 35);
+        const siteFilter = url.searchParams.get('site') || 'liverpool';
+        const allEvs = [...readLocal20FpsClips(), ...readRecentWyzeEvents(eventsRoot, 45)];
+        const events = siteFilter === 'all' ? allEvs : allEvs.filter((e) => e.site === siteFilter);
         let enabledIds = [];
         try {
           const cur = JSON.parse(fs.readFileSync(cctvConfigPath, 'utf8'));
