@@ -90,12 +90,12 @@ export const YARD_FRAMES = [
     // i18n-ignore: Paul's private camera title is source data.
     title: 'Wyze Bed Cam — Solar-Locked (243.95° WSW Sunbeam @ +6.33° El)',
     takenAt: '2026-11-17 16:49:58 CST',
-    camLat: 29.247568,
-    camLon: -95.231368,
-    camHeightM: 4.35,
+    camLat: 29.247595,
+    camLon: -95.231358,
+    camHeightM: 0.32,
     headingDeg: 154,
     pitchDeg: -5,
-    distanceM: 2.75,
+    distanceM: 2.85,
     fovHDeg: 68,
     fovVDeg: 38,
   },
@@ -146,15 +146,14 @@ const CALIBRATED_HOUSE_SURVEY = {
     hiddenByStitch: true,
   },
   'yard-overview-20261012': {
-    // Strictly bounded inside Paul's Lots 23 & 24 NORTH of Palm Drive (26m E-W x 17m N-S):
-    // Cropped at Palm Drive curb (zero neighbor yard / floodlight spillover!) + View-Dependent Balcony POV weighting!
-    camLat: 29.247488,
+    // Strictly between Palm Drive curb (29.247405) and House front wall (29.247520) so the House Roof (29.24753..29.24765) stays 100% uncovered!
+    camLat: 29.247462,
     camLon: -95.231372,
-    camHeightM: 0.22,
+    camHeightM: 0.18,
     headingDeg: 192,
     pitchDeg: -18,
-    distanceM: 6.8,
-    widthScale: 0.86,
+    distanceM: 5.2,
+    widthScale: 1.08,
     rollDeg: 2,
     flat: true,
     texRot: 0,
@@ -193,12 +192,12 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'bed-station-20261012': {
     hiddenByStitch: false,
-    camLat: 29.247568,
-    camLon: -95.231368,
-    camHeightM: 4.35,
+    camLat: 29.247595,
+    camLon: -95.231358,
+    camHeightM: 0.32,
     headingDeg: 154,
     pitchDeg: -5,
-    distanceM: 2.75,
+    distanceM: 2.85,
     fovHDeg: 68,
     fovVDeg: 38,
     widthScale: 1.0,
@@ -208,9 +207,9 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'garage-carport-20261117': {
     hiddenByStitch: false,
-    camLat: 29.247535,
+    camLat: 29.247525,
     camLon: -95.231272,
-    camHeightM: 1.25,
+    camHeightM: 0.28,
     headingDeg: 172,
     pitchDeg: -14,
     distanceM: 3.3,
@@ -325,7 +324,7 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
-    if (parsed && !parsed.fixedBedOnRoofAndGarageV19) {
+    if (parsed && !parsed.fixedRoofGluedNoParallaxV20) {
       for (const id of Object.keys(CALIBRATED_HOUSE_SURVEY)) {
         frames[id] = {
           ...(frames[id] || {}),
@@ -338,6 +337,7 @@ function loadSavedLayout() {
       parsed.fixedYardBoundedPOV_V17 = true;
       parsed.fixedHideFloatingBedSideV18 = true;
       parsed.fixedBedOnRoofAndGarageV19 = true;
+      parsed.fixedRoofGluedNoParallaxV20 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
