@@ -811,7 +811,7 @@ export function loadPflWindowFramework({ viewer }) {
         <button type="button" class="pfl-std-cbtn" data-live-src="wyze-cam-v4" data-fly-lat="29.24753" data-fly-lon="-95.23144" data-fly-hdg="223" style="border-color:#38bdf8;color:#38bdf8">▶ V4 Front Yard</button>
         <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam1" data-fly-lat="29.24751" data-fly-lon="-95.23130" data-fly-hdg="172">▶ Cam1 East Driveway &amp; RV</button>
         <button type="button" class="pfl-std-cbtn" data-live-src="back-yard-cam2" data-fly-lat="29.247640" data-fly-lon="-95.231385" data-fly-hdg="7.5">▶ Cam2 Bayou Dock</button>
-        <button type="button" class="pfl-std-cbtn" data-live-src="hd" data-fly-lat="29.24756" data-fly-lon="-95.23136" data-fly-hdg="92" title="Standby until remounted on Monaco">▶ HD (Standby)</button>
+        <button type="button" class="pfl-std-cbtn" data-live-src="hd" data-fly-lat="29.247485" data-fly-lon="-95.231355" data-fly-hdg="108" title="Live Monaco RV, White Tesla &amp; ~70W Street Lamp">▶ HD Monaco (LIVE)</button>
       </div>
       <div style="font-weight:700;color:#4ade80;font-size:10.5px;margin-bottom:3px">📌 Pin Always-On 3D Yard Projections (Stays ON Even With CCTV OFF!):</div>
       <div id="pfl-always3d-checks" style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 6px;background:rgba(6,78,59,0.32);border:1px solid rgba(34,197,94,0.45);border-radius:6px;margin-bottom:6px;font-size:10.5px"></div>
@@ -828,7 +828,7 @@ export function loadPflWindowFramework({ viewer }) {
               <option value="4">4× (1.5s/ev)</option>
               <option value="8">8× (0.8s/ev)</option>
             </select>
-            <button type="button" class="pfl-std-cbtn" id="pfl-4d-director" style="border-color:#38bdf8;color:#38bdf8" title="Automatically pan the 3D view to follow new Person &amp; Vehicle detections">🎯 Auto-Director: OFF</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-4d-director" style="border-color:#38bdf8;color:#38bdf8" title="Automatically pan the 3D view to follow new Person &amp; Vehicle detections">🎯 Auto-Director: ON</button><button type="button" class="pfl-std-cbtn" id="pfl-yard-alarm" style="border-color:#ef4444;color:#fca5a5" title="Sound audible alarm &amp; flash red banner when a PERSON walks into your yard">🚨 Alarm: ARMED</button>
           </div>
         </div>
         <input type="range" id="pfl-4d-slider" min="0" max="0" value="0" style="width:100%;accent-color:#fbbf24;cursor:pointer" />
@@ -934,9 +934,39 @@ export function loadPflWindowFramework({ viewer }) {
   // 4D Event Time-Slider + Auto-Director Engine
   let chronoEvents = []; // oldest -> newest so scrubbing left->right moves forward in time!
   let scrubPlaying = false;
-  let autoDirectorOn = false;
+  let autoDirectorOn = true;
+  let yardAlarmArmed = true;
   let lastSeenNewestEventId = null;
   let scrubTimeout = 0;
+
+
+  function triggerBrowserIntruderSiren(ev) {
+    if (!yardAlarmArmed) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) {
+        const ctx = new Ctx();
+        [0, 0.32, 0.64].forEach((offset, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(idx % 2 === 0 ? 880 : 660, ctx.currentTime + offset);
+          gain.gain.setValueAtTime(0.18, ctx.currentTime + offset);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.28);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + offset);
+          osc.stop(ctx.currentTime + offset + 0.29);
+        });
+      }
+    } catch {}
+    patrolWin.box.style.borderColor = '#ef4444';
+    patrolWin.box.style.boxShadow = '0 0 32px rgba(239,68,68,0.85)';
+    setTimeout(() => {
+      patrolWin.box.style.borderColor = '';
+      patrolWin.box.style.boxShadow = '';
+    }, 8000);
+  }
 
   function jumpTo4dEvent(chronoIdx, fly3d = true) {
     if (!chronoEvents.length) return;
@@ -995,8 +1025,10 @@ export function loadPflWindowFramework({ viewer }) {
     }
     if (idxEl) idxEl.textContent = chronoEvents.length ? `${chronoEvents.length} / ${chronoEvents.length}` : '0 / 0';
     const newest = chronoEvents[chronoEvents.length - 1];
-    if (newest && lastSeenNewestEventId && newest.id !== lastSeenNewestEventId && autoDirectorOn) {
-      jumpTo4dEvent(chronoEvents.length - 1, true);
+    if (newest && lastSeenNewestEventId && newest.id !== lastSeenNewestEventId) {
+      const isPerson = (newest.tags || []).some((t) => String(t).toUpperCase().includes('PERSON'));
+      if (isPerson) triggerBrowserIntruderSiren(newest);
+      if (autoDirectorOn || isPerson) jumpTo4dEvent(chronoEvents.length - 1, true);
     }
     if (newest) lastSeenNewestEventId = newest.id;
   }
@@ -1026,6 +1058,11 @@ export function loadPflWindowFramework({ viewer }) {
     e.currentTarget.textContent = autoDirectorOn ? '🎯 Auto-Director: ON' : '🎯 Auto-Director: OFF';
     if (autoDirectorOn && chronoEvents.length) jumpTo4dEvent(chronoEvents.length - 1, true);
   });
+  patrolWin.body.querySelector('#pfl-yard-alarm')?.addEventListener('click', (e) => {
+    yardAlarmArmed = !yardAlarmArmed;
+    e.currentTarget.textContent = yardAlarmArmed ? '🚨 Alarm: ARMED' : '🔕 Alarm: MUTED';
+  });
+  const alarmPollTimer = setInterval(() => refreshWyzePatrol(false), 25000);
 
   async function refreshWyzePatrol(triggerHarvest = false) {
     try {
@@ -1040,7 +1077,7 @@ export function loadPflWindowFramework({ viewer }) {
         checksEl.innerHTML = d.allCameras.map((c) => `
           <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
             <input type="checkbox" class="pfl-cam-chk" value="${c.id}" ${c.enabled ? 'checked' : ''} />
-            <span>${c.src === 'hd' ? 'HD (Sky/Monaco Standby)' : c.src}</span>
+            <span>${c.src === 'hd' ? 'hd (Monaco RV)' : c.src}</span>
           </label>
         `).join('');
         checksEl.querySelectorAll('.pfl-cam-chk').forEach((chk) => {
@@ -1317,15 +1354,15 @@ export function loadPflWindowFramework({ viewer }) {
     {
       src: 'hd',
       cctvId: 'pfl-house-hd-cam',
-      label: 'HD (Monaco Standby)',
-      lat: 29.24756,
-      lon: -95.23136,
-      headingDeg: 92,
-      pitchDeg: -12,
+      label: 'HD Monaco & Lamp (~70W)',
+      lat: 29.247485,
+      lon: -95.231355,
+      headingDeg: 108,
+      pitchDeg: -18,
       fovDeg: 100,
-      rangeM: 18.0,
-      mountHeightM: 3.4,
-      defaultOn: false,
+      rangeM: 16.5,
+      mountHeightM: 3.1,
+      defaultOn: true,
     },
   ];
 
@@ -1571,6 +1608,7 @@ export function loadPflWindowFramework({ viewer }) {
       clearInterval(patrolCycleTimer);
       clearTimeout(scrubTimeout);
       clearInterval(always3dTimer);
+      clearInterval(alarmPollTimer);
       try { viewer.scene.primitives.remove(always3dHost); } catch {}
       cancelAnimationFrame(rafId);
       pickHandler.destroy();

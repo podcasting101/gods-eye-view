@@ -58,5 +58,25 @@
     "url": "http://127.0.0.1:1984/api/stream.mp4?src=back-yard-cam2",
     "snapshotUrl": "http://127.0.0.1:1984/api/frame.jpeg?src=back-yard-cam2",
     "license": "Sovereign Operator Feed (Paul Prime)"
+  },
+  {
+    "id": "pfl-house-hd-cam",
+    "name": "HD Monaco",
+    "city": "Liverpool, TX",
+    "cityId": "pfl-liverpool",
+    "provider": "Project Free Life Sovereign Wyze Node (go2rtc)",
+    "lat": 29.247485,
+    "lon": -95.231355,
+    "headingDeg": 108,
+    "pitchDeg": -18,
+    "fovDeg": 100,
+    "rangeM": 16.5,
+    "mountHeightM": 3.1,
+    "frameRefreshMs": 2000,
+    "feedType": "mp4",
+    "sourceKind": "pfl-go2rtc-local",
+    "url": "http://127.0.0.1:1984/api/stream.mp4?src=hd",
+    "snapshotUrl": "http://127.0.0.1:1984/api/frame.jpeg?src=hd",
+    "license": "Sovereign Operator Feed (Paul Prime)"
   }
 ]
