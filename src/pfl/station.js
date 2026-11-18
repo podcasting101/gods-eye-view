@@ -98,7 +98,7 @@ function addSovereignAnchor(viewer) {
       minimumPixelSize: 0,
       maximumScale: 50,
       lightColor: new Cesium.Color(4.8, 4.4, 3.9, 1.0),
-      imageBasedLightingFactor: new Cesium.Cartesian2(1.6, 1.6),
+      imageBasedLightingFactor: new Cesium.Cartesian2(1.0, 1.0),
       silhouetteColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.28),
       silhouetteSize: 1.0,
     },
