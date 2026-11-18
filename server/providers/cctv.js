@@ -47,7 +47,7 @@ async function fetchPflGo2rtcFrame(cameraId, url) {
   try {
     const u = new URL(url);
     if (u.hostname !== '127.0.0.1' && u.hostname !== 'localhost') return null;
-    const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
     if (!r.ok) return cached ? { ok: true, body: cached.body, contentType: 'image/jpeg' } : null;
     const buf = Buffer.from(await r.arrayBuffer());
     if (buf.length < 100 || buf[0] !== 0xff || buf[1] !== 0xd8) {
@@ -59,6 +59,19 @@ async function fetchPflGo2rtcFrame(cameraId, url) {
     return cached ? { ok: true, body: cached.body, contentType: 'image/jpeg' } : null;
   }
 }
+
+
+async function prewarmPflGo2rtc() {
+  for (const [cid, src] of [
+    ['pfl-wyze-cam-v4', 'wyze-cam-v4'],
+    ['pfl-back-yard-cam1', 'back-yard-cam1'],
+    ['pfl-back-yard-cam2', 'back-yard-cam2'],
+    ['pfl-house-hd-cam', 'hd'],
+  ]) {
+    await fetchPflGo2rtcFrame(cid, 'http://127.0.0.1:1984/api/frame.jpeg?src=' + src);
+  }
+}
+setTimeout(() => { prewarmPflGo2rtc().catch(() => {}); }, 800);
 
 export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
   const getCctvSources = createCctvCatalog({ sourceRoot });
