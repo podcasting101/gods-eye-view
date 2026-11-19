@@ -1725,12 +1725,22 @@ export async function loadNeo4jPersonalLayer({
   let visible = false;
   let destroyed = false;
   let selectedNodeId = null;
+  let hoveredNodeId = null;
   let drawerClusterId = 'starbase';
   let drawerOpen = false;
   let eventHandler = null;
   let simTimer = null;
   let domRoot = null;
   let dragState = null;
+
+  function resolveClusterAlt(cluster, rawAlt) {
+    if (cluster.id === 'starbase') return rawAlt;
+    if (viewer?.scene?.globe && viewer.scene.globe.show !== false) {
+      const datumShift = cluster.id === 'birdpond' ? 16.0 : -STORED_GROUND_HEIGHT_M;
+      return rawAlt + datumShift;
+    }
+    return rawAlt;
+  }
 
   function refreshClusterVisuals(targetCluster = null) {
     const list = targetCluster ? [targetCluster] : clusters;
@@ -1739,8 +1749,9 @@ export async function loadNeo4jPersonalLayer({
         const vis = nodeVisuals.get(node.id);
         if (!vis) continue;
         const showNode = visible && Boolean(node.active);
+        const isFocus = selectedNodeId === node.id || hoveredNodeId === node.id;
         vis.sphereEnt.show = showNode;
-        vis.cardEnt.show = showNode;
+        vis.cardEnt.show = showNode && isFocus;
         if (!showNode) continue;
 
         const isSel = selectedNodeId === node.id;
@@ -1794,7 +1805,10 @@ export async function loadNeo4jPersonalLayer({
         Boolean(a?.active) &&
         Boolean(b?.active);
       ev.lineEnt.show = showEdge;
-      if (ev.relEnt) ev.relEnt.show = showEdge;
+      const isEdgeFocus =
+        (selectedNodeId !== null && (ev.edge.from === selectedNodeId || ev.edge.to === selectedNodeId)) ||
+        (hoveredNodeId !== null && (ev.edge.from === hoveredNodeId || ev.edge.to === hoveredNodeId));
+      if (ev.relEnt) ev.relEnt.show = showEdge && isEdgeFocus;
       if (!showEdge) continue;
 
       const isHi =
@@ -1867,7 +1881,7 @@ export async function loadNeo4jPersonalLayer({
         nodeMap.set(node.id, node);
 
         const dynamicPos = new Cesium.CallbackProperty(
-          () => Cesium.Cartesian3.fromDegrees(node.lon, node.lat, node.alt),
+          () => Cesium.Cartesian3.fromDegrees(node.lon, node.lat, resolveClusterAlt(cluster, node.alt)),
           false,
         );
 
@@ -1921,7 +1935,7 @@ export async function loadNeo4jPersonalLayer({
         const cardEnt = viewer.entities.add({
           id: cardId,
           name: `[${node.type}] ${node.label}`,
-          show: Boolean(node.active),
+          show: false,
           position: dynamicPos,
           billboard: badgeCanvas
             ? {
@@ -1956,8 +1970,8 @@ export async function loadNeo4jPersonalLayer({
 
         const linePositions = new Cesium.CallbackProperty(
           () => [
-            Cesium.Cartesian3.fromDegrees(a.lon, a.lat, a.alt),
-            Cesium.Cartesian3.fromDegrees(b.lon, b.lat, b.alt),
+            Cesium.Cartesian3.fromDegrees(a.lon, a.lat, resolveClusterAlt(cluster, a.alt)),
+            Cesium.Cartesian3.fromDegrees(b.lon, b.lat, resolveClusterAlt(cluster, b.alt)),
           ],
           false,
         );
@@ -2931,6 +2945,10 @@ export async function loadNeo4jPersonalLayer({
         if (nowMs - lastHoverPickMs < 180) return;
         lastHoverPickMs = nowMs;
         const hoverId = resolvePickedNodeId(endPos, { allowDrill: false });
+        if (hoverId !== hoveredNodeId) {
+          hoveredNodeId = hoverId;
+          refreshClusterVisuals();
+        }
         if (viewer.scene.canvas.style) {
           viewer.scene.canvas.style.cursor = hoverId ? 'pointer' : '';
         }

@@ -3475,12 +3475,20 @@ export function loadPflWindowFramework({ viewer }) {
 
     // 3D 417 Palm Drive Two-Story Yellow Coastal House GLB (/models/pfl-palm-drive-house.glb)
     // In Cesium glTF axis conversion, heading=90° aligns glTF +X (14.6m width) East-West and glTF +Z (+5.6m front porch/balcony) Due South!
-    const HOUSE_POSE_KEY = 'pfl_house_pose_v2';
-    let houseState = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0 };
+    const HOUSE_POSE_KEY = 'pfl_house_pose_v3';
+    const DEFAULT_HOUSE_STATE = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0, scale: 1 };
+    let houseState = { ...DEFAULT_HOUSE_STATE };
     try {
       const savedHouse = JSON.parse(localStorage.getItem(HOUSE_POSE_KEY) || 'null');
       if (savedHouse && Number.isFinite(savedHouse.lat) && Number.isFinite(savedHouse.lon)) {
-        houseState = { ...houseState, ...savedHouse };
+        const driftM = Math.hypot(
+          (savedHouse.lat - DEFAULT_HOUSE_STATE.lat) * 111320,
+          (savedHouse.lon - DEFAULT_HOUSE_STATE.lon) * 97200,
+        );
+        const safeLift = Math.abs(Number(savedHouse.lift || 0)) <= 4.5 ? Number(savedHouse.lift || 0) : 0;
+        if (driftM <= 32) {
+          houseState = { ...houseState, ...savedHouse, lift: safeLift };
+        }
       }
     } catch {}
 
@@ -4148,8 +4156,8 @@ export function loadPflWindowFramework({ viewer }) {
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:minmax(255px, 1fr) minmax(320px, 1.35fr);gap:10px;align-items:start">
-        <div id="pfl-mls-floorplan-pane" style="display:flex;flex-direction:column;gap:6px;background:rgba(15,23,42,0.82);border:1px solid rgba(56,189,248,0.32);border-radius:8px;padding:7px">
+      <div style="display:grid;grid-template-columns:minmax(240px, 1fr) minmax(280px, 1.35fr);gap:10px;align-items:start;min-width:0">
+        <div id="pfl-mls-floorplan-pane" style="display:flex;flex-direction:column;gap:6px;background:rgba(15,23,42,0.82);border:1px solid rgba(56,189,248,0.32);border-radius:8px;padding:7px;min-width:0">
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#7dd3fc;display:flex;justify-content:space-between">
             <span>⬆️ NORTH = CHOCOLATE BAYOU</span>
             <span>CLICK ANY ROOM</span>
@@ -4187,7 +4195,7 @@ export function loadPflWindowFramework({ viewer }) {
           <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#94a3b8;text-align:center">⬇️ SOUTH = PALM DRIVE &amp; EAST CARPORT</div>
         </div>
 
-        <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:0;overflow:hidden">
           <div style="position:relative;background:#020617;border:1.5px solid rgba(250,204,21,0.5);border-radius:8px;overflow:hidden;min-height:230px;display:flex;align-items:center;justify-content:center">
             <img id="pfl-mls-photo-img" src="/palm-drive-mls/m00.webp" alt="417 Palm Drive MLS Interior Walkthrough" style="width:100%;max-height:310px;object-fit:contain;display:block;background:#020617" />
             <div id="pfl-mls-photo-badge" style="position:absolute;top:6px;left:6px;background:rgba(9,14,26,0.88);border:1px solid rgba(56,189,248,0.65);border-radius:5px;padding:2px 7px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#7dd3fc">1 / 32 · m00</div>

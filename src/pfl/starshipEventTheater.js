@@ -1301,6 +1301,7 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
               height: 46,
               pixelOffset: new Cesium.Cartesian2(0, -28),
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 95000),
             }
           : undefined,
       }),
@@ -1354,6 +1355,7 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
               height: 52,
               pixelOffset: new Cesium.Cartesian2(0, -56),
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 95000),
             }
           : undefined,
       }),
@@ -1413,6 +1415,7 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
               height: 46,
               pixelOffset: new Cesium.Cartesian2(0, -48),
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 95000),
             }
           : undefined,
       }),
@@ -1448,6 +1451,7 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
               height: 50,
               pixelOffset: new Cesium.Cartesian2(0, -34),
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 95000),
             }
           : undefined,
       }),
@@ -1562,6 +1566,7 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
             height: 48,
             pixelOffset: new Cesium.Cartesian2(0, -34),
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 95000),
           }
         : undefined,
     });
