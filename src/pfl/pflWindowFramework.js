@@ -6,7 +6,8 @@ import {
 } from '../renderGovernor.js';
 import { activeYardDatumM } from './yardFrames.js';
 
-const STORAGE_KEY = 'pfl_gev_windows_v1';
+const STORAGE_KEY = 'pfl_gev_windows_v2';
+const IS_LOCAL_NODE = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
 
 function loadSavedLayout() {
   try {
@@ -128,15 +129,23 @@ export function loadPflWindowFramework({ viewer }) {
       padding: 4px 2px !important;
       flex-wrap: wrap !important;
     }
+    /* Keep upper-left GOD'S EYE VIEW brand header compact (~half size) below docked bar */
+    #title-bar {
+      top: 42px !important;
+      left: 12px !important;
+      transform: scale(0.54) !important;
+      transform-origin: top left !important;
+    }
   `;
   document.head.appendChild(style);
   createdEls.push(style);
 
-  function createStandardBox({ id, title, defaultLeft, defaultTop, defaultWidth }) {
+  function createStandardBox({ id, title, defaultLeft, defaultTop, defaultWidth, defaultMinimized = false }) {
     const cfg = saved[id] || {};
+    const initMin = typeof cfg.minimized === 'boolean' ? cfg.minimized : Boolean(defaultMinimized);
     const box = document.createElement('div');
     box.id = id;
-    box.className = 'pfl-std-box' + (cfg.minimized ? ' pfl-minimized' : '');
+    box.className = 'pfl-std-box' + (initMin ? ' pfl-minimized' : '');
     box.style.left = (cfg.left ?? defaultLeft) + 'px';
     box.style.top = (cfg.top ?? defaultTop) + 'px';
     if (cfg.width || defaultWidth) box.style.width = (cfg.width ?? defaultWidth) + 'px';
@@ -151,7 +160,7 @@ export function loadPflWindowFramework({ viewer }) {
       <div class="pfl-std-ctrls">
         <button type="button" class="pfl-std-cbtn" data-act="smaller" title="Decrease font/scale">A−</button>
         <button type="button" class="pfl-std-cbtn" data-act="bigger" title="Increase font/scale">A+</button>
-        <button type="button" class="pfl-std-cbtn" data-act="min" title="Minimize / Expand">${cfg.minimized ? '▢' : '—'}</button>
+        <button type="button" class="pfl-std-cbtn" data-act="min" title="Minimize / Expand">${initMin ? '▢' : '—'}</button>
       </div>
     `;
     const body = document.createElement('div');
@@ -244,9 +253,10 @@ export function loadPflWindowFramework({ viewer }) {
   const cmdWin = createStandardBox({
     id: 'pfl-win-command-dock',
     title: 'PFL SOVEREIGN COMMAND DOCK (3 NODES + KALSHI + 3D TOOLS)',
-    defaultLeft: 18,
-    defaultTop: 58,
-    defaultWidth: 760,
+    defaultLeft: 4,
+    defaultTop: 4,
+    defaultWidth: 690,
+    defaultMinimized: true,
   });
 
   // 🧲 Gather Boxes: snap every floating PFL box (esp. the 3D Compass) back inside the viewport in one click
@@ -319,6 +329,7 @@ export function loadPflWindowFramework({ viewer }) {
       <button type="button" class="pfl-f15-btn" id="pfl-btn-walk-inside-house" style="border-color:#fbbf24;color:#fde047;font-weight:700" title="Open interactive 32-photo 2-story floor plan &amp; guided room-by-room 3D walkthrough of 417 Palm Drive">🏠 Walk Inside 417 Palm Dr (32-Photo Floor Plan &amp; ▶ Auto-Tour)</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-marine-vhf" style="border-color:#22d3ee;color:#67e8f9;font-weight:700" title="Open USCG Houston-Galveston / Chocolate Bayou Marine VHF &amp; Live AIS / Radio Browser Scanner">📻 Marine VHF &amp; Chocolate Bayou Scanner</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-kalshi-inline" style="border-color:#22c55e;color:#4ade80;font-weight:700">📈 Kalshi Paper Arena (Show / Hide)</button>
+      <button type="button" class="pfl-f15-btn active" id="pfl-dock-polymarket-btn" style="border-color:#a855f7;color:#d8b4fe;font-weight:700" title="Show or hide Polymarket prediction odds markers on the globe">📊 Polymarket: ON</button>
       <a href="/kalshi-paper.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-kalshi-tab" style="border-color:#38bdf8;color:#38bdf8;text-decoration:none;display:inline-flex;align-items:center">↗ Full TradingView &amp; Kalshi Tab</a>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-wyze-patrol" style="border-color:#f97316;color:#fdba74;font-weight:700">🎥 Live Wyze Patrol &amp; 4D Scrubber</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-balcony-front" style="border-color:#38bdf8;color:#7dd3fc;font-weight:700" title="Lock 3D view onto your 2nd-story Balcony looking across the stitched Front Yard, Neighbor's House &amp; Horizon">🏠 Balcony Front Splat</button>
@@ -436,6 +447,15 @@ export function loadPflWindowFramework({ viewer }) {
       if (typeof window.__pflOpenFireModal === 'function') window.__pflOpenFireModal();
       else document.getElementById('gev-fire-video-btn')?.click();
     });
+    extraRow.querySelector('#pfl-dock-polymarket-btn')?.addEventListener('click', () => {
+      if (typeof window.__pflTogglePolymarket === 'function') {
+        const next = window.__pflTogglePolymarket();
+        syncPolymarketButtons(next);
+      }
+    });
+    if (typeof window.__pflPolymarketVisible === 'function') {
+      syncPolymarketButtons(window.__pflPolymarketVisible());
+    }
     extraRow.querySelector('#pfl-btn-walk-inside-house')?.addEventListener('click', () => {
       openMlsWalkthrough();
     });
@@ -458,9 +478,10 @@ export function loadPflWindowFramework({ viewer }) {
   const compassWin = createStandardBox({
     id: 'pfl-win-3d-compass-inspector',
     title: 'PFL 3D COMPASS, DRONE ORBIT, LENS & PADS',
-    defaultLeft: Math.max(20, window.innerWidth - 312),
-    defaultTop: 58,
-    defaultWidth: 292,
+    defaultLeft: Math.max(20, window.innerWidth - 296),
+    defaultTop: 118,
+    defaultWidth: 280,
+    defaultMinimized: true,
   });
   compassWin.box.style.zIndex = '9660';
   compassWin.body.innerHTML = `
@@ -2307,7 +2328,7 @@ export function loadPflWindowFramework({ viewer }) {
   });
 
   const timer = setInterval(() => {
-    paintGlobe();
+    if (!compassWin.box.classList.contains('pfl-minimized')) paintGlobe();
     syncTiltPolicy();
     checkHolodeckPortalStep();
     syncAlways3dVisibility();
@@ -2317,15 +2338,17 @@ export function loadPflWindowFramework({ viewer }) {
   const kalshiWin = createStandardBox({
     id: 'pfl-win-kalshi-arena',
     title: '📈 KALSHI WEATHER & MACRO PAPER ARENA ($100 LIVE SEATS)',
-    defaultLeft: 20,
-    defaultTop: 215,
-    defaultWidth: 495,
+    defaultLeft: 12,
+    defaultTop: 280,
+    defaultWidth: 465,
+    defaultMinimized: true,
   });
   kalshiWin.body.innerHTML = `
     <div style="font-family:'Inter',system-ui,sans-serif;font-size:11.5px;color:#e2e8f0">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
         <span style="color:#4ade80;font-weight:700">● Live Kalshi Weather/Macro Book (.cache/ledger)</span>
         <div style="display:flex;gap:4px">
+          <button type="button" class="pfl-std-cbtn active" id="pfl-toggle-polymarket" style="border-color:#a855f7;color:#d8b4fe" title="Show or hide Polymarket prediction odds markers on the globe">📊 Polymarket: ON</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-kalshi-wx-btn" title="Toggle swirling Wind & Weather Radar layers">🌪️ Swirl Weather/Wind</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-kalshi-refresh">↻ Sync Quotes</button>
         </div>
@@ -2356,11 +2379,29 @@ export function loadPflWindowFramework({ viewer }) {
     </div>
   `;
 
+  function syncPolymarketButtons(vis) {
+    const on = typeof vis === 'boolean' ? vis : (typeof window.__pflPolymarketVisible === 'function' ? window.__pflPolymarketVisible() : true);
+    const lbl = on ? '📊 Polymarket: ON' : '📊 Polymarket: OFF';
+    for (const id of ['pfl-toggle-polymarket', 'pfl-dock-polymarket-btn']) {
+      const btn = document.getElementById(id);
+      if (btn) {
+        btn.textContent = lbl;
+        btn.classList.toggle('active', Boolean(on));
+      }
+    }
+  }
+
   async function refreshInlineKalshi() {
     const lbEl = kalshiWin.body.querySelector('#pfl-inline-lb');
     const trEl = kalshiWin.body.querySelector('#pfl-inline-trades');
     const mkEl = kalshiWin.body.querySelector('#pfl-inline-markets');
     if (!lbEl || !mkEl) return;
+    if (!IS_LOCAL_NODE) {
+      lbEl.innerHTML = '<tr><td colspan="5" style="color:#94a3b8;padding:4px 2px">Public Showcase Mode — private local ledger isolated on localhost:4173</td></tr>';
+      if (trEl) trEl.innerHTML = '';
+      mkEl.innerHTML = '<div style="color:#cbd5e1;padding:4px">Public Showcase Mode — live private Kalshi paper ledger runs locally on <code>localhost:4173</code> (home PC isolated). Use <strong>📊 Polymarket</strong> above for global odds pins.</div>';
+      return;
+    }
     try {
       const r = await fetch('/api/pfl/kalshi');
       const d = await r.json();
@@ -2439,6 +2480,12 @@ export function loadPflWindowFramework({ viewer }) {
     }
   }
 
+  kalshiWin.body.querySelector('#pfl-toggle-polymarket')?.addEventListener('click', () => {
+    if (typeof window.__pflTogglePolymarket === 'function') {
+      const next = window.__pflTogglePolymarket();
+      syncPolymarketButtons(next);
+    }
+  });
   kalshiWin.body.querySelector('#pfl-kalshi-refresh')?.addEventListener('click', refreshInlineKalshi);
   kalshiWin.body.querySelector('#pfl-bet-submit')?.addEventListener('click', async () => {
     const ticker = kalshiWin.body.querySelector('#pfl-bet-tkr')?.value?.trim();
@@ -2506,7 +2553,7 @@ export function loadPflWindowFramework({ viewer }) {
     }
   });
   refreshInlineKalshi();
-  const kalshiPoll = setInterval(refreshInlineKalshi, 20000);
+  const kalshiPoll = IS_LOCAL_NODE ? setInterval(refreshInlineKalshi, 20000) : null;
 
 
   // 4) Movable / Sizable Local Memory Palace, Uploaded Splats & Wyze Camera Vault (starts neatly minimized until clicked!)
@@ -2517,6 +2564,7 @@ export function loadPflWindowFramework({ viewer }) {
     defaultTop: 435,
     defaultWidth: 530,
   });
+  vaultWin.box.style.display = 'none';
   if (!saved['pfl-win-local-vault']) {
     vaultWin.box.classList.add('pfl-minimized');
     const mb = vaultWin.box.querySelector('[data-act="min"]');
@@ -2542,6 +2590,11 @@ export function loadPflWindowFramework({ viewer }) {
   `;
 
   async function refreshLocalVault() {
+    if (!IS_LOCAL_NODE) {
+      const sumEl = vaultWin.body.querySelector('#pfl-vault-summary');
+      if (sumEl) sumEl.textContent = '● Public Showcase Mode — Local splats & LAN Wyze vault isolated on localhost:4173';
+      return;
+    }
     try {
       const r = await fetch('/api/pfl/local-vault');
       const d = await r.json();
@@ -2599,9 +2652,10 @@ export function loadPflWindowFramework({ viewer }) {
   const patrolWin = createStandardBox({
     id: 'pfl-win-wyze-patrol',
     title: '🎥 PFL LIVE WYZE VIDEO PATROL & MOTION EVENTS',
-    defaultLeft: Math.max(40, window.innerWidth - 790),
-    defaultTop: 110,
-    defaultWidth: 465,
+    defaultLeft: 6,
+    defaultTop: 88,
+    defaultWidth: 425,
+    defaultMinimized: true,
   });
   if (parseInt(patrolWin.box.style.height || '999', 10) < 120) patrolWin.box.style.height = '';
   patrolWin.body.innerHTML = `
@@ -2685,6 +2739,11 @@ export function loadPflWindowFramework({ viewer }) {
     const vid = patrolWin.body.querySelector('#pfl-patrol-video');
     const stEl = patrolWin.body.querySelector('#pfl-patrol-status');
     if (!vid) return;
+    if (!IS_LOCAL_NODE && !mediaOverrideUrl) {
+      vid.removeAttribute('src');
+      if (stEl) stEl.textContent = '● Public Mode — Private LAN Wyze RTSP streams isolated on local PC';
+      return;
+    }
     if (mediaOverrideUrl) {
       vid.src = mediaOverrideUrl;
       vid.play().catch(() => {});
@@ -2875,9 +2934,16 @@ export function loadPflWindowFramework({ viewer }) {
     yardAlarmArmed = !yardAlarmArmed;
     e.currentTarget.textContent = yardAlarmArmed ? '🚨 Alarm: ARMED' : '🔕 Alarm: MUTED';
   });
-  const alarmPollTimer = setInterval(() => refreshWyzePatrol(false), 25000);
+  const alarmPollTimer = IS_LOCAL_NODE ? setInterval(() => refreshWyzePatrol(false), 25000) : null;
 
   async function refreshWyzePatrol(triggerHarvest = false) {
+    if (!IS_LOCAL_NODE) {
+      const stEl = patrolWin.body.querySelector('#pfl-patrol-status');
+      if (stEl) stEl.textContent = '● Public Mode — Private LAN Wyze RTSP streams isolated on local PC';
+      const evEl = patrolWin.body.querySelector('#pfl-patrol-events');
+      if (evEl) evEl.innerHTML = '<div style="color:#94a3b8;padding:4px">Private home Wyze events are not exposed on public sex-world.ai.</div>';
+      return;
+    }
     try {
       const r = await fetch(`/api/pfl/local-vault/wyze-events?site=${encodeURIComponent(patrolSiteFilter)}`, {
         method: triggerHarvest ? 'POST' : 'GET',
@@ -3999,14 +4065,48 @@ export function loadPflWindowFramework({ viewer }) {
     }
   }
 
+  function isCameraNearLiverpoolYard() {
+    const c = viewer?.camera?.positionCartographic;
+    if (!c || c.height > 2500) return false;
+    return Math.hypot(Cesium.Math.toDegrees(c.latitude) - 29.24755, Cesium.Math.toDegrees(c.longitude) - -95.23140) < 0.05;
+  }
+
   function syncAlways3dVisibility() {
     enforceZeroAltitudeKickGuard();
+    const allowLive = IS_LOCAL_NODE && isCameraNearLiverpoolYard();
+    const dockBtn = document.getElementById('pfl-btn-always3d');
+    if (dockBtn) {
+      const wantLabel = !IS_LOCAL_NODE
+        ? '👁️ Always-On 3D Cams: LOCAL ONLY'
+        : always3dMasterOn ? '👁️ Always-On 3D Cams: ON' : '👁️ Always-On 3D Cams: OFF';
+      if (dockBtn.textContent !== wantLabel) {
+        dockBtn.textContent = wantLabel;
+        dockBtn.classList.toggle('active', IS_LOCAL_NODE && always3dMasterOn);
+      }
+    }
+    if (!allowLive) {
+      let anyHidden = false;
+      for (const rt of always3dRuntimes.values()) {
+        if (rt.prim.show || rt.outlinePrim.show) {
+          rt.prim.show = false;
+          rt.outlinePrim.show = false;
+          anyHidden = true;
+        }
+      }
+      if (anyHidden) governorRequestRender('pfl-always3d-vis');
+      return;
+    }
+    let anyChanged = false;
     for (const cam of SOVEREIGN_3D_CAMS) {
       const baseWant = always3dMasterOn && Boolean(always3dSelected[cam.src]);
       if (!baseWant && !always3dRuntimes.has(cam.src)) continue;
       const rt = ensureAlways3dRuntime(cam);
       const alpha = baseWant ? viewAngleWeight(cam) : 0;
       const want = baseWant && alpha > 0.04;
+      const outlineWant = want && !cam.groundDrape;
+      if (rt.prim.show !== want || rt.outlinePrim.show !== outlineWant) {
+        anyChanged = true;
+      }
       const m = computePflQuadPose(cam);
       Cesium.Matrix4.clone(m, rt.prim.modelMatrix);
       Cesium.Matrix4.clone(m, rt.outlinePrim.modelMatrix);
@@ -4014,15 +4114,10 @@ export function loadPflWindowFramework({ viewer }) {
         rt.material.uniforms.color = Cesium.Color.WHITE.withAlpha(alpha);
       }
       rt.prim.show = want;
-      rt.outlinePrim.show = want && !cam.groundDrape;
+      rt.outlinePrim.show = outlineWant;
       if (want) pumpAlways3dFrame(rt);
     }
-    const dockBtn = document.getElementById('pfl-btn-always3d');
-    if (dockBtn) {
-      dockBtn.textContent = always3dMasterOn ? '👁️ Always-On 3D Cams: ON' : '👁️ Always-On 3D Cams: OFF';
-      dockBtn.classList.toggle('active', always3dMasterOn);
-    }
-    governorRequestRender('pfl-always3d-vis');
+    if (anyChanged) governorRequestRender('pfl-always3d-vis');
   }
 
   const always3dChecksEl = patrolWin.body.querySelector('#pfl-always3d-checks');
@@ -4055,7 +4150,7 @@ export function loadPflWindowFramework({ viewer }) {
   // Staggered 2.5s live frame refresh across pinned 3D quads (zero repeater overload, smooth continuous updates!)
   let a3dRobin = 0;
   const always3dTimer = setInterval(() => {
-    if (!always3dMasterOn) return;
+    if (!IS_LOCAL_NODE || !always3dMasterOn || !isCameraNearLiverpoolYard()) return;
     const activeList = SOVEREIGN_3D_CAMS.filter((c) => always3dSelected[c.src]);
     if (!activeList.length) return;
     const cam = activeList[a3dRobin % activeList.length];

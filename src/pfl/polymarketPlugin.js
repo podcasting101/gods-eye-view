@@ -26,6 +26,15 @@ const CATEGORY_COLORS = Object.freeze({
   trade: '#14b8a6',
 });
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function formatUsdCompact(value) {
   const num = Number(value) || 0;
   if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
@@ -97,24 +106,25 @@ export function makePolymarketBadgeCanvas(marker) {
 function buildMarkerDescriptionHtml(marker) {
   const pct = formatMarkerPct(marker?.yesPrice);
   const accent = CATEGORY_COLORS[marker?.category] || '#38bdf8';
-  const url = String(marker?.url || 'https://polymarket.com').replace(/"/g, '&quot;');
+  const rawUrl = String(marker?.url || 'https://polymarket.com');
+  const safeUrl = /^https?:\/\//i.test(rawUrl) ? escapeHtml(rawUrl) : 'https://polymarket.com';
   return `
     <div style="font-family:system-ui,sans-serif;padding:12px;color:#e2e8f0;background:#0f172a;border-radius:8px">
       <div style="font-size:11px;font-weight:700;color:${accent};letter-spacing:.06em;text-transform:uppercase">
-        Polymarket Real-Time Odds · ${marker?.region || 'Global'}
+        Polymarket Real-Time Odds · ${escapeHtml(marker?.region || 'Global')}
       </div>
-      <h2 style="margin:6px 0 8px;font-size:15px;color:#f8fafc">${marker?.title || ''}</h2>
+      <h2 style="margin:6px 0 8px;font-size:15px;color:#f8fafc">${escapeHtml(marker?.title || '')}</h2>
       <p style="margin:0 0 6px;font-size:13px">
-        <strong>Lead Contract:</strong> ${marker?.topOutcome || 'Yes'} —
+        <strong>Lead Contract:</strong> ${escapeHtml(marker?.topOutcome || 'Yes')} —
         <span style="color:${accent};font-weight:700">${pct} implied</span>
       </p>
       <p style="margin:0 0 8px;font-size:12px;color:#94a3b8">
         <strong>24h Volume:</strong> ${formatUsdCompact(marker?.volume24hr)} &nbsp;|&nbsp;
         <strong>Liquidity:</strong> ${formatUsdCompact(marker?.liquidity)}
       </p>
-      <a href="${url}" target="_blank" rel="noopener noreferrer"
+      <a href="${safeUrl}" target="_blank" rel="noopener noreferrer"
          style="display:inline-block;padding:6px 10px;background:${accent};color:#090d18;font-weight:700;border-radius:6px;text-decoration:none;font-size:12px">
-        Open Market on Polymarket
+        Open Market on Polymarket ↗
       </a>
     </div>`;
 }
@@ -130,11 +140,76 @@ export async function loadPolymarketPlugin({
   }
 
   let dataSource = null;
+  let clickHandler = null;
+  let popupEl = null;
   let destroyed = false;
+
+  const closePopup = () => {
+    if (popupEl) {
+      popupEl.style.display = 'none';
+    }
+  };
+
+  const openPopup = (marker) => {
+    if (typeof document === 'undefined' || !marker) return;
+    const accent = CATEGORY_COLORS[marker?.category] || '#38bdf8';
+    if (!popupEl) {
+      popupEl = document.createElement('div');
+      popupEl.id = 'pfl-polymarket-popup';
+      popupEl.style.cssText = [
+        'position:fixed',
+        'right:20px',
+        'bottom:84px',
+        'width:340px',
+        'max-width:calc(100vw - 32px)',
+        'z-index:9750',
+        'background:rgba(9,14,26,0.96)',
+        'border-radius:12px',
+        'box-shadow:0 16px 40px rgba(0,0,0,0.72)',
+        'backdrop-filter:blur(10px)',
+        'overflow:hidden',
+      ].join(';');
+      document.body.appendChild(popupEl);
+    }
+    popupEl.style.border = `1.5px solid ${accent}`;
+    popupEl.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(15,23,42,0.98);border-bottom:1px solid rgba(56,189,248,0.28);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${accent}">
+        <span>📊 POLYMARKET RADAR MARKET</span>
+        <button type="button" id="pfl-poly-popup-close" aria-label="Close" style="background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.4);color:#e2e8f0;border-radius:5px;padding:1px 7px;cursor:pointer;font-size:11px;font-weight:700">✕</button>
+      </div>
+      <div style="padding:4px">${buildMarkerDescriptionHtml(marker)}</div>
+    `;
+    popupEl.querySelector('#pfl-poly-popup-close')?.addEventListener('click', closePopup);
+    popupEl.style.display = 'block';
+  };
+
+  const syncToggleUi = (vis) => {
+    if (typeof document === 'undefined') return;
+    const label = vis ? '📊 Polymarket: ON' : '📊 Polymarket: OFF';
+    for (const id of ['pfl-toggle-polymarket', 'pfl-dock-polymarket-btn']) {
+      const btn = document.getElementById(id);
+      if (btn) {
+        btn.textContent = label;
+        btn.classList.toggle('active', Boolean(vis));
+      }
+    }
+  };
 
   const destroy = () => {
     if (destroyed) return;
     destroyed = true;
+    try { clickHandler?.destroy?.(); } catch {}
+    clickHandler = null;
+    if (popupEl) {
+      popupEl.remove();
+      popupEl = null;
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        delete window.__pflTogglePolymarket;
+        delete window.__pflPolymarketVisible;
+      } catch {}
+    }
     if (dataSource && viewer.dataSources?.contains?.(dataSource)) {
       viewer.dataSources.remove(dataSource, true);
     }
@@ -154,14 +229,19 @@ export async function loadPolymarketPlugin({
     const displayCond = new Cesium.DistanceDisplayCondition(45000, 35000000);
     const scaleDist = new Cesium.NearFarScalar(80000, 1.0, 14000000, 0.55);
 
+    let idx = 0;
     for (const marker of payload.markers) {
       const lat = Number(marker?.lat);
       const lon = Number(marker?.lon);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
       const accentHex = CATEGORY_COLORS[marker?.category] || '#38bdf8';
       const badgeCanvas = makePolymarketBadgeCanvas(marker);
+      const eyeOffset =
+        typeof Cesium.Cartesian3 === 'function'
+          ? new Cesium.Cartesian3(0, 0, -(idx * 15))
+          : undefined;
 
-      dataSource.entities.add({
+      const entity = dataSource.entities.add({
         id: String(marker.id || `poly-${lat}-${lon}`),
         name: `Polymarket · ${marker.title}`,
         position: Cesium.Cartesian3.fromDegrees(lon, lat, 12000),
@@ -178,6 +258,7 @@ export async function loadPolymarketPlugin({
               width: 220,
               height: 49,
               pixelOffset: new Cesium.Cartesian2(0, -32),
+              ...(eyeOffset ? { eyeOffset } : {}),
               distanceDisplayCondition: displayCond,
               scaleByDistance: scaleDist,
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -185,10 +266,52 @@ export async function loadPolymarketPlugin({
           : undefined,
         description: buildMarkerDescriptionHtml(marker),
       });
+      if (entity) entity._pflPolymarket = marker;
+      idx += 1;
     }
 
     await viewer.dataSources.add(dataSource);
     signal?.throwIfAborted?.();
+
+    if (typeof window !== 'undefined') {
+      window.__pflPolymarketVisible = () => Boolean(dataSource?.show);
+      window.__pflTogglePolymarket = (force) => {
+        if (!dataSource) return false;
+        const next = typeof force === 'boolean' ? force : !dataSource.show;
+        dataSource.show = next;
+        if (!next) closePopup();
+        syncToggleUi(next);
+        governorRequestRender('pfl-polymarket-toggle');
+        return next;
+      };
+      syncToggleUi(Boolean(dataSource.show));
+    }
+
+    if (
+      typeof Cesium.ScreenSpaceEventHandler === 'function' &&
+      Cesium.ScreenSpaceEventType?.LEFT_CLICK !== undefined &&
+      viewer.scene?.canvas
+    ) {
+      clickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      clickHandler.setInputAction((movement) => {
+        if (destroyed || !dataSource?.show || !movement?.position) return;
+        let picked = null;
+        try {
+          picked = viewer.scene.pick?.(movement.position);
+        } catch {}
+        const ent = picked?.id?._pflPolymarket
+          ? picked.id
+          : picked?._pflPolymarket
+            ? picked
+            : null;
+        if (ent?._pflPolymarket) {
+          openPopup(ent._pflPolymarket);
+        } else {
+          closePopup();
+        }
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }
+
     governorRequestRender('pfl-polymarket-load');
     return {
       count: dataSource.entities.values.length,
