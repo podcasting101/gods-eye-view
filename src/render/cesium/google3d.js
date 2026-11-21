@@ -112,9 +112,12 @@ export function configureAndGuardGoogleTileset(tileset) {
   try { tileset.maximumScreenSpaceError = 16; } catch {}
   try { tileset.loadSiblings = false; } catch {}
   try { tileset.preferLeaves = false; } catch {}
-  try { tileset.foveatedScreenSpaceError = true; } catch {}
-  try { tileset.foveatedConeSize = 0.25; } catch {}
-  try { tileset.foveatedTimeDelay = 0.1; } catch {}
+  // Disable foveated center-cone LOD pulsing so continental tiles (US / CA)
+  // never swell or breathe at planetary scale while rotating or resting.
+  try { tileset.foveatedScreenSpaceError = false; } catch {}
+  try { tileset.dynamicScreenSpaceError = false; } catch {}
+  try { tileset.skipLevelOfDetail = false; } catch {}
+  try { tileset.cullWithChildrenBounds = true; } catch {}
   try { tileset.preloadFlightDestinations = true; } catch {}
 
   if (tileset._pflStreamGuarded) return tileset;

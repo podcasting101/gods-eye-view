@@ -3205,14 +3205,9 @@ export function loadPflWindowFramework({ viewer }) {
     }
   } catch {}
 
-  function setOpticalLensFov(deg) {
+  function syncLensFovUiOnly(deg) {
     const clamped = Math.max(12, Math.min(125, Number(deg) || 60));
     currentLensFovDeg = clamped;
-    try {
-      if (viewer?.camera?.frustum && 'fov' in viewer.camera.frustum) {
-        viewer.camera.frustum.fov = Cesium.Math.toRadians(clamped);
-      }
-    } catch {}
     const sl = telepresenceDeck.querySelector('#pfl-fov-slider');
     const vl = telepresenceDeck.querySelector('#pfl-fov-val');
     if (sl && Number(sl.value) !== Math.round(clamped)) sl.value = String(Math.round(clamped));
@@ -3225,6 +3220,17 @@ export function loadPflWindowFramework({ viewer }) {
       b.style.borderColor = match ? '#c084fc' : '';
       b.style.color = match ? '#e9d5ff' : '';
     });
+  }
+
+  function setOpticalLensFov(deg) {
+    const clamped = Math.max(12, Math.min(125, Number(deg) || 60));
+    currentLensFovDeg = clamped;
+    try {
+      if (viewer?.camera?.frustum && 'fov' in viewer.camera.frustum) {
+        viewer.camera.frustum.fov = Cesium.Math.toRadians(clamped);
+      }
+    } catch {}
+    syncLensFovUiOnly(clamped);
     paintGlobe();
     governorRequestRender('pfl-fov-lens');
   }
@@ -3244,7 +3250,8 @@ export function loadPflWindowFramework({ viewer }) {
     setOpticalLensFov(currentLensFovDeg + deltaDeg);
   };
   viewer?.scene?.canvas?.addEventListener?.('wheel', altWheelLensHandler, { capture: true, passive: false });
-  setOpticalLensFov(currentLensFovDeg);
+  // Sync readout/buttons without clobbering Cesium's startup float FOV
+  syncLensFovUiOnly(currentLensFovDeg);
 
   // Wire Second-Life Teleport Pads & 1S788 Carport -> Holodeck Portal
   const TELEPORT_PADS_KEY = 'pfl_teleport_pads_v1';
