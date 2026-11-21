@@ -89,6 +89,27 @@ export class LocationNavigation {
       this._currentPoi = null;
       this._collapsePOIRow();
       this._updateLocationMiniStatus();
+      if (
+        typeof window !== 'undefined' &&
+        typeof window.dispatchEvent === 'function' &&
+        typeof CustomEvent === 'function' &&
+        Number.isFinite(state.destination?.latitude) &&
+        Number.isFinite(state.destination?.longitude)
+      ) {
+        window.dispatchEvent(
+          new CustomEvent('gev:search-pin', {
+            detail: {
+              lat: state.destination.latitude,
+              lon: state.destination.longitude,
+              label: state.destination.label || state.query || 'Pinned Location',
+              query: state.query || '',
+              navigationMode:
+                state.destination.navigationMode || 'precise-place',
+              rangeM: state.destination.rangeM ?? null,
+            },
+          }),
+        );
+      }
     } else if (change.type === 'missing')
       this._setLocationSearchError(
         `${t('Location not found')}. ${t('Check the spelling and press Enter to search again.')}`,

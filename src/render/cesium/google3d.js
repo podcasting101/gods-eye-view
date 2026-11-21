@@ -1,7 +1,15 @@
 // Paul Prime quota guard: boot on keyless Esri/Cesium globe by default so
 // startup never burns Google Photorealistic 3D Tiles API quota automatically.
+import {
+  governorRequestRender,
+  holdContinuousRender,
+  releaseContinuousRender,
+} from '../../renderGovernor.js';
+
 export const PHOTOREAL_AT_STARTUP = false;
 export const PHOTOREAL_TIMEOUT_MS = 20000;
+const GOOGLE_STREAM_HOLD_ID = 'google3d-tiles-stream';
+const GOOGLE_STREAM_TIMEOUT_MS = 8000;
 
 /**
  * @module render/cesium/google3d
@@ -97,16 +105,88 @@ function withTimeout(promise, ms, route) {
   return Promise.race([owned, timeout]).finally(() => clearTimeout(timer));
 }
 
+/** Configure sibling streaming and bounded render-governor wakeups on a Google 3D tileset. */
+export function configureAndGuardGoogleTileset(tileset) {
+  if (!tileset || typeof tileset !== 'object') return tileset;
+  try { tileset.maximumScreenSpaceError = 12; } catch {}
+  try { tileset.loadSiblings = true; } catch {}
+  try { tileset.preferLeaves = true; } catch {}
+  try { tileset.preloadFlightDestinations = true; } catch {}
+  try { tileset.foveatedTimeDelay = 0.0; } catch {}
+
+  if (tileset._pflStreamGuarded) return tileset;
+  try { tileset._pflStreamGuarded = true; } catch {}
+
+  let safetyTimer = null;
+  const clearSafety = () => {
+    if (safetyTimer !== null) {
+      clearTimeout(safetyTimer);
+      safetyTimer = null;
+    }
+  };
+  const armStreamHold = () => {
+    holdContinuousRender(GOOGLE_STREAM_HOLD_ID);
+    clearSafety();
+    safetyTimer = setTimeout(() => {
+      safetyTimer = null;
+      releaseContinuousRender(GOOGLE_STREAM_HOLD_ID);
+      governorRequestRender('google3d-stream-timeout');
+    }, GOOGLE_STREAM_TIMEOUT_MS);
+  };
+  const settleStreamHold = () => {
+    clearSafety();
+    releaseContinuousRender(GOOGLE_STREAM_HOLD_ID);
+    governorRequestRender('google3d-settled');
+    if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
+      try { window.dispatchEvent(new CustomEvent('gev:google3d-settled')); } catch {}
+    }
+  };
+
+  const offs = [];
+  const sub = (ev, fn) => {
+    if (typeof ev?.addEventListener !== 'function') return;
+    const unsub = ev.addEventListener(fn);
+    if (typeof unsub === 'function') offs.push(unsub);
+  };
+
+  sub(tileset.loadProgress, (pendingReq, pendingProc) => {
+    if ((pendingReq || 0) + (pendingProc || 0) > 0) armStreamHold();
+    else settleStreamHold();
+  });
+  sub(tileset.tileLoad, () => {
+    governorRequestRender('google3d-tile');
+  });
+  sub(tileset.allTilesLoaded, settleStreamHold);
+  sub(tileset.initialTilesLoaded, settleStreamHold);
+
+  armStreamHold();
+
+  if (typeof tileset.destroy === 'function') {
+    const origDestroy = tileset.destroy.bind(tileset);
+    tileset.destroy = (...args) => {
+      clearSafety();
+      releaseContinuousRender(GOOGLE_STREAM_HOLD_ID);
+      for (const off of offs) {
+        try { off(); } catch {}
+      }
+      offs.length = 0;
+      return origDestroy(...args);
+    };
+  }
+  return tileset;
+}
+
 /** Pass credentials to the source instead of changing SDK-wide defaults. */
-export function createGoogleDirectTileset(Cesium, key) {
+export async function createGoogleDirectTileset(Cesium, key) {
   key = clean(key);
   if (!key) throw new Error('Google 3D requires an explicit browser key');
   // Tiles keep drawing their own texture while draped weather loads, and
   // clamped marks land on them, as on the token routes' tiles.
-  return Cesium.createGooglePhotorealistic3DTileset(
+  const tileset = await Cesium.createGooglePhotorealistic3DTileset(
     { key, onlyUsingWithGoogleGeocoder: true },
     { asynchronouslyLoadImagery: true, enableCollision: true },
   );
+  return configureAndGuardGoogleTileset(tileset);
 }
 
 /**
@@ -133,13 +213,14 @@ export async function createGoogleTokenTileset(Cesium, tokens) {
     },
   });
   // The settings Cesium's Google helper applies to the key route.
-  return Cesium.Cesium3DTileset.fromUrl(resource, {
+  const tileset = await Cesium.Cesium3DTileset.fromUrl(resource, {
     cacheBytes: 1536 * 1024 * 1024,
     maximumCacheOverflowBytes: 1024 * 1024 * 1024,
     enableCollision: true,
     // Tiles keep drawing their own texture while draped weather loads.
     asynchronouslyLoadImagery: true,
   });
+  return configureAndGuardGoogleTileset(tileset);
 }
 
 export async function createGoogleIonTileset(
@@ -156,11 +237,12 @@ export async function createGoogleIonTileset(
   });
   signal?.throwIfAborted();
   // Match the installed SDK's Google helper rendering/cache defaults.
-  return Cesium.Cesium3DTileset.fromUrl(resource, {
+  const tileset = await Cesium.Cesium3DTileset.fromUrl(resource, {
     cacheBytes: 1536 * 1024 * 1024,
     maximumCacheOverflowBytes: 1024 * 1024 * 1024,
     enableCollision: true,
     // Tiles keep drawing their own texture while draped weather loads.
     asynchronouslyLoadImagery: true,
   });
+  return configureAndGuardGoogleTileset(tileset);
 }

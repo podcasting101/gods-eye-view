@@ -440,7 +440,14 @@ export async function searchAndFlyTo(viewer, query, options = {}) {
         options.signal,
       )
     : null;
-  const range = requestedRange || defaultRangeForNavigationMode(navigationMode);
+  const isStreetAddress =
+    Array.isArray(types) &&
+    (types.includes('street_address') || types.includes('subpremise'));
+  const range =
+    requestedRange ||
+    (isStreetAddress && !buildingBounds
+      ? 160
+      : defaultRangeForNavigationMode(navigationMode));
   // Resolve the real ground height before framing, for the same reason as the
   // coordinate branch: with no detailed outline, a searched place on elevated
   // ground would otherwise be framed against sea level. Resolved before the
@@ -457,7 +464,7 @@ export async function searchAndFlyTo(viewer, query, options = {}) {
     range,
     pitch: buildingPitch(buildingBounds),
     heading: 30,
-    buildingHeight: 30,
+    buildingHeight: isStreetAddress ? 10 : 30,
     buildingBounds: isUnavailableCapability(buildingBounds)
       ? null
       : buildingBounds,

@@ -5,8 +5,9 @@ import {
   governorRequestRender,
 } from '../renderGovernor.js';
 import { activeYardDatumM } from './yardFrames.js';
+import { createSexWorldDemoTour } from './sexWorldDemoTour.js';
 
-const STORAGE_KEY = 'pfl_gev_windows_v2';
+const STORAGE_KEY = 'pfl_gev_windows_v3';
 const IS_LOCAL_NODE = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
 
 function loadSavedLayout() {
@@ -140,6 +141,12 @@ export function loadPflWindowFramework({ viewer }) {
   document.head.appendChild(style);
   createdEls.push(style);
 
+  let topBoxZ = 9665;
+  function bringBoxToFront(el) {
+    if (!el) return;
+    el.style.zIndex = String(++topBoxZ);
+  }
+
   function createStandardBox({ id, title, defaultLeft, defaultTop, defaultWidth, defaultMinimized = false }) {
     const cfg = saved[id] || {};
     const initMin = typeof cfg.minimized === 'boolean' ? cfg.minimized : Boolean(defaultMinimized);
@@ -152,6 +159,7 @@ export function loadPflWindowFramework({ viewer }) {
     if (cfg.height && cfg.height >= 120) box.style.height = cfg.height + 'px';
     let scale = Number(cfg.scale) || 1.0;
     box.style.fontSize = Math.round(12 * scale) + 'px';
+    box.addEventListener('pointerdown', () => bringBoxToFront(box));
 
     const hdr = document.createElement('div');
     hdr.className = 'pfl-std-hdr';
@@ -217,15 +225,18 @@ export function loadPflWindowFramework({ viewer }) {
         if (act === 'min') {
           const isMin = box.classList.toggle('pfl-minimized');
           btn.textContent = isMin ? '▢' : '—';
-          if (!isMin && (!userResizedHeight || userResizedHeight < 120)) {
-            box.style.height = '';
+          if (!isMin) {
+            if (!userResizedHeight || userResizedHeight < 120) box.style.height = '';
+            bringBoxToFront(box);
           }
         } else if (act === 'bigger') {
           scale = Math.min(1.6, +(scale + 0.1).toFixed(2));
           box.style.transform = `scale(${scale})`;
+          bringBoxToFront(box);
         } else if (act === 'smaller') {
           scale = Math.max(0.7, +(scale - 0.1).toFixed(2));
           box.style.transform = `scale(${scale})`;
+          bringBoxToFront(box);
         }
         persist();
       });
@@ -252,45 +263,59 @@ export function loadPflWindowFramework({ viewer }) {
 
   const cmdWin = createStandardBox({
     id: 'pfl-win-command-dock',
-    title: 'PFL SOVEREIGN COMMAND DOCK (3 NODES + KALSHI + 3D TOOLS)',
-    defaultLeft: 4,
-    defaultTop: 4,
-    defaultWidth: 690,
+    title: '🧭 PFL COMMAND DOCK',
+    defaultLeft: 8,
+    defaultTop: 6,
+    defaultWidth: 556,
     defaultMinimized: true,
   });
 
-  // 🧲 Gather Boxes: snap every floating PFL box (esp. the 3D Compass) back inside the viewport in one click
+  // 🧲 Gather Boxes: neatly dock all floating PFL boxes into non-overlapping perimeter slots
   function gatherBoxes() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const vw = window.innerWidth || 1440;
+    const vh = window.innerHeight || 900;
+    const dockSlots = {
+      'pfl-win-command-dock': { left: 8, top: 6, minimize: true },
+      'pfl-win-wyze-patrol': { left: 12, top: Math.max(240, vh - 118), minimize: true },
+      'pfl-win-kalshi-arena': { left: 12, top: Math.max(200, vh - 158), minimize: true },
+      'pfl-win-local-vault': { left: Math.min(390, Math.max(12, vw - 480)), top: Math.max(240, vh - 118), minimize: true },
+    };
     const boxes = [...document.querySelectorAll('.pfl-std-box')];
     for (const box of boxes) {
       if (box.style.display === 'none') continue;
-      const w = Math.min(box.offsetWidth || 300, vw - 16);
-      const hdrH = 36;
-      let left = parseInt(box.style.left, 10);
-      let top = parseInt(box.style.top, 10);
-      if (!Number.isFinite(left)) left = 12;
-      if (!Number.isFinite(top)) top = 58;
-      left = Math.max(8, Math.min(left, vw - w - 8));
-      top = Math.max(48, Math.min(top, vh - hdrH - 8));
+      if (box.id === 'pfl-win-3d-compass-inspector') continue;
+      const w = Math.min(box.offsetWidth || 320, vw - 16);
+      const slot = dockSlots[box.id];
+      const left = slot ? Math.max(8, Math.min(slot.left, vw - w - 8)) : Math.max(8, Math.min(parseInt(box.style.left, 10) || 12, vw - w - 8));
+      const top = slot ? Math.max(6, Math.min(slot.top, vh - 44)) : Math.max(52, Math.min(parseInt(box.style.top, 10) || 64, vh - 44));
       box.style.left = `${Math.round(left)}px`;
       box.style.top = `${Math.round(top)}px`;
-      saved[box.id] = { ...(saved[box.id] || {}), left: Math.round(left), top: Math.round(top), width: Math.round(w) };
+      if (slot?.minimize) {
+        box.classList.add('pfl-minimized');
+        const mb = box.querySelector('[data-act="min"]');
+        if (mb) mb.textContent = '▢';
+      }
+      saved[box.id] = {
+        ...(saved[box.id] || {}),
+        left: Math.round(left),
+        top: Math.round(top),
+        width: Math.round(w),
+        ...(slot?.minimize ? { minimized: true } : {}),
+      };
     }
-    // The compass inspector is the one Paul loses: always bring it back, open, at the right edge
+    // The compass inspector is the one Paul uses most: bring it open cleanly at the right edge
     const cbox = compassWin?.box;
     if (cbox) {
       cbox.style.display = 'flex';
       cbox.classList.remove('pfl-minimized');
       const mb = cbox.querySelector('[data-act="min"]');
       if (mb) mb.textContent = '—';
-      const w = Math.min(cbox.offsetWidth || 292, vw - 16);
-      const left = Math.max(8, vw - w - 20);
+      const w = Math.min(cbox.offsetWidth || 280, vw - 16);
+      const left = Math.max(8, vw - w - 16);
       cbox.style.left = `${left}px`;
-      cbox.style.top = '58px';
-      cbox.style.zIndex = '9660';
-      saved[cbox.id] = { ...(saved[cbox.id] || {}), left, top: 58, width: Math.round(w), minimized: false };
+      cbox.style.top = '118px';
+      bringBoxToFront(cbox);
+      saved[cbox.id] = { ...(saved[cbox.id] || {}), left, top: 118, width: Math.round(w), minimized: false };
     }
     saveLayout(saved);
     governorRequestRender('pfl-gather-boxes');
@@ -326,7 +351,9 @@ export function loadPflWindowFramework({ viewer }) {
     const extraRow = document.createElement('div');
     extraRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(56,189,248,0.22);';
     extraRow.innerHTML = `
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-sexworld-demo" style="border-color:#ec4899;color:#f9a8d4;font-weight:700" title="Launch 6-stop guided global showcase tour for Sex-World.ai">🎬 Sex-World Demo</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-open-compass" style="border-color:#38bdf8;color:#7dd3fc;font-weight:700" title="Open 3D Compass Ball, Walk/WASD Controls, Rotate/Spin &amp; Object Mover">🧭 3D Compass, Walk &amp; Move Objects</button>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-nav-pins" style="border-color:#facc15;color:#fde047;font-weight:700" title="View &amp; jump to pinned addresses or drop a new navigation pin">📍 Pins</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-walk-inside-house" style="border-color:#fbbf24;color:#fde047;font-weight:700" title="Open interactive 32-photo 2-story floor plan &amp; guided room-by-room 3D walkthrough of 417 Palm Drive">🏠 Walk Inside 417 Palm Dr (32-Photo Floor Plan &amp; ▶ Auto-Tour)</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-marine-vhf" style="border-color:#22d3ee;color:#67e8f9;font-weight:700" title="Open USCG Houston-Galveston / Chocolate Bayou Marine VHF &amp; Live AIS / Radio Browser Scanner">📻 Marine VHF &amp; Chocolate Bayou Scanner</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-kalshi-inline" style="border-color:#22c55e;color:#4ade80;font-weight:700">📈 Kalshi Paper Arena (Show / Hide)</button>
@@ -457,12 +484,31 @@ export function loadPflWindowFramework({ viewer }) {
     if (typeof window.__pflPolymarketVisible === 'function') {
       syncPolymarketButtons(window.__pflPolymarketVisible());
     }
+    extraRow.querySelector('#pfl-btn-sexworld-demo')?.addEventListener('click', () => {
+      sexWorldDemo.start(0);
+    });
+    extraRow.querySelector('#pfl-btn-nav-pins')?.addEventListener('click', () => {
+      compassWin.box.style.display = 'flex';
+      compassWin.box.classList.remove('pfl-minimized');
+      const mb = compassWin.box.querySelector('[data-act="min"]');
+      if (mb) mb.textContent = '—';
+      bringBoxToFront(compassWin.box);
+      const vw = window.innerWidth || 1440;
+      const vh = window.innerHeight || 900;
+      const w = compassWin.box.offsetWidth || 280;
+      const left = Math.max(8, Math.min(parseInt(compassWin.box.style.left, 10) || (vw - w - 16), vw - w - 12));
+      const top = Math.max(48, Math.min(parseInt(compassWin.box.style.top, 10) || 118, vh - 120));
+      compassWin.box.style.left = `${left}px`;
+      compassWin.box.style.top = `${top}px`;
+      paintGlobe();
+      compassWin.body.querySelector('#pfl-nav-pins-box')?.scrollIntoView?.({ block: 'start' });
+    });
     extraRow.querySelector('#pfl-btn-open-compass')?.addEventListener('click', () => {
       compassWin.box.style.display = 'flex';
       compassWin.box.classList.remove('pfl-minimized');
       const mb = compassWin.box.querySelector('[data-act="min"]');
       if (mb) mb.textContent = '—';
-      compassWin.box.style.zIndex = '9698';
+      bringBoxToFront(compassWin.box);
       const vw = window.innerWidth || 1440;
       const vh = window.innerHeight || 900;
       const w = compassWin.box.offsetWidth || 292;
@@ -506,13 +552,24 @@ export function loadPflWindowFramework({ viewer }) {
       <div id="pfl-eye-elev-banner" style="width:100%;box-sizing:border-box;background:rgba(6,78,59,0.55);border:1.5px solid rgba(74,222,128,0.75);border-radius:7px;padding:6px 8px;text-align:center;font-size:13.5px;font-weight:800;color:#4ade80;letter-spacing:0.02em;line-height:1.25" title="Live Camera Height Above Ground Level (Meters &amp; Feet) + Optical Lens FOV">EYE: 1.8 m (5.9 ft) AGL · FOV: 60°</div>
       <canvas id="pfl-axis-globe" width="136" height="136" style="cursor:grab;touch-action:none;border-radius:50%" title="Drag anywhere on ball to orbit/tilt camera, or click N/S/E/W/UP"></canvas>
       <div id="pfl-cam-readout" style="text-align:center;font-size:10px;color:#94a3b8;line-height:1.35">CAM READY</div>
+      <div id="pfl-drag-pan-row" style="width:100%;display:flex;gap:4px">
+        <button type="button" class="pfl-std-cbtn" id="pfl-drag-pan-toggle" style="flex:1;border-color:#22c55e;color:#4ade80" title="Lock Yaw on Left-Drag near houses (Google Maps flat pan — use Ctrl+Drag or Compass Ball above to rotate)">✋ Drag: PAN (Flat)</button>
+      </div>
       <div id="pfl-walk-nav-slot" style="width:100%"></div>
+      <div id="pfl-nav-pins-box" style="width:100%;border-top:1px solid rgba(56,189,248,0.25);padding-top:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;margin-bottom:4px">
+          <span id="pfl-nav-pins-hdr" style="color:#38bdf8;font-weight:700">📍 Navigation Pins</span>
+          <button type="button" class="pfl-std-cbtn" id="pfl-pin-here-btn" style="border-color:#facc15;color:#fde047" title="Drop a permanent clickable pin at the center of your view">📌 Pin Here</button>
+        </div>
+        <div id="pfl-nav-pins-list" style="display:flex;flex-direction:column;gap:4px;max-height:132px;overflow:auto"></div>
+      </div>
       <div style="width:100%;border-top:1px solid rgba(56,189,248,0.25);padding-top:6px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px">
           <span style="color:#fbbf24;font-weight:700">🎯 Move / Rotate Object:</span>
-          <div style="display:flex;gap:3px">
+          <div style="display:flex;gap:3px;flex-wrap:wrap">
             <button type="button" class="pfl-std-cbtn" id="pfl-lock-house-btn" style="border-color:#22c55e;color:#4ade80" title="Lock 417 Palm Dr House against accidental mouse drags">🔒 House: LOCKED</button>
-            <button type="button" class="pfl-std-cbtn" id="pfl-reset-house-btn" title="Snap 417 Palm Dr House back to surveyed lot coordinates">↺ Reset House</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-reset-house-btn" title="Snap 417 Palm Dr House back to surveyed lot coordinates">↺ House</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-reset-all-objects-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Reset House, Monaco RV, Lisa, Chair &amp; Yard Photos back to surveyed positions">↺ Reset All</button>
           </div>
         </div>
         <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px">
@@ -552,7 +609,297 @@ export function loadPflWindowFramework({ viewer }) {
   let activeMovable = null;
   let clickToPlaceMode = false;
   let houseDragLocked = true;
+  let panDragMode = true;
+  let buildYard3dLandmarks = () => {};
   const HOUSE_DEFAULT_POSE = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0, scale: 1 };
+  const MONACO_DEFAULT_POSE = { lat: 29.247510, lon: -95.231268, heading: 175, lift: 0 };
+
+  const sexWorldDemo = createSexWorldDemoTour({
+    viewer,
+    onBeforeFly: () => {
+      unlockDroneCamera();
+      cmdWin.box.classList.add('pfl-minimized');
+      const mb = cmdWin.box.querySelector('[data-act="min"]');
+      if (mb) mb.textContent = '▢';
+    },
+    onOpenMlsWalkthrough: () => openMlsWalkthrough(),
+  });
+
+  // ---- Persistent Clickable Navigation Pins (Canvas Billboards + Points, Zero Cesium Labels!) ----
+  const NAV_PINS_KEY = 'pfl_nav_pins_v1';
+  const NAV_PIN_ENTITY_PREFIX = 'pfl-nav-pin:';
+  const navPinEntityIds = new Set();
+  const DEFAULT_SEED_PIN = {
+    id: 'pin-4006-fawn-creek',
+    label: "4006 Fawn Creek Dr, Kingwood, TX (Lisa Grifo's House)",
+    lat: 30.065543,
+    lon: -95.202311,
+    pinnedAt: 1795280000000,
+  };
+
+  function loadNavPins() {
+    try {
+      const raw = localStorage.getItem(NAV_PINS_KEY);
+      if (raw === null) {
+        const seeded = [{ ...DEFAULT_SEED_PIN }];
+        localStorage.setItem(NAV_PINS_KEY, JSON.stringify(seeded));
+        return seeded;
+      }
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed)
+        ? parsed.filter((p) => p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon)))
+        : [];
+    } catch {
+      return [{ ...DEFAULT_SEED_PIN }];
+    }
+  }
+  let navPins = loadNavPins();
+
+  function saveNavPins() {
+    try { localStorage.setItem(NAV_PINS_KEY, JSON.stringify(navPins.slice(0, 25))); } catch {}
+  }
+
+  function makeNavPinCanvas(pin) {
+    if (typeof document === 'undefined') return null;
+    const c = document.createElement('canvas');
+    c.width = 332;
+    c.height = 68;
+    const ctx = c.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.fillStyle = 'rgba(9, 14, 26, 0.94)';
+    ctx.beginPath();
+    ctx.roundRect(4, 4, 324, 46, 10);
+    ctx.fill();
+
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.roundRect(4, 4, 324, 46, 10);
+    ctx.stroke();
+
+    // Pointer tip
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.moveTo(158, 50);
+    ctx.lineTo(174, 50);
+    ctx.lineTo(166, 65);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = '800 12.5px "Inter", system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`📍 ${String(pin.label || 'Pinned Destination').slice(0, 34)}`, 14, 10);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '700 10.5px "JetBrains Mono", monospace';
+    ctx.fillText(`${Number(pin.lat).toFixed(5)}, ${Number(pin.lon).toFixed(5)} · CLICK PIN TO ZOOM`, 14, 30);
+
+    return c;
+  }
+
+  function syncNavPinEntities() {
+    if (!viewer?.entities) return;
+    for (const eid of [...navPinEntityIds]) {
+      try { viewer.entities.removeById(eid); } catch {}
+      navPinEntityIds.delete(eid);
+    }
+    for (const pin of navPins) {
+      const eid = `${NAV_PIN_ENTITY_PREFIX}${pin.id}`;
+      const canvas = makeNavPinCanvas(pin);
+      const ent = viewer.entities.add({
+        id: eid,
+        name: `📍 ${pin.label}`,
+        position: Cesium.Cartesian3.fromDegrees(Number(pin.lon), Number(pin.lat), 2),
+        point: {
+          pixelSize: 10,
+          color: Cesium.Color.fromCssColorString('#facc15'),
+          outlineColor: Cesium.Color.fromCssColorString('#0ea5e9'),
+          outlineWidth: 2.5,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        ...(canvas
+          ? {
+              billboard: {
+                image: canvas,
+                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                pixelOffset: new Cesium.Cartesian2(0, -10),
+                heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                scaleByDistance: new Cesium.NearFarScalar(120, 1.0, 120000, 0.55),
+                eyeOffset: new Cesium.Cartesian3(0, 0, -10),
+              },
+            }
+          : {}),
+      });
+      if (ent) ent._pflNavPinId = pin.id;
+      navPinEntityIds.add(eid);
+    }
+    governorRequestRender('pfl-nav-pins-sync');
+  }
+
+  function flyToNavPin(pin, rangeM = 140) {
+    if (!pin || !viewer?.camera) return;
+    unlockDroneCamera();
+    try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
+    const lat = Number(pin.lat);
+    const lon = Number(pin.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    let groundH = 0;
+    try {
+      if (viewer.scene?.globe?.show !== false) {
+        const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
+        if (Number.isFinite(gh) && gh > -80 && gh < 5000) groundH = gh;
+      } else {
+        const sh = viewer.scene.sampleHeight?.(Cesium.Cartographic.fromDegrees(lon, lat));
+        if (Number.isFinite(sh) && sh > -80 && sh < 5000) groundH = sh;
+      }
+    } catch {}
+    holdContinuousRender('pfl-nav-pin-fly');
+    const release = () => {
+      releaseContinuousRender('pfl-nav-pin-fly');
+      governorRequestRender('pfl-nav-pin-arrived');
+    };
+    const bs = new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(lon, lat, groundH + 8), 18);
+    viewer.camera.flyToBoundingSphere(bs, {
+      offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(15), Cesium.Math.toRadians(-42), rangeM),
+      duration: 1.4,
+      complete: release,
+      cancel: release,
+    });
+  }
+
+  function renderNavPinsList() {
+    const hdrEl = compassWin.body.querySelector('#pfl-nav-pins-hdr');
+    if (hdrEl) hdrEl.textContent = `📍 Navigation Pins (${navPins.length})`;
+    const dockBtn = document.getElementById('pfl-btn-nav-pins');
+    if (dockBtn) dockBtn.textContent = `📍 Pins (${navPins.length})`;
+    const listEl = compassWin.body.querySelector('#pfl-nav-pins-list');
+    if (!listEl) return;
+    if (!navPins.length) {
+      listEl.innerHTML = '<div style="font-size:10px;color:#64748b">Search an address in LOCATION or click Pin Here.</div>';
+      return;
+    }
+    listEl.innerHTML = navPins.map((p) => {
+      const safeLbl = String(p.label || 'Pin').replace(/[<>&"]/g, '');
+      return `
+        <div style="display:flex;align-items:center;gap:3px;padding:3px 4px;border:1px solid rgba(56,189,248,0.22);border-radius:6px;background:rgba(15,23,42,0.72)">
+          <button type="button" class="pfl-std-cbtn" data-pin-fly="${p.id}" style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:none;background:transparent;padding:1px 3px;color:#fde047" title="Fly to ${safeLbl} (${Number(p.lat).toFixed(5)}, ${Number(p.lon).toFixed(5)})">📍 ${safeLbl}</button>
+          <button type="button" class="pfl-std-cbtn" data-pin-close="${p.id}" style="padding:1px 5px;font-size:9.5px;border-color:#38bdf8;color:#7dd3fc" title="Close-up rooftop zoom (70m)">🔍70m</button>
+          <button type="button" class="pfl-std-cbtn" data-pin-del="${p.id}" style="padding:1px 5px;font-size:9.5px;border-color:rgba(244,63,94,0.5);color:#fda4af" title="Delete pin">✕</button>
+        </div>
+      `;
+    }).join('');
+    listEl.querySelectorAll('[data-pin-fly]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const pin = navPins.find((p) => p.id === b.getAttribute('data-pin-fly'));
+        if (pin) flyToNavPin(pin, 140);
+      });
+    });
+    listEl.querySelectorAll('[data-pin-close]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const pin = navPins.find((p) => p.id === b.getAttribute('data-pin-close'));
+        if (pin) flyToNavPin(pin, 70);
+      });
+    });
+    listEl.querySelectorAll('[data-pin-del]').forEach((b) => {
+      b.addEventListener('click', () => removeNavPin(b.getAttribute('data-pin-del')));
+    });
+  }
+
+  function addNavPin({ lat, lon, label }) {
+    const nLat = Number(lat);
+    const nLon = Number(lon);
+    if (!Number.isFinite(nLat) || !Number.isFinite(nLon)) return null;
+    const cleanLabel = String(label || `${nLat.toFixed(5)}, ${nLon.toFixed(5)}`).trim();
+    const matchIdx = navPins.findIndex(
+      (p) => Math.hypot(Number(p.lat) - nLat, Number(p.lon) - nLon) < 0.00035,
+    );
+    let item;
+    if (matchIdx >= 0) {
+      item = { ...navPins[matchIdx], lat: nLat, lon: nLon, label: cleanLabel, pinnedAt: Date.now() };
+      navPins.splice(matchIdx, 1);
+      navPins.unshift(item);
+    } else {
+      item = {
+        id: `pin-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+        label: cleanLabel,
+        lat: nLat,
+        lon: nLon,
+        pinnedAt: Date.now(),
+      };
+      navPins.unshift(item);
+      if (navPins.length > 25) navPins = navPins.slice(0, 25);
+    }
+    saveNavPins();
+    syncNavPinEntities();
+    renderNavPinsList();
+    return item;
+  }
+
+  function removeNavPin(id) {
+    navPins = navPins.filter((p) => p.id !== id);
+    saveNavPins();
+    syncNavPinEntities();
+    renderNavPinsList();
+  }
+
+  function pinCameraCenter(customLabel = null) {
+    if (!viewer?.camera) return null;
+    const canvas = viewer.scene?.canvas;
+    const center = new Cesium.Cartesian2((canvas?.clientWidth || 1280) * 0.5, (canvas?.clientHeight || 800) * 0.5);
+    let cart = null;
+    try {
+      const ray = viewer.camera.getPickRay(center);
+      if (ray && viewer.scene?.globe?.show !== false) cart = viewer.scene.globe.pick(ray, viewer.scene);
+    } catch {}
+    if (!cart) {
+      try { cart = viewer.camera.pickEllipsoid(center, viewer.scene?.globe?.ellipsoid); } catch {}
+    }
+    let lat; let lon;
+    if (cart) {
+      const cg = Cesium.Cartographic.fromCartesian(cart);
+      lat = Cesium.Math.toDegrees(cg.latitude);
+      lon = Cesium.Math.toDegrees(cg.longitude);
+    } else {
+      const c = viewer.camera.positionCartographic;
+      if (!c) return null;
+      lat = Cesium.Math.toDegrees(c.latitude);
+      lon = Cesium.Math.toDegrees(c.longitude);
+    }
+    return addNavPin({ lat, lon, label: customLabel || `View Pin (${lat.toFixed(4)}, ${lon.toFixed(4)})` });
+  }
+
+  const onGevSearchPin = (ev) => {
+    const d = ev?.detail;
+    if (!d || !Number.isFinite(Number(d.lat)) || !Number.isFinite(Number(d.lon))) return;
+    addNavPin({ lat: Number(d.lat), lon: Number(d.lon), label: d.label || d.query });
+  };
+  window.addEventListener('gev:search-pin', onGevSearchPin);
+  compassWin.body.querySelector('#pfl-pin-here-btn')?.addEventListener('click', () => pinCameraCenter());
+  window.__pflNavPins = {
+    list: () => [...navPins],
+    add: addNavPin,
+    remove: removeNavPin,
+    flyTo: (id, rangeM = 140) => {
+      const pin = navPins.find((p) => p.id === id);
+      if (pin) flyToNavPin(pin, rangeM);
+      return Boolean(pin);
+    },
+    pinCameraCenter,
+  };
+  syncNavPinEntities();
+  renderNavPinsList();
+
+  compassWin.body.querySelector('#pfl-drag-pan-toggle')?.addEventListener('click', (e) => {
+    panDragMode = !panDragMode;
+    e.currentTarget.textContent = panDragMode ? '✋ Drag: PAN (Flat)' : '🌍 Drag: CESIUM';
+    e.currentTarget.style.borderColor = panDragMode ? '#22c55e' : '#38bdf8';
+    e.currentTarget.style.color = panDragMode ? '#4ade80' : '#7dd3fc';
+  });
 
   compassWin.body.querySelector('#pfl-lock-house-btn')?.addEventListener('click', (e) => {
     houseDragLocked = !houseDragLocked;
@@ -569,6 +916,19 @@ export function loadPflWindowFramework({ viewer }) {
       if (activeMovable?.kind === 'house') bindMovable(hMov);
     }
     governorRequestRender('pfl-reset-house');
+  });
+
+  compassWin.body.querySelector('#pfl-reset-all-objects-btn')?.addEventListener('click', () => {
+    for (const k of ['pfl_house_pose_v3', 'pfl_monaco_pose_v2', 'pfl_custom_objects_v1', 'pfl_movable_scales_v1', 'gev-yardframes-layout-v1']) {
+      try { localStorage.removeItem(k); } catch {}
+    }
+    try { window.__pflMovables?.house?.update?.({ ...HOUSE_DEFAULT_POSE }); } catch {}
+    try { window.__pflMovables?.monaco?.update?.({ ...MONACO_DEFAULT_POSE }); } catch {}
+    try { window.__pflMovables?.lisa?.update?.({ lat: 29.247436, lon: -95.231445, heading: 192, lift: 0 }); } catch {}
+    try { window.__pflMovables?.chair?.update?.({ lat: 29.247434, lon: -95.231426, heading: 192, lift: 0 }); } catch {}
+    try { buildYard3dLandmarks(); } catch {}
+    if (activeMovable) bindMovable(activeMovable);
+    governorRequestRender('pfl-reset-all-objects');
   });
 
   // Helper to resolve the ONE yard datum shared with yardFrames.js so photos, 3D House, Monaco, pads & AGL all agree
@@ -1411,26 +1771,151 @@ export function loadPflWindowFramework({ viewer }) {
     } catch {}
   }
 
-  // ---- Anti-Space-Ejection clamp: ONLY guard sudden >2,500m single-frame spikes during LEFT/MIDDLE drag; NEVER interfere with RIGHT-DRAG or WHEEL/PINCH zoom! ----
+  // ---- Anti-Space-Ejection clamp & Low-Altitude Flat ENU Pan (prevents Cesium look3D/rotate3D spin near houses/Google 3D) ----
   const canvasEl = viewer.scene.canvas;
+  let panDragSession = null;
+
+  function endPanDragSession() {
+    if (!panDragSession) return;
+    const wasMoved = panDragSession.moved;
+    panDragSession = null;
+    try {
+      const ctrl = viewer?.scene?.screenSpaceCameraController;
+      if (ctrl && !dragMovableSession) {
+        ctrl.enableRotate = true;
+        ctrl.enableTilt = true;
+      }
+      releaseContinuousRender('pfl-flat-pan');
+    } catch {}
+    if (wasMoved) {
+      lastDragReleaseMs = Date.now();
+      governorRequestRender('pfl-flat-pan-end');
+    }
+  }
+
+  function applyFlatHorizontalPan(dx, dy, aglM) {
+    try {
+      const cam = viewer?.camera;
+      if (!cam || !cam.positionWC) return;
+      const ellipsoid = viewer.scene?.globe?.ellipsoid || Cesium.Ellipsoid.WGS84;
+      const up = ellipsoid.geodeticSurfaceNormal(cam.positionWC, new Cesium.Cartesian3());
+      const projectHoriz = (vec, out) => {
+        const dot = Cesium.Cartesian3.dot(vec, up);
+        const scaled = Cesium.Cartesian3.multiplyByScalar(up, dot, new Cesium.Cartesian3());
+        Cesium.Cartesian3.subtract(vec, scaled, out);
+        const mag = Cesium.Cartesian3.magnitude(out);
+        if (mag > 1e-4) Cesium.Cartesian3.multiplyByScalar(out, 1 / mag, out);
+        return mag > 1e-4;
+      };
+      const eastRightH = new Cesium.Cartesian3();
+      const fwdH = new Cesium.Cartesian3();
+      if (!projectHoriz(cam.rightWC, eastRightH)) return;
+      if (!projectHoriz(cam.directionWC, fwdH)) {
+        Cesium.Cartesian3.cross(up, eastRightH, fwdH);
+        Cesium.Cartesian3.normalize(fwdH, fwdH);
+      }
+      const fovy = Number(cam.frustum?.fovy) || Cesium.Math.toRadians(45);
+      const canvasH = Math.max(240, canvasEl.clientHeight || 720);
+      const scaleDist = Math.max(8, Math.min(1800, Math.abs(aglM)));
+      const metersPerPx = Math.max(0.04, Math.min(18, (2 * scaleDist * Math.tan(fovy * 0.5)) / canvasH));
+      const moveR = Cesium.Cartesian3.multiplyByScalar(eastRightH, -dx * metersPerPx, new Cesium.Cartesian3());
+      const moveF = Cesium.Cartesian3.multiplyByScalar(fwdH, dy * metersPerPx * 1.15, new Cesium.Cartesian3());
+      const delta = Cesium.Cartesian3.add(moveR, moveF, new Cesium.Cartesian3());
+      const nextPos = Cesium.Cartesian3.add(cam.positionWC, delta, new Cesium.Cartesian3());
+      cam.setView({
+        destination: nextPos,
+        orientation: { heading: cam.heading, pitch: cam.pitch, roll: 0 },
+      });
+    } catch {}
+  }
+
   const onPtrDown = (e) => {
     activeMouseButtonsMask = typeof e?.buttons === 'number' ? e.buttons : 0;
     if (e?.button === 2 || (activeMouseButtonsMask & 2)) {
       rightButtonDown = true;
       lastZoomActivityMs = Date.now();
-    } else if (e?.button === 0 || e?.button === 1) {
+      endPanDragSession();
+      return;
+    }
+    if (e?.button === 0 || e?.button === 1) {
       leftOrMiddleButtonsDown += 1;
+    }
+    if (
+      panDragMode &&
+      e?.button === 0 &&
+      !e.ctrlKey &&
+      !e.shiftKey &&
+      !e.altKey &&
+      !clickToPlaceMode &&
+      !droneOrbitState.active &&
+      !dragMovableSession
+    ) {
+      try {
+        const c = viewer?.camera?.positionCartographic;
+        if (c) {
+          const lat = Cesium.Math.toDegrees(c.latitude);
+          const lon = Cesium.Math.toDegrees(c.longitude);
+          const agl = c.height - resolveLocalGroundM(lon, lat);
+          if (agl < 1800) {
+            const rect = canvasEl.getBoundingClientRect();
+            const localPos = new Cesium.Cartesian2(e.clientX - rect.left, e.clientY - rect.top);
+            const hit = drillFindTarget(localPos);
+            const isInteractiveObj = hit && (
+              hit.type === 'portal' ||
+              hit.type === 'mls-room' ||
+              (hit.type === 'movable' && !(houseDragLocked && hit.mov?.kind === 'house'))
+            );
+            if (!isInteractiveObj) {
+              panDragSession = {
+                id: e.pointerId,
+                startX: e.clientX,
+                startY: e.clientY,
+                lastX: e.clientX,
+                lastY: e.clientY,
+                moved: false,
+                agl: Math.max(8, agl),
+              };
+              const ctrl = viewer?.scene?.screenSpaceCameraController;
+              if (ctrl) {
+                ctrl.enableRotate = false;
+                ctrl.enableTilt = false;
+              }
+            }
+          }
+        }
+      } catch {}
     }
   };
   const onPtrMove = (e) => {
-    if (typeof e?.buttons !== 'number') return;
-    activeMouseButtonsMask = e.buttons;
-    if (e.buttons & 2) {
-      rightButtonDown = true;
-      lastZoomActivityMs = Date.now();
-    } else if (rightButtonDown) {
-      rightButtonDown = false;
-      lastZoomActivityMs = Date.now();
+    if (typeof e?.buttons === 'number') {
+      activeMouseButtonsMask = e.buttons;
+      if (e.buttons & 2) {
+        rightButtonDown = true;
+        lastZoomActivityMs = Date.now();
+      } else if (rightButtonDown) {
+        rightButtonDown = false;
+        lastZoomActivityMs = Date.now();
+      }
+    }
+    if (panDragSession && (e.pointerId === panDragSession.id || panDragSession.id === undefined)) {
+      if (typeof e?.buttons === 'number' && !(e.buttons & 1)) {
+        endPanDragSession();
+        return;
+      }
+      const total = Math.hypot(e.clientX - panDragSession.startX, e.clientY - panDragSession.startY);
+      if (!panDragSession.moved && total < 4) return;
+      if (!panDragSession.moved) {
+        panDragSession.moved = true;
+        holdContinuousRender('pfl-flat-pan');
+      }
+      const dx = e.clientX - panDragSession.lastX;
+      const dy = e.clientY - panDragSession.lastY;
+      panDragSession.lastX = e.clientX;
+      panDragSession.lastY = e.clientY;
+      if (dx || dy) {
+        applyFlatHorizontalPan(dx, dy, panDragSession.agl);
+        governorRequestRender('pfl-flat-pan');
+      }
     }
   };
   const onPtrUp = (e) => {
@@ -1441,6 +1926,9 @@ export function loadPflWindowFramework({ viewer }) {
     }
     if (e?.button === 0 || e?.button === 1 || activeMouseButtonsMask === 0) {
       leftOrMiddleButtonsDown = activeMouseButtonsMask === 0 ? 0 : Math.max(0, leftOrMiddleButtonsDown - 1);
+    }
+    if (panDragSession && (e?.button === 0 || activeMouseButtonsMask === 0 || e?.type === 'pointercancel' || e?.type === 'blur')) {
+      endPanDragSession();
     }
     if (activeMouseButtonsMask === 0 && dragMovableSession) {
       endDragMovableSession();
@@ -1456,6 +1944,7 @@ export function loadPflWindowFramework({ viewer }) {
   window.addEventListener('pointermove', onPtrMove, { capture: true, passive: true });
   window.addEventListener('pointerup', onPtrUp, true);
   window.addEventListener('pointercancel', onPtrUp, true);
+  window.addEventListener('blur', onPtrUp);
   canvasEl.addEventListener('wheel', onWheelZoomTrack, { capture: true, passive: true });
   canvasEl.addEventListener('touchstart', onTouchZoomTrack, { capture: true, passive: true });
   canvasEl.addEventListener('touchmove', onTouchZoomTrack, { capture: true, passive: true });
@@ -1605,6 +2094,20 @@ export function loadPflWindowFramework({ viewer }) {
         return;
       }
     }
+
+    try {
+      const pinPicks = viewer.scene.drillPick(movement.position, 8) || [];
+      for (const pk of pinPicks) {
+        const pinId = pk?.id?._pflNavPinId || (typeof pk?.id?.id === 'string' && pk.id.id.startsWith(NAV_PIN_ENTITY_PREFIX) ? pk.id.id.slice(NAV_PIN_ENTITY_PREFIX.length) : null);
+        if (pinId) {
+          const pin = navPins.find((p) => p.id === pinId);
+          if (pin) {
+            flyToNavPin(pin, 140);
+            return;
+          }
+        }
+      }
+    } catch {}
 
     const hit = drillFindTarget(movement.position);
     if (!hit) return;
@@ -2503,14 +3006,14 @@ export function loadPflWindowFramework({ viewer }) {
     id: 'pfl-win-kalshi-arena',
     title: '📈 KALSHI WEATHER & MACRO PAPER ARENA ($100 LIVE SEATS)',
     defaultLeft: 12,
-    defaultTop: 280,
-    defaultWidth: 465,
+    defaultTop: Math.max(200, (window.innerHeight || 900) - 158),
+    defaultWidth: 365,
     defaultMinimized: true,
   });
   kalshiWin.body.innerHTML = `
     <div style="font-family:'Inter',system-ui,sans-serif;font-size:11.5px;color:#e2e8f0">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-        <span style="color:#4ade80;font-weight:700">● Live Kalshi Weather/Macro Book (.cache/ledger)</span>
+        <span id="pfl-kalshi-mode-lbl" style="color:#4ade80;font-weight:700">● Live Kalshi Weather/Macro Book (.cache/ledger)</span>
         <div style="display:flex;gap:4px">
           <button type="button" class="pfl-std-cbtn active" id="pfl-toggle-polymarket" style="border-color:#a855f7;color:#d8b4fe" title="Show or hide Polymarket prediction odds markers on the globe">📊 Polymarket: ON</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-kalshi-wx-btn" title="Toggle swirling Wind & Weather Radar layers">🌪️ Swirl Weather/Wind</button>
@@ -2528,17 +3031,20 @@ export function loadPflWindowFramework({ viewer }) {
         </tbody>
       </table>
       <div style="font-weight:700;color:#fbbf24;margin-bottom:3px">Active Swarm Paper Tickets (Marked to Live Kalshi Orderbook):</div>
-      <div id="pfl-inline-trades" style="max-height:95px;overflow:auto;border:1px solid #1e293b;border-radius:6px;padding:4px;font-size:10.5px;margin-bottom:6px"></div>
-      <div style="font-weight:700;color:#38bdf8;margin-bottom:3px">Click Any Live Weather / Macro Contract to Paper-Bet:</div>
+      <div id="pfl-inline-trades" style="max-height:115px;overflow:auto;border:1px solid #1e293b;border-radius:6px;padding:4px;font-size:10.5px;margin-bottom:6px"></div>
+      <div style="font-weight:700;color:#38bdf8;margin-bottom:3px">Live Weather / Macro Contracts:</div>
       <div id="pfl-inline-markets" style="max-height:115px;overflow:auto;border:1px solid #1e293b;border-radius:6px;padding:4px;font-size:10.5px;margin-bottom:6px">
         Loading live Kalshi Houston Temp, Austin Temp, S&amp;P &amp; BTC markets...
       </div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
-        <input id="pfl-bet-tkr" placeholder="KXHIGHTHOU-26NOV18-B73.5" style="flex:1;min-width:130px;background:#090e18;border:1px solid #334155;color:#fff;padding:3px 6px;border-radius:4px;font-size:10.5px" />
+      <div id="pfl-kalshi-order-row" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+        <input id="pfl-bet-tkr" placeholder="KXHIGHTHOU-26NOV21-B77.5" style="flex:1;min-width:130px;background:#090e18;border:1px solid #334155;color:#fff;padding:3px 6px;border-radius:4px;font-size:10.5px" />
         <select id="pfl-bet-side" style="background:#090e18;border:1px solid #334155;color:#fff;padding:3px;border-radius:4px;font-size:10.5px"><option>YES</option><option>NO</option></select>
         <input id="pfl-bet-qty" type="number" value="20" style="width:46px;background:#090e18;border:1px solid #334155;color:#fff;padding:3px;border-radius:4px;font-size:10.5px" />
-        <input id="pfl-bet-px" type="number" value="53" style="width:44px;background:#090e18;border:1px solid #334155;color:#fff;padding:3px;border-radius:4px;font-size:10.5px" title="Entry ¢" />
+        <input id="pfl-bet-px" type="number" value="54" style="width:44px;background:#090e18;border:1px solid #334155;color:#fff;padding:3px;border-radius:4px;font-size:10.5px" title="Entry ¢" />
         <button type="button" class="pfl-std-cbtn" id="pfl-bet-submit" style="background:#38bdf8;color:#041019;border:none;padding:4px 8px">Place Bet</button>
+      </div>
+      <div id="pfl-kalshi-readonly-note" style="display:none;padding:5px 8px;border:1px solid rgba(56,189,248,0.35);border-radius:6px;background:rgba(15,23,42,0.85);font-size:10.5px;color:#94a3b8">
+        🔒 <strong>Read-Only Public Leaderboard</strong> — paper trade submission is locked to Paul's local node (<code>localhost:4173</code>).
       </div>
     </div>
   `;
@@ -2559,22 +3065,29 @@ export function loadPflWindowFramework({ viewer }) {
     const lbEl = kalshiWin.body.querySelector('#pfl-inline-lb');
     const trEl = kalshiWin.body.querySelector('#pfl-inline-trades');
     const mkEl = kalshiWin.body.querySelector('#pfl-inline-markets');
+    const modeLbl = kalshiWin.body.querySelector('#pfl-kalshi-mode-lbl');
+    const orderRow = kalshiWin.body.querySelector('#pfl-kalshi-order-row');
+    const roNote = kalshiWin.body.querySelector('#pfl-kalshi-readonly-note');
     if (!lbEl || !mkEl) return;
-    if (!IS_LOCAL_NODE) {
-      lbEl.innerHTML = '<tr><td colspan="5" style="color:#94a3b8;padding:4px 2px">Public Showcase Mode — private local ledger isolated on localhost:4173</td></tr>';
-      if (trEl) trEl.innerHTML = '';
-      mkEl.innerHTML = '<div style="color:#cbd5e1;padding:4px">Public Showcase Mode — live private Kalshi paper ledger runs locally on <code>localhost:4173</code> (home PC isolated). Use <strong>📊 Polymarket</strong> above for global odds pins.</div>';
-      return;
-    }
     try {
       const r = await fetch('/api/pfl/kalshi');
       const d = await r.json();
       if (!d.ok) throw new Error(d.error || 'Failed');
+      const isReadOnly = Boolean(d.readOnly) || !IS_LOCAL_NODE;
+      if (modeLbl) {
+        modeLbl.textContent = isReadOnly
+          ? '● Live Swarm Paper Leaderboard (Read-Only · Trading Locked)'
+          : '● Live Kalshi Weather/Macro Book (.cache/ledger)';
+        modeLbl.style.color = isReadOnly ? '#38bdf8' : '#4ade80';
+      }
+      if (orderRow) orderRow.style.display = isReadOnly ? 'none' : 'flex';
+      if (roNote) roNote.style.display = isReadOnly ? 'block' : 'none';
+
       lbEl.innerHTML = (d.leaderboard || [])
         .map((row) => {
           const col = row.pnl > 0 ? '#4ade80' : row.pnl < 0 ? '#f87171' : '#94a3b8';
           const sign = row.pnl > 0 ? '+' : '';
-          return `<tr><td><strong>${row.name}</strong></td><td>$${row.cash.toFixed(2)}</td><td style="color:#cbd5e1">$${row.posVal.toFixed(2)} <span style="color:#64748b">(${row.count})</span></td><td><strong>$${row.equity.toFixed(2)}</strong></td><td style="color:${col};font-weight:700">${sign}$${row.pnl.toFixed(2)}</td></tr>`;
+          return `<tr><td><strong>${row.name}</strong></td><td>$${Number(row.cash || 0).toFixed(2)}</td><td style="color:#cbd5e1">$${Number(row.posVal || 0).toFixed(2)} <span style="color:#64748b">(${row.count || 0})</span></td><td><strong>$${Number(row.equity || 0).toFixed(2)}</strong></td><td style="color:${col};font-weight:700">${sign}$${Number(row.pnl || 0).toFixed(2)}</td></tr>`;
         })
         .join('');
       if (trEl) {
@@ -2586,8 +3099,12 @@ export function loadPflWindowFramework({ viewer }) {
               const pnlD = ((t.qty * (t.markCents - t.entryCents)) / 100);
               const pnlStr = (pnlD >= 0 ? '+' : '') + '$' + pnlD.toFixed(2);
               const pnlCol = pnlD > 0 ? '#4ade80' : pnlD < 0 ? '#f87171' : '#94a3b8';
+              const isSettled = t.liveQuote?.status === 'finalized' || t.liveQuote?.status === 'settled';
+              const badge = isSettled
+                ? (t.markCents >= 99 ? '<span style="color:#4ade80;font-weight:700">[WON]</span>' : '<span style="color:#94a3b8">[SETTLED]</span>')
+                : '<span style="color:#38bdf8;font-weight:700">[LIVE]</span>';
               return `<div class="pfl-trade-row" data-idx="${idx}" style="padding:3px 2px;border-bottom:1px solid rgba(30,41,59,0.6);cursor:pointer" title="Click to drill into position math &amp; Kalshi link">
-                <strong>${t.owner.split(' ')[0]}</strong> · <span style="color:${t.side === 'YES' ? '#4ade80' : '#f87171'};font-weight:700">${t.side}×${t.qty}</span> <code>${t.ticker}</code> @${t.entryCents}¢ → <strong>${t.markCents}¢</strong> (<span style="color:${pnlCol};font-weight:700">${pnlStr}</span> · Val $${valD} on $${costD})
+                ${badge} <strong>${t.owner.split(' ')[0]}</strong> · <span style="color:${t.side === 'YES' ? '#4ade80' : '#f87171'};font-weight:700">${t.side}×${t.qty}</span> <code>${t.ticker}</code> @${t.entryCents}¢ → <strong>${t.markCents}¢</strong> (<span style="color:${pnlCol};font-weight:700">${pnlStr}</span> · Val $${valD} on $${costD})
               </div>`;
             })
             .join('');
@@ -2612,22 +3129,24 @@ export function loadPflWindowFramework({ viewer }) {
               <div style="color:#94a3b8;margin-top:2px"><strong>Thesis:</strong> ${t.thesis}</div>
               <div style="margin-top:4px;display:flex;gap:8px">
                 <a href="https://kalshi.com/markets/${seriesSlug}" target="_blank" rel="noopener" style="color:#4ade80;font-weight:700">Open Live on Kalshi.com ↗</a>
-                <a href="/kalshi-paper.html" target="_blank" rel="noopener" style="color:#38bdf8;font-weight:700">Open Candlestick Workbench ↗</a>
+                ${isReadOnly ? '' : '<a href="/kalshi-paper.html" target="_blank" rel="noopener" style="color:#38bdf8;font-weight:700">Open Candlestick Workbench ↗</a>'}
               </div>
             `;
             drill.querySelector('#pfl-close-drill')?.addEventListener('click', (e) => {
               e.stopPropagation();
               drill.style.display = 'none';
             });
-            kalshiWin.body.querySelector('#pfl-bet-tkr').value = t.ticker;
-            kalshiWin.body.querySelector('#pfl-bet-px').value = String(t.markCents || t.entryCents);
+            const tkrIn = kalshiWin.body.querySelector('#pfl-bet-tkr');
+            const pxIn = kalshiWin.body.querySelector('#pfl-bet-px');
+            if (tkrIn) tkrIn.value = t.ticker;
+            if (pxIn) pxIn.value = String(t.markCents || t.entryCents);
           });
         });
       }
       mkEl.innerHTML = (d.markets || [])
         .map(
           (m) =>
-            `<div class="pfl-mkt-pick" data-tkr="${m.ticker}" data-ask="${m.yesAsk || m.mid}" style="display:flex;justify-content:space-between;gap:6px;padding:3px 2px;border-bottom:1px solid rgba(30,41,59,0.7);cursor:pointer" title="Click to load into bet ticket">
+            `<div class="pfl-mkt-pick" data-tkr="${m.ticker}" data-ask="${m.yesAsk || m.mid}" style="display:flex;justify-content:space-between;gap:6px;padding:3px 2px;border-bottom:1px solid rgba(30,41,59,0.7);cursor:pointer" title="${isReadOnly ? 'Live Kalshi quote' : 'Click to load into bet ticket'}">
               <span><strong>${m.ticker}</strong> · ${m.eventTitle} (${m.bracket})</span>
               <span style="color:#4ade80;white-space:nowrap;font-weight:700">${m.yesBid}¢/${m.yesAsk}¢</span>
             </div>`,
@@ -2635,8 +3154,10 @@ export function loadPflWindowFramework({ viewer }) {
         .join('');
       mkEl.querySelectorAll('.pfl-mkt-pick').forEach((row) => {
         row.addEventListener('click', () => {
-          kalshiWin.body.querySelector('#pfl-bet-tkr').value = row.dataset.tkr || '';
-          kalshiWin.body.querySelector('#pfl-bet-px').value = row.dataset.ask || '50';
+          const tkrIn = kalshiWin.body.querySelector('#pfl-bet-tkr');
+          const pxIn = kalshiWin.body.querySelector('#pfl-bet-px');
+          if (tkrIn) tkrIn.value = row.dataset.tkr || '';
+          if (pxIn) pxIn.value = row.dataset.ask || '50';
         });
       });
     } catch (err) {
@@ -2717,16 +3238,20 @@ export function loadPflWindowFramework({ viewer }) {
     }
   });
   refreshInlineKalshi();
-  const kalshiPoll = IS_LOCAL_NODE ? setInterval(refreshInlineKalshi, 20000) : null;
+  const kalshiPoll = setInterval(() => {
+    if (!kalshiWin.box.classList.contains('pfl-minimized') && kalshiWin.box.style.display !== 'none') {
+      refreshInlineKalshi();
+    }
+  }, 45000);
 
 
   // 4) Movable / Sizable Local Memory Palace, Uploaded Splats & Wyze Camera Vault (starts neatly minimized until clicked!)
   const vaultWin = createStandardBox({
     id: 'pfl-win-local-vault',
     title: '🏛️ LOCAL MEMORY PALACE, UPLOADED SPLATS & WYZE CAMERAS',
-    defaultLeft: Math.max(40, window.innerWidth - 560),
-    defaultTop: 435,
-    defaultWidth: 530,
+    defaultLeft: Math.min(390, Math.max(12, (window.innerWidth || 1440) - 480)),
+    defaultTop: Math.max(240, (window.innerHeight || 900) - 118),
+    defaultWidth: 460,
   });
   vaultWin.box.style.display = 'none';
   if (!saved['pfl-win-local-vault']) {
@@ -2816,9 +3341,9 @@ export function loadPflWindowFramework({ viewer }) {
   const patrolWin = createStandardBox({
     id: 'pfl-win-wyze-patrol',
     title: '🎥 PFL LIVE WYZE VIDEO PATROL & MOTION EVENTS',
-    defaultLeft: 6,
-    defaultTop: 88,
-    defaultWidth: 425,
+    defaultLeft: 12,
+    defaultTop: Math.max(240, (window.innerHeight || 900) - 118),
+    defaultWidth: 365,
     defaultMinimized: true,
   });
   if (parseInt(patrolWin.box.style.height || '999', 10) < 120) patrolWin.box.style.height = '';
@@ -3279,7 +3804,7 @@ export function loadPflWindowFramework({ viewer }) {
 
   // 6) 3D Backyard Live Oak Trees, Wooden Bayou Dock & PID 214140 Lot Outline (Anchored to Brazoria CAD Ortho)
   const yardLandmarkIds = [];
-  function buildYard3dLandmarks() {
+  buildYard3dLandmarks = () => {
     if (!viewer?.entities) return;
     for (const id of yardLandmarkIds) viewer.entities.removeById(id);
     yardLandmarkIds.length = 0;
@@ -3817,7 +4342,9 @@ export function loadPflWindowFramework({ viewer }) {
     }
   }
   buildYard3dLandmarks();
-  window.addEventListener('gev:map-stack-changed', () => setTimeout(buildYard3dLandmarks, 400));
+  const onMapOrTilesSettled = () => setTimeout(buildYard3dLandmarks, 400);
+  window.addEventListener('gev:map-stack-changed', onMapOrTilesSettled);
+  window.addEventListener('gev:google3d-settled', onMapOrTilesSettled);
 
   playPatrolStream('wyze-cam-v4', 'Wyze Cam V4 (Front Yard & Driveway)');
   refreshWyzePatrol(false);
@@ -4842,6 +5369,8 @@ export function loadPflWindowFramework({ viewer }) {
       unlockDroneCamera();
       stopMlsAutoTour();
       endDragMovableSession();
+      endPanDragSession();
+      sexWorldDemo.destroy();
       clearInterval(timer);
       clearInterval(kalshiPoll);
       clearInterval(patrolCycleTimer);
@@ -4850,16 +5379,21 @@ export function loadPflWindowFramework({ viewer }) {
       clearInterval(alarmPollTimer);
       clearInterval(vhfBadgeTimer);
       window.removeEventListener('keydown', wasdKeydownHandler);
+      window.removeEventListener('gev:search-pin', onGevSearchPin);
+      window.removeEventListener('gev:map-stack-changed', onMapOrTilesSettled);
+      window.removeEventListener('gev:google3d-settled', onMapOrTilesSettled);
       try { viewer?.scene?.canvas?.removeEventListener?.('wheel', altWheelLensHandler, { capture: true }); } catch {}
       try { viewer?.entities?.removeById?.(GIZMO_ENTITY_ID); } catch {}
       try { viewer?.entities?.removeById?.(BORDER_ENTITY_ID); viewer?.entities?.removeById?.(HOVER_ENTITY_ID); } catch {}
       try { for (const pid of mlsPinEntityIds) viewer?.entities?.removeById?.(pid); } catch {}
+      try { for (const nid of navPinEntityIds) viewer?.entities?.removeById?.(nid); navPinEntityIds.clear(); } catch {}
       try { antiEjectionUnsub?.(); } catch {}
       try {
         canvasEl.removeEventListener('pointerdown', onPtrDown, true);
         window.removeEventListener('pointermove', onPtrMove, { capture: true });
         window.removeEventListener('pointerup', onPtrUp, true);
         window.removeEventListener('pointercancel', onPtrUp, true);
+        window.removeEventListener('blur', onPtrUp);
         canvasEl.removeEventListener('wheel', onWheelZoomTrack, { capture: true });
         canvasEl.removeEventListener('touchstart', onTouchZoomTrack, { capture: true });
         canvasEl.removeEventListener('touchmove', onTouchZoomTrack, { capture: true });
