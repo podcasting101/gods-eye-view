@@ -146,14 +146,14 @@ const CALIBRATED_HOUSE_SURVEY = {
     hiddenByStitch: true,
   },
   'yard-overview-20261012': {
-    // Strictly between Palm Drive curb (29.247405) and House front wall (29.247520) so the House Roof (29.24753..29.24765) stays 100% uncovered!
-    camLat: 29.247462,
-    camLon: -95.231372,
-    camHeightM: 0.18,
-    headingDeg: 192,
+    // Stretched across the East Driveway + Solar Carport so the White Tesla & solar panels align over their driveway footprint
+    camLat: 29.247452,
+    camLon: -95.231350,
+    camHeightM: 0.22,
+    headingDeg: 194,
     pitchDeg: -18,
-    distanceM: 5.2,
-    widthScale: 1.08,
+    distanceM: 6.4,
+    widthScale: 1.48,
     rollDeg: 2,
     flat: true,
     texRot: 0,
@@ -177,11 +177,11 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'back-yard-cam2-water': {
     hiddenByStitch: true,
-    // Positioned cleanly under the two 3D backyard Live Oak trees along the shoreline & dock (never floating out in the bayou)
-    camLat: 29.24774,
+    // Positioned cleanly under the two 3D backyard Live Oak trees along the Lot 23 shoreline & dock (14° bayou perpendicular)
+    camLat: 29.247748,
     camLon: -95.231385,
     camHeightM: 0.25,
-    headingDeg: 7.5,
+    headingDeg: 14,
     pitchDeg: -18,
     distanceM: 9.5,
     widthScale: 0.95,
@@ -192,7 +192,7 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'bed-station-20261012': {
     hiddenByStitch: false,
-    camLat: 29.247618,
+    camLat: 29.247605,
     camLon: -95.231412,
     camHeightM: 0.32,
     // Photo space: headboard at upper-right, bed axis (head -> feet) points down-left at ~240° math-angle,
@@ -210,10 +210,10 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'garage-carport-20261117': {
     hiddenByStitch: false,
-    camLat: 29.247560,
-    camLon: -95.231292,
+    camLat: 29.247555,
+    camLon: -95.231285,
     camHeightM: 1.48,
-    headingDeg: 175,
+    headingDeg: 194,
     pitchDeg: -5,
     distanceM: 2.45,
     fovHDeg: 78,
@@ -377,6 +377,17 @@ function loadSavedLayout() {
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
+    if (parsed && !parsed.fixedLot23AlignedV24) {
+      for (const id of ['yard-overview-20261012', 'back-yard-cam2-water', 'bed-station-20261012', 'garage-carport-20261117']) {
+        frames[id] = {
+          ...(frames[id] || {}),
+          ...CALIBRATED_HOUSE_SURVEY[id],
+        };
+      }
+      parsed.fixedLot23AlignedV24 = true;
+      parsed.frames = frames;
+      window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
+    }
     return frames;
   } catch (error) {
     console.warn(
@@ -399,9 +410,35 @@ export function activeYardDatumM(viewer, lon, lat) {
   if (viewer?.scene?.globe?.show) {
     return resolveTerrainGroundM(viewer, lon, lat, STORED_GROUND_HEIGHT_M);
   }
+  if (Number.isFinite(viewer._pflUniformGoogleDatumM)) {
+    return viewer._pflUniformGoogleDatumM;
+  }
+  // Sample bare Palm Drive street/apron pavement excluding placed entities so houses/oaks never corrupt datum height.
   try {
-    const sh = viewer?.scene?.sampleHeight?.(Cesium.Cartographic.fromDegrees(lon, lat));
-    if (Number.isFinite(sh) && sh > -40 && sh < 40) return sh + 0.18;
+    const sampleFn = viewer?.scene?.sampleHeight;
+    if (typeof sampleFn === 'function') {
+      const excludeList = [];
+      try {
+        for (const ent of viewer?.entities?.values || []) excludeList.push(ent);
+      } catch {}
+      const probes = [
+        [-95.231340, 29.247395],
+        [-95.231385, 29.247402],
+        [lon, lat],
+      ];
+      for (const [pLon, pLat] of probes) {
+        if (!Number.isFinite(pLon) || !Number.isFinite(pLat)) continue;
+        const sh = sampleFn.call(
+          viewer.scene,
+          Cesium.Cartographic.fromDegrees(pLon, pLat),
+          excludeList.length ? excludeList : undefined,
+        );
+        if (Number.isFinite(sh) && sh >= -30 && sh <= -18) {
+          viewer._pflUniformGoogleDatumM = sh + 0.18;
+          return viewer._pflUniformGoogleDatumM;
+        }
+      }
+    }
   } catch {}
   return STORED_GROUND_HEIGHT_M + 1.55;
 }

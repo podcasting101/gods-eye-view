@@ -7,6 +7,12 @@ import {
 import { activeYardDatumM } from './yardFrames.js';
 import { resolveTerrainGroundM } from './placedObjects.js';
 import { createSexWorldDemoTour } from './sexWorldDemoTour.js';
+import {
+  parsePhotoMetadata,
+  extractVisualVectorFromImage,
+  correlatePhotoToAnchors,
+} from './photoVectorAlign.js';
+import { ALBUM_2018_ITEMS, ALBUM_2018_ERA } from './album2018Manifest.js';
 
 const STORAGE_KEY = 'pfl_gev_windows_v6';
 const IS_LOCAL_NODE = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
@@ -712,6 +718,31 @@ export function loadPflWindowFramework({ viewer }) {
             <button type="button" class="pfl-std-cbtn" id="pfl-hs-spin" title="Rotate selected object 90°">🔄 90°</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-hs-resize" title="Focus Size slider">📐 Size</button>
           </div>
+          <details id="pfl-photo-align-box" style="margin-top:4px;padding:5px;border:1px solid rgba(34,211,238,0.5);border-radius:7px;background:rgba(8,47,73,0.45)">
+            <summary style="cursor:pointer;color:#67e8f9;font-weight:700;font-size:10px;list-style:none">📷 Photo / 360° / 3D &amp; 4D Time Machine ▾</summary>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-top:5px">
+              <div style="display:flex;gap:3px;flex-wrap:wrap">
+                <input type="file" id="pfl-photo-file-input" accept="image/*,.jpg,.jpeg,.png,.webp" multiple style="display:none" />
+                <button type="button" class="pfl-std-cbtn" id="pfl-photo-drop-btn" style="flex:1;border-color:#22d3ee;color:#67e8f9" title="Drop 2D, 3D Stereo, or 360° equirectangular photos — extracts EXIF GPS/DateTimeOriginal/GPano &amp; auto-aligns via visual feature vectors">📷 Drop Photos / 360° / 3D</button>
+              </div>
+              <div style="display:flex;gap:3px;align-items:center">
+                <span style="font-size:9.5px;color:#94a3b8;white-space:nowrap">🕰️ 4D Era:</span>
+                <select id="pfl-era-select" style="flex:1;min-width:0;background:#0f172a;color:#fde047;border:1px solid #334155;border-radius:4px;padding:2px 4px;font-size:9.5px">
+                  <option value="all">All Eras (2018 + Live 2026)</option>
+                  <option value="2026">Live 2026 Survey</option>
+                  <option value="2018-11-04">Nov 4, 2018 (21× LG-R105 360°)</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:3px;flex-wrap:wrap">
+                <button type="button" class="pfl-std-cbtn" id="pfl-360-orbs-toggle" style="flex:1;border-color:#38bdf8;color:#7dd3fc" title="Show/hide clickable floating 360° Time Orbs around 417 Palm Dr">🌐 360° Orbs: ON</button>
+                <button type="button" class="pfl-std-cbtn" id="pfl-time-machine-spot-btn" style="flex:1;border-color:#facc15;color:#fde047" title="Find nearest 360° spheres at your current standing position &amp; play 2018 → 2026 over time">▶️ Play Spot Time</button>
+              </div>
+              <div style="display:flex;gap:3px">
+                <button type="button" class="pfl-std-cbtn" id="pfl-photo-lock-btn" style="flex:1;border-color:#4ade80;color:#86efac" title="Lock &amp; index selected photo vector pose locally">🔗 Lock &amp; Index Selected</button>
+              </div>
+              <div id="pfl-photo-align-status" style="font-size:9px;color:#a5f3fc;line-height:1.25">21× Nov 4 2018 360° spheres indexed · Click any orb or Drop Photos</div>
+            </div>
+          </details>
           <details id="pfl-sketchfab-box" style="margin-top:4px;padding:5px;border:1px solid rgba(168,85,247,0.45);border-radius:7px;background:rgba(15,23,42,0.8)">
             <summary style="cursor:pointer;color:#e9d5ff;font-weight:700;font-size:10px;list-style:none">📦 Sketchfab &amp; Local GLB Loader ▾</summary>
             <div style="display:flex;flex-direction:column;gap:4px;margin-top:5px">
@@ -756,8 +787,38 @@ export function loadPflWindowFramework({ viewer }) {
     padRepeatIntervals.clear();
   };
   let buildYard3dLandmarks = () => {};
-  const HOUSE_DEFAULT_POSE = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0, scale: 1, opacity: 1 };
-  const MONACO_DEFAULT_POSE = { lat: 29.247510, lon: -95.231268, heading: 175, lift: 0, scale: 1, opacity: 1 };
+  let open360ViewerModal = () => {};
+  let sync360SphereEntities = () => {};
+  let walkCollisionsOn = true;
+  const HOUSE_DEFAULT_POSE = { lat: 29.247585, lon: -95.231378, heading: 104, lift: 0, scale: 1, opacity: 1 };
+  const MONACO_DEFAULT_POSE = { lat: 29.247515, lon: -95.231255, heading: 194, lift: 0, scale: 1, opacity: 1 };
+
+  function houseLocalToGeo(localEastM, localNorthM, hState = null) {
+    const hs = hState || window.__pflMovables?.house?.getState?.() || HOUSE_DEFAULT_POSE;
+    const hdgDeg = Number(hs.heading ?? HOUSE_DEFAULT_POSE.heading);
+    const deltaRad = Cesium.Math.toRadians(hdgDeg - 104);
+    const cosA = Math.cos(deltaRad);
+    const sinA = Math.sin(deltaRad);
+    const worldEastM = localEastM * cosA + localNorthM * sinA;
+    const worldNorthM = -localEastM * sinA + localNorthM * cosA;
+    const lat = Number(hs.lat) + worldNorthM / 111320;
+    const lon = Number(hs.lon) + worldEastM / (111320 * Math.cos(Cesium.Math.toRadians(Number(hs.lat))));
+    return { lat, lon, worldEastM, worldNorthM };
+  }
+
+  function geoToHouseLocal(lat, lon, hState = null) {
+    const hs = hState || window.__pflMovables?.house?.getState?.() || HOUSE_DEFAULT_POSE;
+    const hdgDeg = Number(hs.heading ?? HOUSE_DEFAULT_POSE.heading);
+    const wN = (lat - Number(hs.lat)) * 111320;
+    const wE = (lon - Number(hs.lon)) * 111320 * Math.cos(Cesium.Math.toRadians(Number(hs.lat)));
+    const deltaRad = Cesium.Math.toRadians(hdgDeg - 104);
+    const cosA = Math.cos(deltaRad);
+    const sinA = Math.sin(deltaRad);
+    return {
+      x: wE * cosA - wN * sinA,
+      y: wE * sinA + wN * cosA,
+    };
+  }
 
   const RBAC_TIERS = {
     admin:   { label: 'Admin',   canEditGlobalScene: true,  canPublishGlobalLayout: true,  canAddPersonalPins: true },
@@ -1276,7 +1337,10 @@ export function loadPflWindowFramework({ viewer }) {
 
   compassWin.body.querySelector('#pfl-reset-house-btn')?.addEventListener('click', () => {
     if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
-    try { localStorage.removeItem('pfl_house_pose_v3'); } catch {}
+    try {
+      localStorage.removeItem('pfl_house_pose_v3');
+      localStorage.removeItem('pfl_house_pose_v4');
+    } catch {}
     const hMov = window.__pflMovables?.house;
     if (hMov) {
       hMov.update({ ...HOUSE_DEFAULT_POSE });
@@ -1287,7 +1351,7 @@ export function loadPflWindowFramework({ viewer }) {
 
   compassWin.body.querySelector('#pfl-reset-all-objects-btn')?.addEventListener('click', () => {
     if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
-    for (const k of ['pfl_house_pose_v3', 'pfl_monaco_pose_v2', 'pfl_custom_objects_v1', 'pfl_movable_scales_v1', 'gev-yardframes-layout-v1']) {
+    for (const k of ['pfl_house_pose_v3', 'pfl_house_pose_v4', 'pfl_monaco_pose_v2', 'pfl_monaco_pose_v3', 'pfl_custom_objects_v1', 'pfl_movable_scales_v1', 'gev-yardframes-layout-v1']) {
       try { localStorage.removeItem(k); } catch {}
     }
     try { window.__pflMovables?.house?.update?.({ ...HOUSE_DEFAULT_POSE }); } catch {}
@@ -1309,6 +1373,18 @@ export function loadPflWindowFramework({ viewer }) {
       if (Number.isFinite(d)) return d;
     } catch {}
     return nearLiverpool ? -26.19 : 0.0;
+  }
+
+  function resolveHouseGroundM(lonDeg, latDeg) {
+    const center = resolveLocalGroundM(lonDeg, latDeg);
+    if (!viewer?.scene?.globe?.show) return center;
+    // Sample 4 footprint corners so sloping World Terrain never buries the 1F slab at any corner
+    const samples = [center];
+    for (const [dLat, dLon] of [[-0.000055, -0.00008], [-0.000055, 0.00008], [0.000055, -0.00008], [0.000055, 0.00008]]) {
+      const s = resolveLocalGroundM(lonDeg + dLon, latDeg + dLat);
+      if (Number.isFinite(s) && s > center - 1.5 && s < center + 2.2) samples.push(s);
+    }
+    return Math.max(...samples);
   }
 
   // 1S788 Holodeck Hallway Portal Window (:8766 Stargate Room Map & Launchpad — 100% CSP-Clean Native DOM)
@@ -1333,8 +1409,12 @@ export function loadPflWindowFramework({ viewer }) {
         </div>
       </div>
       <div style="padding:12px;border:1.5px solid rgba(34,211,238,0.45);border-radius:10px;background:radial-gradient(circle at 50% 35%, rgba(34,211,238,0.14), rgba(88,28,135,0.20) 52%, rgba(3,7,18,0.96) 100%)">
-        <div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:#a5f3fc;margin-bottom:10px">
-          ● STARGATE DOOR GRAPH ONLINE · BIDIRECTIONAL RETURN TO <code>:4173</code> ACTIVE
+        <div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#a5f3fc;margin-bottom:8px;line-height:1.4">
+          🌀 <b>STARGATE TRANSPORT RING</b> · Step into the glowing cyan ring or click below to beam from outdoor 417 Palm Dr into your indoor 3D Gaussian Splats (<code>127.0.0.1:8766</code>), or toggle the self-hosted Yard 3D Splat right here!
+        </div>
+        <div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-bottom:9px">
+          <button type="button" class="pfl-std-cbtn" id="pfl-holodeck-splat-btn" style="border-color:#22d3ee;color:#67e8f9;padding:4px 9px">✨ Yard 3D Point Splat: OFF</button>
+          <span id="pfl-holodeck-server-badge" style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 8px;border:1px solid #334155;border-radius:5px;color:#94a3b8">Local Splat Server (:8766) Ready</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px">
           <div style="padding:8px 10px;border:1px solid rgba(34,211,238,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
@@ -1401,6 +1481,22 @@ export function loadPflWindowFramework({ viewer }) {
     });
   });
   holodeckWin.body.querySelector('#pfl-holodeck-close')?.addEventListener('click', closeHolodeckHallway);
+  holodeckWin.body.querySelector('#pfl-holodeck-splat-btn')?.addEventListener('click', () => {
+    const on = Boolean(window.__pflToggleLegacyPointSplat?.());
+    const hb = holodeckWin.body.querySelector('#pfl-holodeck-splat-btn');
+    if (hb) {
+      hb.textContent = on ? '✨ Yard 3D Point Splat: ON' : '✨ Yard 3D Point Splat: OFF';
+      hb.style.borderColor = on ? '#4ade80' : '#22d3ee';
+      hb.style.color = on ? '#86efac' : '#67e8f9';
+    }
+    const tb = document.getElementById('pfl-yard-splat-toggle');
+    if (tb) {
+      tb.textContent = on ? '✨ Yard 3D Splat: ON' : '✨ Yard 3D Splat: OFF';
+      tb.style.borderColor = on ? '#22d3ee' : 'rgba(148,163,184,0.35)';
+      tb.style.color = on ? '#67e8f9' : '#94a3b8';
+    }
+    governorRequestRender('pfl-holodeck-splat-toggle');
+  });
   window.__pflOpenHolodeckHallway = openHolodeckHallway;
 
   // Remote Drone Telepresence Orbit State & Target Resolver
@@ -1844,8 +1940,18 @@ export function loadPflWindowFramework({ viewer }) {
     if (hdgVl) hdgVl.textContent = `${hdg}°`;
     const altSl = compassWin.body.querySelector('#pfl-alt-slider');
     const altVl = compassWin.body.querySelector('#pfl-alt-val');
+    const liftZeroBtn = compassWin.body.querySelector('#pfl-lift-zero-btn');
+    const highLift = Math.abs(lift) > 0.35;
     if (altSl) altSl.value = String(lift);
-    if (altVl) altVl.textContent = `${lift.toFixed(2)}m`;
+    if (altVl) {
+      altVl.textContent = highLift ? `${lift.toFixed(2)}m ⚠️` : `${lift.toFixed(2)}m`;
+      altVl.style.color = highLift ? '#f87171' : '#e2e8f0';
+    }
+    if (liftZeroBtn) {
+      liftZeroBtn.style.borderColor = highLift ? '#ef4444' : '#22c55e';
+      liftZeroBtn.style.color = highLift ? '#fca5a5' : '#4ade80';
+      liftZeroBtn.style.background = highLift ? 'rgba(239,68,68,0.22)' : '';
+    }
 
     const scSl = compassWin.body.querySelector('#pfl-scale-slider');
     const scVl = compassWin.body.querySelector('#pfl-scale-val');
@@ -2226,6 +2332,9 @@ export function loadPflWindowFramework({ viewer }) {
       if (eid.startsWith('pfl-s788-') || eid.startsWith('pfl-oak-')) continue;
       if (eid === 'pfl-holodeck-portal-1s788') {
         return { type: 'portal' };
+      }
+      if (ent?._pfl360Item) {
+        return { type: 'sphere360', item: ent._pfl360Item };
       }
       if (eid.startsWith('pfl-mls-pin-')) {
         return { type: 'mls-room', roomId: ent._pflMlsRoomId || eid.slice('pfl-mls-pin-'.length) };
@@ -2774,6 +2883,10 @@ export function loadPflWindowFramework({ viewer }) {
       openHolodeckHallway();
       return;
     }
+    if (hit.type === 'sphere360' && hit.item) {
+      open360ViewerModal(hit.item);
+      return;
+    }
     if (hit.type === 'mls-room') {
       openMlsWalkthrough(hit.roomId);
       return;
@@ -3310,6 +3423,8 @@ export function loadPflWindowFramework({ viewer }) {
         <button type="button" class="pfl-std-cbtn" id="pfl-drop-pad-btn" style="border-color:#4ade80;color:#4ade80" title="Drop a persistent Second-Life teleport pad at your exact current camera position, angle &amp; lens FOV">➕ Drop Pad Here</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-enter-holodeck-btn" style="border-color:#a855f7;color:#e9d5ff" title="Step through the 1S788 Carport Portal into the 3D Gaussian Splat Holodeck Hallway (:8766)">🚪 Enter Holodeck Hallway (:8766)</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-house-3d-toggle" style="border-color:#fbbf24;color:#fde047" title="Toggle 3D 417 Palm Dr Yellow Coastal House GLB model &amp; auto-elevate Bed photo onto upstairs west-bedroom roof">🏠 3D House: ON</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-yard-splat-toggle" style="border-color:rgba(148,163,184,0.35);color:#94a3b8" title="Toggle self-hosted 417 Palm Dr Front Yard 3D Gaussian Point Splat tileset">✨ Yard 3D Splat: OFF</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-walk-collisions-toggle" style="border-color:#4ade80;color:#86efac" title="Toggle solid 3D wall colliders with Front, Carport &amp; Bayou Doorways">🧱 Collisions: ON</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-s788-canopy-toggle" style="border-color:rgba(148,163,184,0.35);color:#94a3b8" title="Toggle 3D engineering wireframe of MIL-STD S-788/G shelters (102&quot;L × 84&quot;W × 67&quot;H = 2.59m × 2.13m × 1.70m) + 11ft (3.35m) walk-through overhead solar canopy">🏗️ S-788 &amp; 11ft Canopy: OFF</button>
       </div>
     </div>
@@ -3810,18 +3925,36 @@ export function loadPflWindowFramework({ viewer }) {
     governorRequestRender('pfl-s788-toggle');
   });
 
+  const yardSplatToggleBtn = telepresenceDeck.querySelector('#pfl-yard-splat-toggle');
+  yardSplatToggleBtn?.addEventListener('click', () => {
+    const on = Boolean(window.__pflToggleLegacyPointSplat?.());
+    yardSplatToggleBtn.textContent = on ? '✨ Yard 3D Splat: ON' : '✨ Yard 3D Splat: OFF';
+    yardSplatToggleBtn.style.borderColor = on ? '#22d3ee' : 'rgba(148,163,184,0.35)';
+    yardSplatToggleBtn.style.color = on ? '#67e8f9' : '#94a3b8';
+    const hb = holodeckWin.body.querySelector('#pfl-holodeck-splat-btn');
+    if (hb) hb.textContent = on ? '✨ Yard 3D Point Splat: ON' : '✨ Yard 3D Point Splat: OFF';
+    governorRequestRender('pfl-yard-splat-toggle');
+  });
+
+  const walkCollToggleBtn = telepresenceDeck.querySelector('#pfl-walk-collisions-toggle');
+  walkCollToggleBtn?.addEventListener('click', () => {
+    walkCollisionsOn = !walkCollisionsOn;
+    walkCollToggleBtn.textContent = walkCollisionsOn ? '🧱 Collisions: ON' : '🧱 Collisions: OFF';
+    walkCollToggleBtn.style.borderColor = walkCollisionsOn ? '#4ade80' : 'rgba(148,163,184,0.35)';
+    walkCollToggleBtn.style.color = walkCollisionsOn ? '#86efac' : '#94a3b8';
+  });
+
   function checkHolodeckPortalStep() {
     if (droneOrbitState.active || Date.now() < portalStepCooldownUntil) return;
     const c = viewer?.camera?.positionCartographic;
     if (!c) return;
     const camLat = Cesium.Math.toDegrees(c.latitude);
     const camLon = Cesium.Math.toDegrees(c.longitude);
-    const portalLat = 29.247518;
-    const portalLon = -95.231435;
-    const dN = (camLat - portalLat) * 111320;
-    const dE = (camLon - portalLon) * 111320 * Math.cos(Cesium.Math.toRadians(portalLat));
+    const pGeo = houseLocalToGeo(8.2, -4.8);
+    const dN = (camLat - pGeo.lat) * 111320;
+    const dE = (camLon - pGeo.lon) * 111320 * Math.cos(Cesium.Math.toRadians(pGeo.lat));
     const distM = Math.hypot(dN, dE);
-    const hAbove = c.height - resolveLocalGroundM(portalLon, portalLat);
+    const hAbove = c.height - resolveLocalGroundM(pGeo.lon, pGeo.lat);
     if (distM <= 1.35 && hAbove >= -1.5 && hAbove <= 5.5) {
       if (!insideHolodeckPortalZone) {
         insideHolodeckPortalZone = true;
@@ -3830,6 +3963,47 @@ export function loadPflWindowFramework({ viewer }) {
     } else if (distM > 1.95) {
       insideHolodeckPortalZone = false;
     }
+  }
+
+  function resolveWalkWithCollisions(fromLat, fromLon, toLat, toLon, camHeightM) {
+    if (!walkCollisionsOn) return { lat: toLat, lon: toLon, enteredDoor: false };
+    const agl = camHeightM - resolveLocalGroundM(toLon, toLat);
+    if (!Number.isFinite(agl) || agl > 8.8) return { lat: toLat, lon: toLon, enteredDoor: false };
+    const p0 = geoToHouseLocal(fromLat, fromLon);
+    const p1 = geoToHouseLocal(toLat, toLon);
+    // Exterior house wall shell (|x| <= 7.85, |y| <= 4.75) with generous 3m walkable doorway corridors
+    const inExteriorBand = (pt) => Math.abs(pt.x) <= 8.05 && Math.abs(pt.y) <= 5.05;
+    const inInteriorVoid = (pt) => Math.abs(pt.x) < 7.25 && Math.abs(pt.y) < 4.25;
+    const inDoorCorridor = (pt) =>
+      Math.abs(pt.x) <= 1.65 && Math.abs(pt.y) <= 5.65 || // North Bayou & South Front doorways
+      (pt.x >= 6.8 && pt.x <= 8.6 && pt.y >= -1.5 && pt.y <= 1.5); // East Carport breezeway doorway
+
+    let nextLat = toLat;
+    let nextLon = toLon;
+    let enteredDoor = false;
+    if (inExteriorBand(p1) && !inInteriorVoid(p1) && !inDoorCorridor(p1)) {
+      // Slide cleanly along axis with smaller penetration so walls never dead-stop diagonal walking
+      if (Math.abs(p0.x) > 7.85) {
+        return { lat: toLat, lon: fromLon, enteredDoor: false };
+      }
+      return { lat: fromLat, lon: toLon, enteredDoor: false };
+    }
+    if (inInteriorVoid(p1) && !inInteriorVoid(p0)) {
+      enteredDoor = true;
+    }
+    // Keep clear of Monaco RV Coach body (width 2.8m, length 12.4m)
+    const mon = window.__pflMovables?.monaco?.getState?.();
+    if (mon && Number.isFinite(mon.lat) && agl < 4.0) {
+      const mRad = Cesium.Math.toRadians(Number(mon.heading || 194));
+      const dE = (toLon - mon.lon) * 111320 * Math.cos(Cesium.Math.toRadians(mon.lat));
+      const dN = (toLat - mon.lat) * 111320;
+      const mx = dE * Math.cos(mRad) - dN * Math.sin(mRad);
+      const my = dE * Math.sin(mRad) + dN * Math.cos(mRad);
+      if (Math.abs(mx) < 1.45 && Math.abs(my) < 6.25) {
+        return { lat: fromLat, lon: toLon, enteredDoor: false };
+      }
+    }
+    return { lat: nextLat, lon: nextLon, enteredDoor };
   }
 
   // Add LiveWire 3D Walk Pad layout (matching LiveWire splat_stage.html 4x2 grid) inside left Camera & Walk card:
@@ -3869,10 +4043,20 @@ export function loadPflWindowFramework({ viewer }) {
     const hdg = viewer.camera.heading || 0;
     const eastM = Math.sin(hdg) * fwdM + Math.cos(hdg) * rightM;
     const northM = Math.cos(hdg) * fwdM - Math.sin(hdg) * rightM;
-    const newLat = Cesium.Math.toDegrees(c.latitude) + northM / 111320;
-    const newLon = Cesium.Math.toDegrees(c.longitude) + eastM / (111320 * Math.cos(c.latitude));
+    const curLat = Cesium.Math.toDegrees(c.latitude);
+    const curLon = Cesium.Math.toDegrees(c.longitude);
+    const rawLat = curLat + northM / 111320;
+    const rawLon = curLon + eastM / (111320 * Math.cos(c.latitude));
+    const solved = resolveWalkWithCollisions(curLat, curLon, rawLat, rawLon, c.height);
+    if (solved.enteredDoor) {
+      const wh = compassWin.body.querySelector('#pfl-walk-hint');
+      if (wh) {
+        wh.style.display = 'block';
+        wh.textContent = '🚪 Inside 417 Palm Dr — click 🌐 360° or 🏠 Walk Inside to explore!';
+      }
+    }
     viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(newLon, newLat, c.height),
+      destination: Cesium.Cartesian3.fromDegrees(solved.lon, solved.lat, c.height),
       orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
     });
     checkHolodeckPortalStep();
@@ -4882,10 +5066,10 @@ export function loadPflWindowFramework({ viewer }) {
     const gBase = resolveLocalGroundM(-95.23138, 29.24768);
 
     const oaks = [
-      // West Live Oak (left trunk in Cam2 view, framing the left edge of dock & water)
-      { id: 'pfl-oak-west', name: '🌳 Backyard West Live Oak (Cam2 Left Frame)', lat: 29.247705, lon: -95.231430, trunkH: 4.2, crownR: 4.8, crownH: 6.4 },
-      // East Live Oak (forked foreground tree on right side of Cam2 view, right beside smoker/white box)
-      { id: 'pfl-oak-east', name: '🌳 Backyard East Forked Live Oak (Cam2 Right Frame)', lat: 29.247695, lon: -95.231325, trunkH: 4.5, crownR: 4.6, crownH: 6.8 },
+      // West Live Oak (left trunk in Cam2 view, aligned on Brazoria CAD Lot 23 NW lawn)
+      { id: 'pfl-oak-west', name: '🌳 Backyard West Live Oak (Cam2 Left Frame)', lat: 29.247702, lon: -95.231432, trunkH: 4.2, crownR: 4.8, crownH: 6.4 },
+      // East Live Oak (forked foreground tree on right side of Cam2 view, Lot 23 NE lawn)
+      { id: 'pfl-oak-east', name: '🌳 Backyard East Forked Live Oak (Cam2 Right Frame)', lat: 29.247694, lon: -95.231328, trunkH: 4.5, crownR: 4.6, crownH: 6.8 },
     ];
 
     for (const t of oaks) {
@@ -4954,18 +5138,18 @@ export function loadPflWindowFramework({ viewer }) {
       oakImg.src = '/yard-frames/back-yard-cam2-2026-10-12.jpg';
     }
 
-    // Wooden Bayou Dock at exact ortho shoreline (29.24779, -95.23138)
+    // Wooden Bayou Dock at Brazoria CAD Lot 23 shoreline, aligned straight out into Chocolate Bayou (14° NNE axis)
     const dockId = 'pfl-bayou-dock-3d';
     viewer.entities.add({
       id: dockId,
       name: '⚓ 417 Palm Dr Chocolate Bayou Dock',
-      position: Cesium.Cartesian3.fromDegrees(-95.231380, 29.247792, gBase + 0.35),
+      position: Cesium.Cartesian3.fromDegrees(-95.231388, 29.247786, gBase + 0.35),
       orientation: Cesium.Transforms.headingPitchRollQuaternion(
-        Cesium.Cartesian3.fromDegrees(-95.231380, 29.247792, gBase + 0.35),
-        new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(354), 0, 0),
+        Cesium.Cartesian3.fromDegrees(-95.231388, 29.247786, gBase + 0.35),
+        new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(14), 0, 0),
       ),
       box: {
-        dimensions: new Cesium.Cartesian3(4.2, 5.4, 0.35),
+        dimensions: new Cesium.Cartesian3(3.8, 6.2, 0.35),
         material: Cesium.Color.fromCssColorString('#7c5c3e').withAlpha(0.85),
         outline: true,
         outlineColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.75),
@@ -4999,7 +5183,8 @@ export function loadPflWindowFramework({ viewer }) {
     pctx.arc(128, 128, 72, 0, Math.PI * 2);
     pctx.stroke();
 
-    const portalGround = resolveLocalGroundM(-95.231435, 29.247518);
+    const portalGeo = houseLocalToGeo(8.2, -4.8);
+    const portalGround = resolveLocalGroundM(portalGeo.lon, portalGeo.lat);
     const makeWorldTagCanvas = (text, borderHex, fgHex) => {
       const c = document.createElement('canvas');
       c.width = 320;
@@ -5023,8 +5208,8 @@ export function loadPflWindowFramework({ viewer }) {
     const portalId = 'pfl-holodeck-portal-1s788';
     viewer.entities.add({
       id: portalId,
-      name: '🚪 1S788 Carport → Holodeck Hallway Portal (:8766)',
-      position: Cesium.Cartesian3.fromDegrees(-95.231435, 29.247518, portalGround + 1.15),
+      name: '🚪 Stargate Transport Ring → 1S788 Holodeck Hallway (:8766)',
+      position: Cesium.Cartesian3.fromDegrees(portalGeo.lon, portalGeo.lat, portalGround + 1.15),
       ellipse: {
         semiMajorAxis: 1.15,
         semiMinorAxis: 1.15,
@@ -5146,10 +5331,10 @@ export function loadPflWindowFramework({ viewer }) {
       yardLandmarkIds.push(canopyId);
     }
 
-    // 3D Monaco 40ft Class-A Diesel Pusher Coach RV in East Driveway beside Fleetwood RV (12.2m L × 2.59m W × 3.65m H)
-    const MONACO_POSE_KEY = 'pfl_monaco_pose_v2';
+    // 3D Monaco 40ft Class-A Diesel Pusher Coach RV in East Lot 24 Driveway (12.2m L × 2.59m W × 3.65m H)
+    const MONACO_POSE_KEY = 'pfl_monaco_pose_v3';
     const MONACO_GROUND_CLEARANCE_M = 0.35;
-    let monacoState = { lat: 29.247510, lon: -95.231268, heading: 175, lift: 0, scale: 1, opacity: 1 };
+    let monacoState = { ...MONACO_DEFAULT_POSE };
     try {
       const savedMon = JSON.parse(localStorage.getItem(MONACO_POSE_KEY) || 'null');
       if (savedMon && Number.isFinite(savedMon.lat) && Number.isFinite(savedMon.lon)) {
@@ -5343,10 +5528,10 @@ export function loadPflWindowFramework({ viewer }) {
     window.__pflMovables = window.__pflMovables || {};
     window.__pflMovables.monaco = monacoMovable;
 
-    // 3D 417 Palm Drive Two-Story Yellow Coastal House GLB (/models/pfl-palm-drive-house.glb)
-    // In Cesium glTF axis conversion, heading=90° aligns glTF +X (14.6m width) East-West and glTF +Z (+5.6m front porch/balcony) Due South!
-    const HOUSE_POSE_KEY = 'pfl_house_pose_v3';
-    const DEFAULT_HOUSE_STATE = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0, scale: 1, opacity: 1 };
+    // 3D 417 Palm Drive Two-Story Coastal House GLB (/models/pfl-palm-drive-house.glb, real walkable shell + wrap balconies)
+    // heading=104° aligns glTF +X along Palm Dr ESE (14.8° S of E) and +Z toward Palm Dr SSW (194.8°)
+    const HOUSE_POSE_KEY = 'pfl_house_pose_v4';
+    const DEFAULT_HOUSE_STATE = { ...HOUSE_DEFAULT_POSE };
     let houseState = { ...DEFAULT_HOUSE_STATE };
     try {
       const savedHouse = JSON.parse(localStorage.getItem(HOUSE_POSE_KEY) || 'null');
@@ -5371,7 +5556,7 @@ export function loadPflWindowFramework({ viewer }) {
         syncBedElevationForHouse(false);
         return null;
       }
-      const hGround = resolveLocalGroundM(houseState.lon, houseState.lat);
+      const hGround = resolveHouseGroundM(houseState.lon, houseState.lat);
       const houseScale = Math.max(0.25, Math.min(3.5, Number(houseState.scale) > 0 ? Number(houseState.scale) : 1));
       const houseOpacity = Math.max(0.05, Math.min(1, Number(houseState.opacity ?? 1)));
       const hPos = Cesium.Cartesian3.fromDegrees(houseState.lon, houseState.lat, hGround + Number(houseState.lift || 0));
@@ -5395,7 +5580,7 @@ export function loadPflWindowFramework({ viewer }) {
         position: hPos,
         orientation: hOri,
         model: {
-          uri: `/models/pfl-palm-drive-house.glb?v=${viewer._pflHouseRev || 1}`,
+          uri: `/models/pfl-palm-drive-house.glb?v=${viewer._pflHouseRev || 12}`,
           scale: houseScale,
           color: Cesium.Color.WHITE.withAlpha(houseOpacity),
           heightReference: Cesium.HeightReference.NONE,
@@ -5428,6 +5613,18 @@ export function loadPflWindowFramework({ viewer }) {
         Object.assign(houseState, patch);
         try { localStorage.setItem(HOUSE_POSE_KEY, JSON.stringify(houseState)); } catch {}
         spawnHouseEntityIfReady();
+        // Move House-parented Stargate portal, indoor MLS pins & 360° spheres dynamically with House
+        try {
+          const pEnt = viewer?.entities?.getById?.(portalId);
+          if (pEnt) {
+            const pg = houseLocalToGeo(8.2, -4.8, houseState);
+            const pGround = resolveLocalGroundM(pg.lon, pg.lat);
+            pEnt.position = Cesium.Cartesian3.fromDegrees(pg.lon, pg.lat, pGround + 1.15);
+            if (pEnt.ellipse) pEnt.ellipse.height = pGround + 0.12;
+          }
+          if (typeof syncMlsRoomPins === 'function') syncMlsRoomPins(null);
+          if (typeof sync360SphereEntities === 'function') sync360SphereEntities();
+        } catch {}
         governorRequestRender('pfl-move-house');
       },
     };
@@ -5465,6 +5662,7 @@ export function loadPflWindowFramework({ viewer }) {
     if (terrainSyncTimer) clearTimeout(terrainSyncTimer);
     terrainSyncTimer = setTimeout(() => {
       terrainSyncTimer = null;
+      if (force && viewer) viewer._pflUniformGoogleDatumM = undefined;
       const nextSig = sampleYardDatumSig();
       if (!force && nextSig === lastGroundedDatumSig) return;
       lastGroundedDatumSig = nextSig;
@@ -5473,6 +5671,7 @@ export function loadPflWindowFramework({ viewer }) {
       try { window.__pflMovables?.chair?.update?.({}); } catch {}
       try { window.__pflMovables?.house?.update?.({}); } catch {}
       try { window.__pflMovables?.monaco?.update?.({}); } catch {}
+      try { if (typeof sync360SphereEntities === 'function') sync360SphereEntities(); } catch {}
       try { syncActiveMovableGizmo(); } catch {}
     }, delayMs);
   };
@@ -6001,23 +6200,35 @@ export function loadPflWindowFramework({ viewer }) {
   }, 2200);
   window.addEventListener('gev:map-stack-changed', () => setTimeout(syncAlways3dVisibility, 400));
 
-  // 8) 32 MLS Interior Photos Interactive 2-Floor + Waterfront Walkthrough & Guided Auto-Tour + 3D Room Hotspot Pins
+  // 8) 32 MLS Interior Photos Interactive 2-Floor + Waterfront Walkthrough & Guided Auto-Tour + 3D Room Hotspot Pins (House-Parented!)
   const MLS_ROOMS = [
-    { id: 'boathouse-wf', floor: 'waterfront', title: '⚓ Boathouse, Boat Lift & Bayou Gazebo', shortTag: '⚓ BOATHOUSE & GAZEBO', codes: ['m00', 'm27', 'm28', 'm29', 'm30', 'm31'], lat: 29.247770, lon: -95.231390, altOff: 1.9, az: 175, pitch: -18, range: 17.5 },
-    { id: 'porch-2f', floor: '2f', title: '🌅 2F Screened Bayou Porch (1,470 sf Level)', shortTag: '🌅 2F BAYOU PORCH', codes: ['m04', 'm05', 'm26'], lat: 29.247635, lon: -95.231385, altOff: 5.8, az: 10, pitch: -16, range: 11.5 },
-    { id: 'living-2f', floor: '2f', title: '🛋️ 2F Living Room (Bayou View)', shortTag: '🛋️ 2F LIVING RM', codes: ['m06', 'm07'], lat: 29.247605, lon: -95.231390, altOff: 5.8, az: 20, pitch: -20, range: 12.5 },
-    { id: 'kitchen-2f', floor: '2f', title: '🍳 2F Chef Kitchen (East Wing)', shortTag: '🍳 2F KITCHEN', codes: ['m08', 'm10'], lat: 29.247595, lon: -95.231345, altOff: 5.8, az: 265, pitch: -20, range: 12.0 },
-    { id: 'dining-2f', floor: '2f', title: '🍽️ 2F Dining Area (NE Bayou Corner)', shortTag: '🍽️ 2F DINING', codes: ['m09', 'm11'], lat: 29.247618, lon: -95.231348, altOff: 5.8, az: 235, pitch: -20, range: 12.0 },
-    { id: 'master-sw-2f', floor: '2f', title: '🛏️ 2F Master SW & Guest Bedrooms', shortTag: '🛏️ 2F MASTER SW', codes: ['m12', 'm15'], lat: 29.247568, lon: -95.231425, altOff: 5.9, az: 55, pitch: -20, range: 11.5 },
-    { id: 'office-nw-2f', floor: '2f', title: '💻 2F Waterfront Office (NW Wing)', shortTag: '💻 2F OFFICE', codes: ['m14'], lat: 29.247622, lon: -95.231425, altOff: 5.9, az: 125, pitch: -18, range: 11.5 },
-    { id: 'baths-2f', floor: '2f', title: '🚿 2F Primary & Hall Baths', shortTag: '🚿 2F BATHS', codes: ['m13', 'm16'], lat: 29.247585, lon: -95.231408, altOff: 5.8, az: 90, pitch: -22, range: 11.5 },
-    { id: 'balcony-2f', floor: '2f', title: '☀️ 2F Front Balcony (Palm Dr View)', shortTag: '☀️ 2F BALCONY', codes: ['m02', 'm03', 'm17'], lat: 29.247548, lon: -95.231385, altOff: 5.6, az: 185, pitch: -16, range: 13.0 },
-    { id: 'patio-1f', floor: '1f', title: '🌿 1F Covered Waterfront Patio (1,570 sf Level)', shortTag: '🌿 1F PATIO', codes: ['m01', 'm19'], lat: 29.247642, lon: -95.231385, altOff: 1.8, az: 180, pitch: -14, range: 11.5 },
-    { id: 'gameroom-1f', floor: '1f', title: '🎱 1F Cedar Gameroom & Great Room (1,570 sf)', shortTag: '🎱 1F GAMEROOM', codes: ['m18', 'm19', 'm20', 'm21'], lat: 29.247598, lon: -95.231388, altOff: 2.2, az: 15, pitch: -16, range: 12.5 },
-    { id: 'galley-1f', floor: '1f', title: '☕ 1F Galley Kitchenette', shortTag: '☕ 1F GALLEY', codes: ['m22', 'm23'], lat: 29.247582, lon: -95.231348, altOff: 2.2, az: 260, pitch: -16, range: 11.5 },
-    { id: 'utility-1f', floor: '1f', title: '🧺 1F Utility & Laundry Room', shortTag: '🧺 1F UTILITY', codes: ['m24'], lat: 29.247566, lon: -95.231355, altOff: 2.2, az: 295, pitch: -18, range: 11.5 },
-    { id: 'bath3-1f', floor: '1f', title: '🚿 1F Full Bath #3', shortTag: '🚿 1F BATH 3', codes: ['m25'], lat: 29.247570, lon: -95.231415, altOff: 2.2, az: 75, pitch: -18, range: 11.5 },
+    { id: 'boathouse-wf', floor: 'waterfront', title: '⚓ Boathouse, Boat Lift & Bayou Gazebo', shortTag: '⚓ BOATHOUSE & GAZEBO', codes: ['m00', 'm27', 'm28', 'm29', 'm30', 'm31'], lat: 29.247786, lon: -95.231388, altOff: 1.9, az: 194, pitch: -18, range: 17.5 },
+    { id: 'porch-2f', floor: '2f', title: '🌅 2F Screened Bayou Porch (1,470 sf Level)', shortTag: '🌅 2F BAYOU PORCH', codes: ['m04', 'm05', 'm26'], relHouse: [0.0, 5.4], lat: 29.247635, lon: -95.231385, altOff: 5.8, az: 14, pitch: -16, range: 11.5 },
+    { id: 'living-2f', floor: '2f', title: '🛋️ 2F Living Room (Bayou View)', shortTag: '🛋️ 2F LIVING RM', codes: ['m06', 'm07'], relHouse: [0.0, 2.0], lat: 29.247605, lon: -95.231390, altOff: 5.8, az: 14, pitch: -20, range: 12.5 },
+    { id: 'kitchen-2f', floor: '2f', title: '🍳 2F Chef Kitchen (East Wing)', shortTag: '🍳 2F KITCHEN', codes: ['m08', 'm10'], relHouse: [4.0, 1.2], lat: 29.247595, lon: -95.231345, altOff: 5.8, az: 284, pitch: -20, range: 12.0 },
+    { id: 'dining-2f', floor: '2f', title: '🍽️ 2F Dining Area (NE Bayou Corner)', shortTag: '🍽️ 2F DINING', codes: ['m09', 'm11'], relHouse: [3.8, 3.2], lat: 29.247618, lon: -95.231348, altOff: 5.8, az: 235, pitch: -20, range: 12.0 },
+    { id: 'master-sw-2f', floor: '2f', title: '🛏️ 2F Master SW & Guest Bedrooms', shortTag: '🛏️ 2F MASTER SW', codes: ['m12', 'm15'], relHouse: [-4.4, -2.0], lat: 29.247568, lon: -95.231425, altOff: 5.9, az: 55, pitch: -20, range: 11.5 },
+    { id: 'office-nw-2f', floor: '2f', title: '💻 2F Waterfront Office (NW Wing)', shortTag: '💻 2F OFFICE', codes: ['m14'], relHouse: [-4.5, 2.4], lat: 29.247622, lon: -95.231425, altOff: 5.9, az: 125, pitch: -18, range: 11.5 },
+    { id: 'baths-2f', floor: '2f', title: '🚿 2F Primary & Hall Baths', shortTag: '🚿 2F BATHS', codes: ['m13', 'm16'], relHouse: [-2.8, 0.2], lat: 29.247585, lon: -95.231408, altOff: 5.8, az: 104, pitch: -22, range: 11.5 },
+    { id: 'balcony-2f', floor: '2f', title: '☀️ 2F Front Balcony (Palm Dr View)', shortTag: '☀️ 2F BALCONY', codes: ['m02', 'm03', 'm17'], relHouse: [0.0, -5.6], lat: 29.247548, lon: -95.231385, altOff: 5.6, az: 194, pitch: -16, range: 13.0 },
+    { id: 'patio-1f', floor: '1f', title: '🌿 1F Covered Waterfront Patio (1,570 sf Level)', shortTag: '🌿 1F PATIO', codes: ['m01', 'm19'], relHouse: [0.0, 5.4], lat: 29.247642, lon: -95.231385, altOff: 1.8, az: 194, pitch: -14, range: 11.5 },
+    { id: 'gameroom-1f', floor: '1f', title: '🎱 1F Cedar Gameroom & Great Room (1,570 sf)', shortTag: '🎱 1F GAMEROOM', codes: ['m18', 'm19', 'm20', 'm21'], relHouse: [0.0, 0.6], lat: 29.247598, lon: -95.231388, altOff: 2.2, az: 14, pitch: -16, range: 12.5 },
+    { id: 'galley-1f', floor: '1f', title: '☕ 1F Galley Kitchenette', shortTag: '☕ 1F GALLEY', codes: ['m22', 'm23'], relHouse: [3.9, 0.0], lat: 29.247582, lon: -95.231348, altOff: 2.2, az: 284, pitch: -16, range: 11.5 },
+    { id: 'utility-1f', floor: '1f', title: '🧺 1F Utility & Laundry Room', shortTag: '🧺 1F UTILITY', codes: ['m24'], relHouse: [3.2, -2.5], lat: 29.247566, lon: -95.231355, altOff: 2.2, az: 295, pitch: -18, range: 11.5 },
+    { id: 'bath3-1f', floor: '1f', title: '🚿 1F Full Bath #3', shortTag: '🚿 1F BATH 3', codes: ['m25'], relHouse: [-3.4, -1.8], lat: 29.247570, lon: -95.231415, altOff: 2.2, az: 75, pitch: -18, range: 11.5 },
   ];
+
+  function resolveMlsRoomWorld(room) {
+    if (!room) return { lat: 29.247585, lon: -95.231378, altOff: 2.0, az: 14 };
+    if (Array.isArray(room.relHouse)) {
+      const hs = window.__pflMovables?.house?.getState?.() || HOUSE_DEFAULT_POSE;
+      const g = houseLocalToGeo(room.relHouse[0], room.relHouse[1], hs);
+      const lift = Number(hs.lift || 0);
+      const az = ((room.az + (Number(hs.heading ?? 104) - 104)) % 360 + 360) % 360;
+      return { lat: g.lat, lon: g.lon, altOff: room.altOff + lift, az };
+    }
+    return { lat: room.lat, lon: room.lon, altOff: room.altOff, az: room.az };
+  }
 
   const MLS_PHOTO_CAPTIONS = {
     m00: 'Chocolate Bayou Waterfront Hero — 2-Story House, Covered Boat Lift & Pier Gazebo',
@@ -6088,6 +6299,7 @@ export function loadPflWindowFramework({ viewer }) {
           <button type="button" class="pfl-std-cbtn" data-mls-floor="waterfront">⚓ Boathouse/Gazebo</button>
         </div>
         <div style="display:flex;gap:5px;align-items:center">
+          <button type="button" class="pfl-std-cbtn" id="pfl-mls-360-btn" style="border-color:#22d3ee;color:#67e8f9" title="Open interactive 360° Sphere &amp; Nov 4 2018 ↔ 2026 Time Machine for this room">🌐 360° Interactive View</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-mls-pins-toggle" style="border-color:#4ade80;color:#86efac" title="Show/hide clickable 3D room hotspot pins around 417 Palm Drive">📍 3D Room Pins: ON</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-mls-close-btn" style="border-color:#f43f5e;color:#fda4af">✕ Close</button>
         </div>
@@ -6190,12 +6402,13 @@ export function loadPflWindowFramework({ viewer }) {
     }
     for (const r of MLS_ROOMS) {
       const pid = `pfl-mls-pin-${r.id}`;
-      const gAlt = resolveLocalGroundM(r.lon, r.lat);
+      const rw = resolveMlsRoomWorld(r);
+      const gAlt = resolveLocalGroundM(rw.lon, rw.lat);
       const isAct = r.id === activeRoomId;
       const ent = viewer.entities.add({
         id: pid,
         name: `🏠 ${r.title}`,
-        position: Cesium.Cartesian3.fromDegrees(r.lon, r.lat, gAlt + r.altOff),
+        position: Cesium.Cartesian3.fromDegrees(rw.lon, rw.lat, gAlt + rw.altOff),
         billboard: {
           image: makeMlsPinCanvas(r.shortTag, isAct),
           width: isAct ? 132 : 114,
@@ -6216,13 +6429,14 @@ export function loadPflWindowFramework({ viewer }) {
     unlockDroneCamera();
     enforceZeroAltitudeKickGuard();
     try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
-    const gAlt = resolveLocalGroundM(room.lon, room.lat);
-    const targetAlt = gAlt + room.altOff;
-    const azRad = Cesium.Math.toRadians(room.az);
+    const rw = resolveMlsRoomWorld(room);
+    const gAlt = resolveLocalGroundM(rw.lon, rw.lat);
+    const targetAlt = gAlt + rw.altOff;
+    const azRad = Cesium.Math.toRadians(rw.az);
     const pitchRad = Cesium.Math.toRadians(room.pitch);
     const horizM = Math.cos(pitchRad) * room.range;
-    const eyeLat = room.lat - (Math.cos(azRad) * horizM) / 111320;
-    const eyeLon = room.lon - (Math.sin(azRad) * horizM) / (111320 * Math.cos(Cesium.Math.toRadians(room.lat)));
+    const eyeLat = rw.lat - (Math.cos(azRad) * horizM) / 111320;
+    const eyeLon = rw.lon - (Math.sin(azRad) * horizM) / (111320 * Math.cos(Cesium.Math.toRadians(rw.lat)));
     const eyeAlt = targetAlt - Math.sin(pitchRad) * room.range;
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(eyeLon, eyeLat, eyeAlt),
@@ -6376,6 +6590,11 @@ export function loadPflWindowFramework({ viewer }) {
     e.currentTarget.style.color = mlsRoomPinsOn ? '#86efac' : '#94a3b8';
     syncMlsRoomPins(MLS_PHOTOS[currentMlsIdx]?.roomId || null);
   });
+  mlsWin.body.querySelector('#pfl-mls-360-btn')?.addEventListener('click', () => {
+    const rid = MLS_PHOTOS[currentMlsIdx]?.roomId || 'kitchen-2f';
+    const match = ALBUM_2018_ITEMS.find((s) => s.roomId === rid) || ALBUM_2018_ITEMS[9];
+    open360ViewerModal(match);
+  });
   mlsWin.body.querySelector('#pfl-mls-close-btn')?.addEventListener('click', () => {
     stopMlsAutoTour();
     mlsWin.box.style.display = 'none';
@@ -6508,6 +6727,542 @@ export function loadPflWindowFramework({ viewer }) {
     if (vhfWin.box.style.display !== 'none') syncMarineVhfLayerBadges();
   }, 1500);
 
+  // 10) Photo / 360° / 3D Vector Auto-Aligner + 21× Historical Nov 4, 2018 360° Sphere Orbs & 4D Time Machine
+  const CUSTOM_PHOTO_INDEX_KEY = 'pfl_custom_photo_index_v1';
+  const createdPhotoUrls = [];
+  const customPhotoItems = [];
+  let active4dEraFilter = 'all';
+  let orbs360Visible = true;
+  const sphereEntityIds = [];
+  const customPhotoEntityIds = [];
+
+  function resolveSphereWorldPose(it) {
+    if (!it) return { lat: 29.247585, lon: -95.231378, altOff: 1.8, heading: 14 };
+    if (Array.isArray(it.relHouse)) {
+      const hs = window.__pflMovables?.house?.getState?.() || HOUSE_DEFAULT_POSE;
+      const g = houseLocalToGeo(it.relHouse[0], it.relHouse[1], hs);
+      const lift = Number(hs.lift || 0);
+      const hdg = ((Number(it.heading || 0) + (Number(hs.heading ?? 104) - 104)) % 360 + 360) % 360;
+      return { lat: g.lat, lon: g.lon, altOff: (Number(it.altOff) || 1.9) + lift, heading: hdg };
+    }
+    return {
+      lat: Number(it.lat || 29.247585),
+      lon: Number(it.lon || -95.231378),
+      altOff: Number(it.altOff) || 1.8,
+      heading: Number(it.heading || 14),
+    };
+  }
+
+  function make360OrbBadgeCanvas(item) {
+    const c = document.createElement('canvas');
+    c.width = 216;
+    c.height = 38;
+    const ctx = c.getContext('2d');
+    const isHighlight = Boolean(item.downloadedMatch);
+    ctx.fillStyle = isHighlight ? 'rgba(66, 32, 6, 0.94)' : 'rgba(8, 47, 73, 0.92)';
+    ctx.strokeStyle = isHighlight ? '#facc15' : item.custom ? '#4ade80' : '#22d3ee';
+    ctx.lineWidth = isHighlight ? 2.5 : 1.8;
+    ctx.beginPath();
+    ctx.roundRect(2, 2, 212, 34, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = isHighlight ? '#fef08a' : '#e0f2fe';
+    ctx.font = '700 10.5px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const shortTag = `${item.custom ? '🆕' : '🌐'} ${String(item.label || '360°').slice(0, 22)}`;
+    ctx.fillText(shortTag, 108, 13);
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = '600 8.5px "JetBrains Mono", monospace';
+    ctx.fillText(String(item.capturedAt || item.era || '360°').slice(0, 24), 108, 27);
+    return c;
+  }
+
+  function allIndexed360Items() {
+    const custom360 = customPhotoItems.filter((x) => x.is360);
+    return [...ALBUM_2018_ITEMS, ...custom360].filter((x) => {
+      if (active4dEraFilter === 'all') return true;
+      if (active4dEraFilter === '2026') return Boolean(x.custom && !String(x.era || '').startsWith('2018'));
+      return x.era === active4dEraFilter;
+    });
+  }
+
+  sync360SphereEntities = () => {
+    if (!viewer?.entities) return;
+    for (const id of sphereEntityIds) {
+      try { viewer.entities.removeById(id); } catch {}
+    }
+    sphereEntityIds.length = 0;
+    if (!orbs360Visible) {
+      governorRequestRender('pfl-360-orbs-off');
+      return;
+    }
+    for (const item of allIndexed360Items()) {
+      const eid = `pfl-360-orb-${item.id}`;
+      const wp = resolveSphereWorldPose(item);
+      const gAlt = resolveLocalGroundM(wp.lon, wp.lat);
+      const ent = viewer.entities.add({
+        id: eid,
+        name: `🌐 360° Sphere · ${item.label} (${item.capturedAt})`,
+        position: Cesium.Cartesian3.fromDegrees(wp.lon, wp.lat, gAlt + wp.altOff),
+        ellipsoid: {
+          radii: new Cesium.Cartesian3(0.42, 0.42, 0.42),
+          material: Cesium.Color.fromCssColorString(item.downloadedMatch ? '#facc15' : '#22d3ee').withAlpha(0.75),
+          outline: true,
+          outlineColor: Cesium.Color.WHITE.withAlpha(0.85),
+        },
+        billboard: {
+          image: make360OrbBadgeCanvas(item),
+          width: 126,
+          height: 22,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -14),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 88),
+          disableDepthTestDistance: 35,
+        },
+      });
+      ent._pfl360Item = item;
+      sphereEntityIds.push(eid);
+    }
+    governorRequestRender('pfl-360-orbs-sync');
+  };
+
+  // Interactive CSP-Clean Canvas 2D Equirectangular 360° Panorama + 4D Time Machine Modal
+  const viewer360Win = createStandardBox({
+    id: 'pfl-win-360-viewer',
+    title: '🌐 360° INTERACTIVE SPHERE & 4D TIME MACHINE (2018 ↔ 2026)',
+    defaultLeft: Math.max(24, Math.round((window.innerWidth - 700) * 0.5)),
+    defaultTop: 68,
+    defaultWidth: 700,
+  });
+  viewer360Win.box.style.display = 'none';
+  viewer360Win.box.style.zIndex = '9785';
+  viewer360Win.body.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:7px;font-family:'Inter',system-ui,sans-serif;font-size:11px;color:#e2e8f0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="pfl-std-cbtn" id="pfl-360-prev" style="padding:3px 8px">◀ Prev Spot</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-360-next" style="padding:3px 8px">Next Spot ▶</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-360-time-play" style="border-color:#facc15;color:#fde047;background:rgba(250,204,21,0.16);padding:3px 9px">▶️ Play Over Time (2018 → 2026)</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-360-align-cam" style="border-color:#22d3ee;color:#67e8f9;padding:3px 8px" title="Teleport Cesium 3D Camera here matching exact look heading">🧭 Sync 3D Globe Here</button>
+        </div>
+        <button type="button" class="pfl-std-cbtn" id="pfl-360-close" style="border-color:#f43f5e;color:#fda4af">✕ Close</button>
+      </div>
+      <div id="pfl-360-meta-bar" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#7dd3fc;background:rgba(9,14,26,0.88);border:1px solid rgba(56,189,248,0.35);border-radius:6px;padding:4px 8px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <span id="pfl-360-title-lbl">🌐 360° Panorama</span>
+        <span id="pfl-360-pose-lbl">🧭 HDG 14° · PITCH 0° · FOV 95°</span>
+      </div>
+      <div style="position:relative;border-radius:8px;overflow:hidden;border:1.5px solid rgba(34,211,238,0.55);background:#020617">
+        <canvas id="pfl-360-canvas" width="480" height="270" style="width:100%;height:350px;display:block;cursor:grab;touch-action:none"></canvas>
+        <img id="pfl-360-compare-2026" alt="2026 MLS Room Comparison" style="display:none;position:absolute;right:8px;bottom:8px;width:36%;max-height:44%;object-fit:cover;border:2px solid #facc15;border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,0.8);cursor:pointer" title="Click to toggle full 2026 MLS room photo" />
+        <div id="pfl-360-compare-tag" style="display:none;position:absolute;right:12px;bottom:12px;background:rgba(9,14,26,0.88);color:#fde047;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 5px;border-radius:4px;pointer-events:none">2026 MLS COMPARE</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:10px;color:#94a3b8">Drag anywhere to look 360° · Wheel to zoom FOV · 🕰️ PIP compares matching 2026 MLS room</span>
+        <div style="display:flex;gap:4px">
+          <button type="button" class="pfl-std-cbtn" data-pfl-360-fov="65" style="font-size:9.5px">FOV 65°</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-360-fov="95" style="font-size:9.5px;border-color:#38bdf8;color:#7dd3fc">FOV 95°</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-360-fov="115" style="font-size:9.5px">Wide 115°</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const canvas360 = viewer360Win.body.querySelector('#pfl-360-canvas');
+  const ctx360 = canvas360?.getContext?.('2d');
+  const compareImgEl = viewer360Win.body.querySelector('#pfl-360-compare-2026');
+  const compareTagEl = viewer360Win.body.querySelector('#pfl-360-compare-tag');
+  let active360Item = null;
+  let panoYawDeg = 0; // offset inside equirectangular image relative to item.heading
+  let panoPitchDeg = 0;
+  let panoFovDeg = 95;
+  let srcPanoData = null;
+  let srcPanoW = 0;
+  let srcPanoH = 0;
+  let out360ImgData = ctx360 ? ctx360.createImageData(480, 270) : null;
+  let timePlay360Timer = 0;
+  let timePlay360Mode = false;
+
+  function render360Projection() {
+    if (!ctx360 || !out360ImgData || !srcPanoData) return;
+    const W = 480;
+    const H = 270;
+    const out = out360ImgData.data;
+    const yawRad = (panoYawDeg * Math.PI) / 180;
+    const pitchRad = (panoPitchDeg * Math.PI) / 180;
+    const halfW = Math.tan(((panoFovDeg * 0.5) * Math.PI) / 180);
+    const halfH = halfW * (H / W);
+    const sinY = Math.sin(yawRad), cosY = Math.cos(yawRad);
+    const sinP = Math.sin(pitchRad), cosP = Math.cos(pitchRad);
+    const twoPiInv = 1 / (Math.PI * 2);
+    const piInv = 1 / Math.PI;
+
+    for (let y = 0; y < H; y++) {
+      const ny = (0.5 - y / H) * 2 * halfH;
+      for (let x = 0; x < W; x++) {
+        const nx = (x / W - 0.5) * 2 * halfW;
+        // Local ray (right=nx, up=ny, fwd=1) rotated by pitch then yaw
+        const dy = ny * cosP + sinP;
+        const dz0 = -ny * sinP + cosP;
+        const rx = nx * cosY + dz0 * sinY;
+        const rz = -nx * sinY + dz0 * cosY;
+        const ry = dy;
+        const rLen = Math.hypot(rx, ry, rz) || 1;
+        const theta = Math.atan2(rx, rz); // [-PI, PI] -> equirectangular X
+        const phi = Math.asin(Math.max(-1, Math.min(1, ry / rLen))); // [-PI/2, PI/2]
+        let u = (0.5 + theta * twoPiInv) * srcPanoW;
+        let v = (0.5 - phi * piInv) * srcPanoH;
+        const sx = ((Math.floor(u) % srcPanoW) + srcPanoW) % srcPanoW;
+        const sy = Math.max(0, Math.min(srcPanoH - 1, Math.floor(v)));
+        const sIdx = (sy * srcPanoW + sx) * 4;
+        const dIdx = (y * W + x) * 4;
+        out[dIdx] = srcPanoData[sIdx];
+        out[dIdx + 1] = srcPanoData[sIdx + 1];
+        out[dIdx + 2] = srcPanoData[sIdx + 2];
+        out[dIdx + 3] = 255;
+      }
+    }
+    ctx360.putImageData(out360ImgData, 0, 0);
+    const poseLbl = viewer360Win.body.querySelector('#pfl-360-pose-lbl');
+    if (poseLbl && active360Item) {
+      const wp = resolveSphereWorldPose(active360Item);
+      const compassHdg = (((Math.round(wp.heading + panoYawDeg) % 360) + 360) % 360);
+      poseLbl.textContent = `🧭 ${compassHdg}° · PITCH ${Math.round(panoPitchDeg)}° · FOV ${Math.round(panoFovDeg)}°`;
+    }
+  }
+
+  function loadEquirectangularSource(item, desiredCompassHeading = null) {
+    if (!item || !ctx360) return;
+    active360Item = item;
+    const wp = resolveSphereWorldPose(item);
+    panoYawDeg = desiredCompassHeading != null ? (((desiredCompassHeading - wp.heading + 540) % 360) - 180) : 0;
+    panoPitchDeg = 0;
+
+    const titleLbl = viewer360Win.body.querySelector('#pfl-360-title-lbl');
+    if (titleLbl) {
+      titleLbl.textContent = `${item.label} · 🕰️ ${item.capturedAt || item.era} · ${item.camera || '360°'}`;
+    }
+
+    // Show matching 2026 MLS room comparison PIP when available
+    const room = MLS_ROOMS.find((r) => r.id === item.roomId);
+    const code = room?.codes?.[0];
+    if (compareImgEl && compareTagEl) {
+      if (code) {
+        compareImgEl.src = `/palm-drive-mls/${code}.webp`;
+        compareImgEl.style.display = 'block';
+        compareTagEl.style.display = 'block';
+        compareTagEl.textContent = `2026 MLS · ${room.shortTag}`;
+      } else {
+        compareImgEl.style.display = 'none';
+        compareTagEl.style.display = 'none';
+      }
+    }
+
+    ctx360.fillStyle = '#090e1a';
+    ctx360.fillRect(0, 0, 480, 270);
+    ctx360.fillStyle = '#7dd3fc';
+    ctx360.font = '700 13px "JetBrains Mono", monospace';
+    ctx360.textAlign = 'center';
+    ctx360.fillText('Loading 5660×2830 360° sphere...', 240, 135);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (active360Item?.id !== item.id) return;
+      const off = document.createElement('canvas');
+      off.width = 1440;
+      off.height = 720;
+      const octx = off.getContext('2d');
+      octx.drawImage(img, 0, 0, 1440, 720);
+      const idata = octx.getImageData(0, 0, 1440, 720);
+      srcPanoData = idata.data;
+      srcPanoW = 1440;
+      srcPanoH = 720;
+      render360Projection();
+    };
+    img.onerror = () => {
+      if (active360Item?.id !== item.id) return;
+      ctx360.fillStyle = '#f87171';
+      ctx360.fillText('Failed to decode 360° image', 240, 135);
+    };
+    img.src = item.file || item.url;
+  }
+
+  let drag360Ptr = null;
+  canvas360?.addEventListener('pointerdown', (e) => {
+    drag360Ptr = { id: e.pointerId, x: e.clientX, y: e.clientY, yaw: panoYawDeg, pitch: panoPitchDeg };
+    canvas360.style.cursor = 'grabbing';
+    try { canvas360.setPointerCapture(e.pointerId); } catch {}
+  });
+  canvas360?.addEventListener('pointermove', (e) => {
+    if (!drag360Ptr || e.pointerId !== drag360Ptr.id) return;
+    const dx = e.clientX - drag360Ptr.x;
+    const dy = e.clientY - drag360Ptr.y;
+    panoYawDeg = drag360Ptr.yaw - dx * 0.28;
+    panoPitchDeg = Math.max(-72, Math.min(72, drag360Ptr.pitch + dy * 0.24));
+    render360Projection();
+  });
+  const end360Drag = () => {
+    drag360Ptr = null;
+    if (canvas360) canvas360.style.cursor = 'grab';
+  };
+  canvas360?.addEventListener('pointerup', end360Drag);
+  canvas360?.addEventListener('pointercancel', end360Drag);
+  canvas360?.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    panoFovDeg = Math.max(40, Math.min(125, panoFovDeg + Math.sign(e.deltaY) * 6));
+    render360Projection();
+  }, { passive: false });
+
+  viewer360Win.body.querySelectorAll('[data-pfl-360-fov]').forEach((b) => {
+    b.addEventListener('click', () => {
+      panoFovDeg = Number(b.getAttribute('data-pfl-360-fov')) || 95;
+      render360Projection();
+    });
+  });
+
+  function stop360TimePlay() {
+    timePlay360Mode = false;
+    clearInterval(timePlay360Timer);
+    const pb = viewer360Win.body.querySelector('#pfl-360-time-play');
+    if (pb) pb.textContent = '▶️ Play Over Time (2018 → 2026)';
+  }
+
+  open360ViewerModal = (item, desiredHeadingDeg = null, autoPlayTime = false) => {
+    const pool = allIndexed360Items();
+    const target = item || pool[9] || ALBUM_2018_ITEMS[9];
+    if (!target) return;
+    viewer360Win.box.style.display = 'flex';
+    viewer360Win.box.classList.remove('pfl-minimized');
+    const mb = viewer360Win.box.querySelector('[data-act="min"]');
+    if (mb) mb.textContent = '—';
+    viewer360Win.box.style.zIndex = '9790';
+    loadEquirectangularSource(target, desiredHeadingDeg);
+    if (autoPlayTime) {
+      timePlay360Mode = true;
+      clearInterval(timePlay360Timer);
+      const pb = viewer360Win.body.querySelector('#pfl-360-time-play');
+      if (pb) pb.textContent = '⏸ Pause Time Machine (2018 ↔ 2026)';
+      let tick = 0;
+      timePlay360Timer = window.setInterval(() => {
+        if (!timePlay360Mode) return;
+        tick++;
+        const curPool = allIndexed360Items();
+        if (!curPool.length) return;
+        // Alternate showing 2026 comparison PIP pulse & advancing along Paul's 2018 timeline!
+        if (compareImgEl && tick % 2 === 1 && compareImgEl.style.display === 'block') {
+          compareImgEl.style.width = '54%';
+        } else {
+          if (compareImgEl) compareImgEl.style.width = '36%';
+          const i = curPool.findIndex((x) => x.id === active360Item?.id);
+          const nxt = curPool[(i + 1) % curPool.length];
+          loadEquirectangularSource(nxt, desiredHeadingDeg);
+        }
+      }, 2400);
+    }
+  };
+  window.__pflOpen360Viewer = open360ViewerModal;
+
+  viewer360Win.body.querySelector('#pfl-360-close')?.addEventListener('click', () => {
+    stop360TimePlay();
+    viewer360Win.box.style.display = 'none';
+  });
+  viewer360Win.body.querySelector('#pfl-360-prev')?.addEventListener('click', () => {
+    stop360TimePlay();
+    const pool = allIndexed360Items();
+    const idx = pool.findIndex((x) => x.id === active360Item?.id);
+    if (pool.length) loadEquirectangularSource(pool[(idx - 1 + pool.length) % pool.length]);
+  });
+  viewer360Win.body.querySelector('#pfl-360-next')?.addEventListener('click', () => {
+    stop360TimePlay();
+    const pool = allIndexed360Items();
+    const idx = pool.findIndex((x) => x.id === active360Item?.id);
+    if (pool.length) loadEquirectangularSource(pool[(idx + 1) % pool.length]);
+  });
+  viewer360Win.body.querySelector('#pfl-360-time-play')?.addEventListener('click', () => {
+    if (timePlay360Mode) stop360TimePlay();
+    else open360ViewerModal(active360Item, null, true);
+  });
+  viewer360Win.body.querySelector('#pfl-360-align-cam')?.addEventListener('click', () => {
+    if (!active360Item || !viewer?.camera) return;
+    unlockDroneCamera();
+    enforceZeroAltitudeKickGuard();
+    const wp = resolveSphereWorldPose(active360Item);
+    const gAlt = resolveLocalGroundM(wp.lon, wp.lat);
+    const targetHeading = (((wp.heading + panoYawDeg) % 360) + 360) % 360;
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(wp.lon, wp.lat, gAlt + wp.altOff),
+      orientation: {
+        heading: Cesium.Math.toRadians(targetHeading),
+        pitch: Cesium.Math.toRadians(panoPitchDeg * 0.5),
+        roll: 0,
+      },
+      duration: 0.9,
+    });
+  });
+
+  function playTimeMachineAtCameraSpot() {
+    const c = viewer?.camera?.positionCartographic;
+    const pool = allIndexed360Items();
+    if (!pool.length) return;
+    if (!c) {
+      open360ViewerModal(pool[0], null, true);
+      return;
+    }
+    const camLat = Cesium.Math.toDegrees(c.latitude);
+    const camLon = Cesium.Math.toDegrees(c.longitude);
+    const camHdgDeg = ((Cesium.Math.toDegrees(viewer.camera.heading || 0) % 360) + 360) % 360;
+    const camAgl = c.height - resolveLocalGroundM(camLon, camLat);
+    let best = pool[0];
+    let bestScore = Infinity;
+    for (const s of pool) {
+      const wp = resolveSphereWorldPose(s);
+      const dHoriz = Math.hypot((wp.lat - camLat) * 111320, (wp.lon - camLon) * 97200);
+      const dVert = Math.abs(wp.altOff - Math.max(1.0, Math.min(8.0, camAgl)));
+      const score = dHoriz + dVert * 2.2;
+      if (score < bestScore) {
+        bestScore = score;
+        best = s;
+      }
+    }
+    const alignStatusEl = compassWin.body.querySelector('#pfl-photo-align-status');
+    if (alignStatusEl) {
+      alignStatusEl.textContent = `🕰️ Time Machine @ ${Math.round(bestScore)}m away: ${best.label} (${best.capturedAt})`;
+    }
+    open360ViewerModal(best, camHdgDeg, true);
+  }
+  window.__pflPlayTimeMachineSpot = playTimeMachineAtCameraSpot;
+
+  function buildPhotoAnchorsList() {
+    const out = MLS_ROOMS.map((r) => {
+      const rw = resolveMlsRoomWorld(r);
+      return { id: r.id, label: r.title, lat: rw.lat, lon: rw.lon, altOff: r.altOff, heading: rw.az };
+    });
+    for (const s of ALBUM_2018_ITEMS) {
+      const wp = resolveSphereWorldPose(s);
+      out.push({ id: s.id, label: s.label, lat: wp.lat, lon: wp.lon, altOff: wp.altOff, heading: wp.heading });
+    }
+    return out;
+  }
+
+  function addCustomAlignedPhotoToWorld(item) {
+    customPhotoItems.push(item);
+    if (item.is360) {
+      sync360SphereEntities();
+      return;
+    }
+    const pid = `pfl-custom-photo-${item.id}`;
+    viewer.entities.removeById(pid);
+    const wp = resolveSphereWorldPose(item);
+    const gAlt = resolveLocalGroundM(wp.lon, wp.lat);
+    const ent = viewer.entities.add({
+      id: pid,
+      name: `📷 ${item.label} (${item.mediaKind || '2D'})`,
+      position: Cesium.Cartesian3.fromDegrees(wp.lon, wp.lat, gAlt + (Number(item.altOff) || 1.8)),
+      orientation: Cesium.Transforms.headingPitchRollQuaternion(
+        Cesium.Cartesian3.fromDegrees(wp.lon, wp.lat, gAlt + (Number(item.altOff) || 1.8)),
+        new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(wp.heading || 14), 0, 0),
+      ),
+      billboard: {
+        image: item.url,
+        width: 140,
+        height: 92,
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 140),
+      },
+    });
+    customPhotoEntityIds.push(pid);
+    governorRequestRender('pfl-custom-photo-added');
+  }
+
+  const photoFileIn = compassWin.body.querySelector('#pfl-photo-file-input');
+  const photoDropBtn = compassWin.body.querySelector('#pfl-photo-drop-btn');
+  const photoStatusEl = compassWin.body.querySelector('#pfl-photo-align-status');
+  const eraSelEl = compassWin.body.querySelector('#pfl-era-select');
+  const orbsToggleBtn = compassWin.body.querySelector('#pfl-360-orbs-toggle');
+
+  photoDropBtn?.addEventListener('click', () => photoFileIn?.click());
+  photoFileIn?.addEventListener('change', async () => {
+    const files = Array.from(photoFileIn.files || []);
+    if (!files.length) return;
+    const anchors = buildPhotoAnchorsList();
+    let alignedCount = 0;
+    let lastAligned = null;
+    for (const file of files) {
+      try {
+        const buf = await file.arrayBuffer();
+        const url = URL.createObjectURL(file);
+        createdPhotoUrls.push(url);
+        const img = new Image();
+        await new Promise((res, rej) => {
+          img.onload = res;
+          img.onerror = rej;
+          img.src = url;
+        });
+        const meta = parsePhotoMetadata(buf, { width: img.naturalWidth, height: img.naturalHeight });
+        const vec = extractVisualVectorFromImage(img);
+        const corr = correlatePhotoToAnchors(vec, meta, anchors);
+        const item = {
+          id: `cust-${Date.now()}-${alignedCount}`,
+          label: file.name.replace(/\.[^.]+$/, '').slice(0, 28),
+          url,
+          file: url,
+          is360: meta.is360,
+          is3dStereo: meta.is3dStereo,
+          mediaKind: meta.mediaKind,
+          capturedAt: meta.dateTimeOriginal || new Date(file.lastModified || Date.now()).toISOString().slice(0, 19).replace('T', ' '),
+          era: (meta.dateTimeOriginal || '').startsWith('2018') ? ALBUM_2018_ERA : '2026',
+          camera: meta.model || meta.make || 'User Upload',
+          lat: corr.lat,
+          lon: corr.lon,
+          altOff: meta.is360 ? 1.85 : corr.altOff,
+          heading: corr.heading,
+          confidence: corr.confidence,
+          usedGps: corr.usedGps,
+          custom: true,
+        };
+        addCustomAlignedPhotoToWorld(item);
+        lastAligned = item;
+        alignedCount++;
+      } catch {}
+    }
+    photoFileIn.value = '';
+    if (photoStatusEl && lastAligned) {
+      photoStatusEl.textContent = `✅ Aligned ${alignedCount} ${lastAligned.mediaKind} · ${lastAligned.usedGps ? 'EXIF GPS' : 'Visual Vector'} (${Math.round(lastAligned.confidence * 100)}%) · ${lastAligned.capturedAt}`;
+    }
+    if (lastAligned?.is360) {
+      open360ViewerModal(lastAligned);
+    }
+  });
+
+  eraSelEl?.addEventListener('change', () => {
+    active4dEraFilter = eraSelEl.value || 'all';
+    sync360SphereEntities();
+    if (photoStatusEl) {
+      photoStatusEl.textContent = `🕰️ Era filter: ${active4dEraFilter} (${allIndexed360Items().length} spheres visible)`;
+    }
+  });
+  orbsToggleBtn?.addEventListener('click', () => {
+    orbs360Visible = !orbs360Visible;
+    orbsToggleBtn.textContent = orbs360Visible ? '🌐 360° Orbs: ON' : '🌐 360° Orbs: OFF';
+    orbsToggleBtn.style.borderColor = orbs360Visible ? '#38bdf8' : 'rgba(148,163,184,0.35)';
+    orbsToggleBtn.style.color = orbs360Visible ? '#7dd3fc' : '#94a3b8';
+    sync360SphereEntities();
+  });
+  compassWin.body.querySelector('#pfl-time-machine-spot-btn')?.addEventListener('click', () => {
+    playTimeMachineAtCameraSpot();
+  });
+  compassWin.body.querySelector('#pfl-photo-lock-btn')?.addEventListener('click', () => {
+    try {
+      const idxData = customPhotoItems.map(({ id, label, lat, lon, heading, altOff, mediaKind, capturedAt, era }) => ({
+        id, label, lat, lon, heading, altOff, mediaKind, capturedAt, era,
+      }));
+      localStorage.setItem(CUSTOM_PHOTO_INDEX_KEY, JSON.stringify(idxData));
+      if (photoStatusEl) photoStatusEl.textContent = `🔗 Indexed ${allIndexed360Items().length} spheres + ${idxData.length} custom photos locally.`;
+    } catch {}
+  });
+  sync360SphereEntities();
+
   const onDragShiftDown = (e) => { if (e.key === 'Shift') dragShiftHeld = true; };
   const onDragShiftUp = (e) => { if (e.key === 'Shift') dragShiftHeld = false; };
   const onDragShiftBlur = () => { dragShiftHeld = false; clearAllPadRepeats(); };
@@ -6521,6 +7276,7 @@ export function loadPflWindowFramework({ viewer }) {
       stopFlightPathPlay();
       unlockDroneCamera();
       stopMlsAutoTour();
+      stop360TimePlay();
       endDragMovableSession();
       endPanDragSession();
       clearAllPadRepeats();
@@ -6546,6 +7302,8 @@ export function loadPflWindowFramework({ viewer }) {
       try { viewer?.entities?.removeById?.(GIZMO_ENTITY_ID); } catch {}
       try { viewer?.entities?.removeById?.(BORDER_ENTITY_ID); viewer?.entities?.removeById?.(HOVER_ENTITY_ID); } catch {}
       try { for (const pid of mlsPinEntityIds) viewer?.entities?.removeById?.(pid); } catch {}
+      try { for (const sid of sphereEntityIds) viewer?.entities?.removeById?.(sid); } catch {}
+      try { for (const cid of customPhotoEntityIds) viewer?.entities?.removeById?.(cid); } catch {}
       try { for (const nid of navPinEntityIds) viewer?.entities?.removeById?.(nid); navPinEntityIds.clear(); } catch {}
       try { antiEjectionUnsub?.(); } catch {}
       try {
@@ -6567,6 +7325,7 @@ export function loadPflWindowFramework({ viewer }) {
       try { viewer.scene.primitives.remove(always3dHost); } catch {}
       cancelAnimationFrame(rafId);
       try { for (const u of createdGlbUrls) URL.revokeObjectURL(u); createdGlbUrls.length = 0; } catch {}
+      try { for (const u of createdPhotoUrls) URL.revokeObjectURL(u); createdPhotoUrls.length = 0; } catch {}
       pickHandler.destroy();
       for (const el of createdEls) el.remove();
     },
