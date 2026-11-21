@@ -38,6 +38,29 @@ export const FRONT_YARD = { lat: 29.2475, lon: -95.23145 };
 export const STORED_GROUND_HEIGHT_M = -26.19;
 export const PLACEMENT_LIFT_M = 0.8; // raised 2026-10-12 eve: rendered CWT mesh bulges ~0.5 m over the point sample at render LODs — Paul saw the figure sink on zoom-in at 0.3
 
+/** Return true when the viewer is explicitly configured with a flat WGS84 ellipsoid terrain. */
+export function isFlatEllipsoidGlobe(viewer) {
+  const tp = viewer?.terrainProvider ?? viewer?.scene?.terrainProvider;
+  return Boolean(
+    tp &&
+      typeof Cesium.EllipsoidTerrainProvider === 'function' &&
+      tp instanceof Cesium.EllipsoidTerrainProvider,
+  );
+}
+
+/** Resolve local terrain altitude in meters, avoiding bogus 0.0 m ellipsoid fallbacks while CWT tiles load. */
+export function resolveTerrainGroundM(viewer, lon, lat, fallbackM = STORED_GROUND_HEIGHT_M) {
+  if (viewer?.scene?.globe?.show) {
+    const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
+    if (isFlatEllipsoidGlobe(viewer)) {
+      return Number.isFinite(gh) ? gh : 0.0;
+    }
+    if (Number.isFinite(gh) && Math.abs(gh) > 0.05) return gh;
+    return fallbackM;
+  }
+  return fallbackM;
+}
+
 // Paul's front-yard Gaussian splat (built 2026-10-02 from his front two Wyze
 // cams). Self-hosted 3D Tiles (KHR_gaussian_splatting) — no ion upload needed.
 export const SPLAT_URL = '/splat/gaussians-yard/tileset.json';
@@ -119,11 +142,7 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
     }
   } catch {}
   const { lat, lon } = chairState;
-  let baseGrade = STORED_GROUND_HEIGHT_M;
-  if (viewer?.scene?.globe?.show) {
-    const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
-    baseGrade = Number.isFinite(gh) ? gh : 0.0;
-  }
+  const baseGrade = resolveTerrainGroundM(viewer, lon, lat, STORED_GROUND_HEIGHT_M);
   const groundHeight = baseGrade + PLACEMENT_LIFT_M + (chairState.lift || 0);
   console.info(
     `[PlacedObjects] front-yard ground height: ${groundHeight.toFixed(2)} m`,
@@ -257,39 +276,44 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
     console.warn('[PlacedObjects] splat failed to load:', err?.message || err);
   }
 
-  if (typeof window !== 'undefined') {
-    const recomputeChairPose = (patch) => {
-      Object.assign(chairState, patch);
-      try {
+  let destroyed = false;
+  let terrainRegroundTimer = null;
+  const terrainUnsubs = [];
+
+  const recomputeChairPose = (patch = {}) => {
+    Object.assign(chairState, patch);
+    try {
+      if (typeof localStorage !== 'undefined') {
         const all = JSON.parse(localStorage.getItem('pfl_custom_objects_v1') || '{}');
         all.chair = chairState;
         localStorage.setItem('pfl_custom_objects_v1', JSON.stringify(all));
-      } catch {}
-      const bg = viewer?.scene?.globe?.show
-        ? (viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(chairState.lon, chairState.lat)) || 0)
-        : STORED_GROUND_HEIGHT_M;
-      const gh = bg + PLACEMENT_LIFT_M + (chairState.lift || 0);
-      const gCart = Cesium.Cartesian3.fromDegrees(chairState.lon, chairState.lat, gh);
-      const cEnu = Cesium.Transforms.eastNorthUpToFixedFrame(gCart);
-      const rotZ = Cesium.Matrix4.fromRotationTranslation(
-        Cesium.Matrix3.fromRotationZ(-Cesium.Math.toRadians(chairState.heading || 0))
-      );
-      const mLocal = Cesium.Matrix4.multiply(
-        rotZ,
-        Cesium.Matrix4.multiply(lift, scale, new Cesium.Matrix4()),
-        new Cesium.Matrix4(),
-      );
-      if (chair && !chair.isDestroyed()) {
-        chair.modelMatrix = Cesium.Matrix4.multiply(cEnu, mLocal, new Cesium.Matrix4());
       }
-      if (billboards && !billboards.isDestroyed() && billboards.length >= 2) {
-        const sLon = chairState.lon + 1.5 / (111320 * Math.cos(Cesium.Math.toRadians(chairState.lat)));
-        const sEnu = Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.fromDegrees(sLon, chairState.lat, gh));
-        billboards.get(0).position = Cesium.Matrix4.multiplyByPoint(sEnu, new Cesium.Cartesian3(0, 0, postHeight / 2), new Cesium.Cartesian3());
-        billboards.get(1).position = Cesium.Matrix4.multiplyByPoint(sEnu, new Cesium.Cartesian3(0, 0, postHeight + 0.19), new Cesium.Cartesian3());
-      }
-      viewer?.scene?.requestRender?.();
-    };
+    } catch {}
+    const bg = resolveTerrainGroundM(viewer, chairState.lon, chairState.lat, STORED_GROUND_HEIGHT_M);
+    const gh = bg + PLACEMENT_LIFT_M + (chairState.lift || 0);
+    const gCart = Cesium.Cartesian3.fromDegrees(chairState.lon, chairState.lat, gh);
+    const cEnu = Cesium.Transforms.eastNorthUpToFixedFrame(gCart);
+    const rotZ = Cesium.Matrix4.fromRotationTranslation(
+      Cesium.Matrix3.fromRotationZ(-Cesium.Math.toRadians(chairState.heading || 0))
+    );
+    const mLocal = Cesium.Matrix4.multiply(
+      rotZ,
+      Cesium.Matrix4.multiply(lift, scale, new Cesium.Matrix4()),
+      new Cesium.Matrix4(),
+    );
+    if (chair && !chair.isDestroyed()) {
+      chair.modelMatrix = Cesium.Matrix4.multiply(cEnu, mLocal, new Cesium.Matrix4());
+    }
+    if (billboards && !billboards.isDestroyed() && billboards.length >= 2) {
+      const sLon = chairState.lon + 1.5 / (111320 * Math.cos(Cesium.Math.toRadians(chairState.lat)));
+      const sEnu = Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.fromDegrees(sLon, chairState.lat, gh));
+      billboards.get(0).position = Cesium.Matrix4.multiplyByPoint(sEnu, new Cesium.Cartesian3(0, 0, postHeight / 2), new Cesium.Cartesian3());
+      billboards.get(1).position = Cesium.Matrix4.multiplyByPoint(sEnu, new Cesium.Cartesian3(0, 0, postHeight + 0.19), new Cesium.Cartesian3());
+    }
+    viewer?.scene?.requestRender?.();
+  };
+
+  if (typeof window !== 'undefined') {
     window.__pflMovables = window.__pflMovables || {};
     window.__pflMovables.chair = {
       kind: 'chair',
@@ -300,7 +324,28 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
     };
   }
 
-  let destroyed = false;
+  let lastChairBaseGrade = baseGrade;
+  const scheduleChairReground = (force = false) => {
+    if (destroyed) return;
+    if (terrainRegroundTimer) clearTimeout(terrainRegroundTimer);
+    terrainRegroundTimer = setTimeout(() => {
+      terrainRegroundTimer = null;
+      if (destroyed) return;
+      const nextG = resolveTerrainGroundM(viewer, chairState.lon, chairState.lat, STORED_GROUND_HEIGHT_M);
+      if (!force && Math.abs(nextG - lastChairBaseGrade) <= 0.15) return;
+      lastChairBaseGrade = nextG;
+      recomputeChairPose({});
+    }, 220);
+  };
+  if (viewer?.scene?.terrainProviderChanged?.addEventListener) {
+    terrainUnsubs.push(viewer.scene.terrainProviderChanged.addEventListener(() => scheduleChairReground(true)));
+  }
+  if (viewer?.scene?.globe?.tileLoadProgressEvent?.addEventListener) {
+    terrainUnsubs.push(viewer.scene.globe.tileLoadProgressEvent.addEventListener((pending) => {
+      if (pending === 0) scheduleChairReground(false);
+    }));
+  }
+
   return {
     chair,
     billboards,
@@ -310,6 +355,11 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      if (terrainRegroundTimer) clearTimeout(terrainRegroundTimer);
+      for (const unsub of terrainUnsubs) {
+        try { if (typeof unsub === 'function') unsub(); } catch {}
+      }
+      terrainUnsubs.length = 0;
       if (chair && !chair.isDestroyed()) {
         if (!viewer.scene.primitives.remove(chair)) chair.destroy();
       }

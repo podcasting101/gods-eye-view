@@ -5,9 +5,10 @@ import {
   governorRequestRender,
 } from '../renderGovernor.js';
 import { activeYardDatumM } from './yardFrames.js';
+import { resolveTerrainGroundM } from './placedObjects.js';
 import { createSexWorldDemoTour } from './sexWorldDemoTour.js';
 
-const STORAGE_KEY = 'pfl_gev_windows_v4';
+const STORAGE_KEY = 'pfl_gev_windows_v5';
 const IS_LOCAL_NODE = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
 
 function loadSavedLayout() {
@@ -61,6 +62,14 @@ export function loadPflWindowFramework({ viewer }) {
       min-height: 34px !important;
       resize: none !important;
     }
+    @media (max-width: 1180px) {
+      .pfl-std-box.pfl-minimized {
+        max-width: 248px !important;
+      }
+      #pfl-win-command-dock.pfl-minimized {
+        max-width: calc(100vw - 16px) !important;
+      }
+    }
     .pfl-std-hdr {
       display: flex;
       align-items: center;
@@ -76,6 +85,12 @@ export function loadPflWindowFramework({ viewer }) {
       font-weight: 700;
       color: #38bdf8;
       letter-spacing: 0.04em;
+    }
+    .pfl-std-hdr > span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
     }
     .pfl-std-hdr:active { cursor: grabbing; }
     .pfl-std-ctrls { display: flex; align-items: center; gap: 4px; }
@@ -276,9 +291,9 @@ export function loadPflWindowFramework({ viewer }) {
     const vh = window.innerHeight || 900;
     const dockSlots = {
       'pfl-win-command-dock': { left: 8, top: 6, minimize: true },
-      'pfl-win-wyze-patrol': { left: 12, top: Math.max(240, vh - 118), minimize: true },
-      'pfl-win-kalshi-arena': { left: 12, top: Math.max(200, vh - 158), minimize: true },
-      'pfl-win-local-vault': { left: Math.min(390, Math.max(12, vw - 480)), top: Math.max(240, vh - 118), minimize: true },
+      'pfl-win-wyze-patrol': { left: 8, top: Math.max(240, vh - 86), minimize: true },
+      'pfl-win-kalshi-arena': { left: 8, top: Math.max(200, vh - 124), minimize: true },
+      'pfl-win-local-vault': { left: Math.min(390, Math.max(8, vw - 480)), top: Math.max(240, vh - 86), minimize: true },
     };
     const boxes = [...document.querySelectorAll('.pfl-std-box')];
     for (const box of boxes) {
@@ -388,14 +403,7 @@ export function loadPflWindowFramework({ viewer }) {
     function flyBalconyFront() {
       unlockDroneCamera();
       try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
-      let base = 0;
-      try {
-        if (viewer.scene?.globe?.show === false) base = -26.19;
-        else {
-          const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(-95.23136, 29.24764));
-          if (Number.isFinite(h)) base = h;
-        }
-      } catch {}
+      const base = resolveLocalGroundM(-95.23136, 29.24764);
       // Paul's 2nd-story Balcony vantage looking SSW (198°) across the stitched Front Yard (Cam1+V4), Neighbor's House & Horizon!
       viewer.camera.flyTo({
         destination: Cesium.Cartesian3.fromDegrees(-95.23134, 29.24782, base + 22.0),
@@ -410,14 +418,7 @@ export function loadPflWindowFramework({ viewer }) {
     function flyBackyard180() {
       unlockDroneCamera();
       try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
-      let base = 0;
-      try {
-        if (viewer.scene?.globe?.show === false) base = -26.19;
-        else {
-          const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(-95.231385, 29.24764));
-          if (Number.isFinite(h)) base = h;
-        }
-      } catch {}
+      const base = resolveLocalGroundM(-95.231385, 29.24764);
       // 180° flip over the house roof looking 7.5° NNE through the two 3D Live Oak trees onto the Boat Dock & Chocolate Bayou!
       viewer.camera.flyTo({
         destination: Cesium.Cartesian3.fromDegrees(-95.23141, 29.24748, base + 14.5),
@@ -542,7 +543,7 @@ export function loadPflWindowFramework({ viewer }) {
     id: 'pfl-win-3d-compass-inspector',
     title: 'PFL 3D COMPASS, DRONE ORBIT, LENS & PADS',
     defaultLeft: Math.max(20, window.innerWidth - 296),
-    defaultTop: 344,
+    defaultTop: 222,
     defaultWidth: 280,
     defaultMinimized: true,
   });
@@ -583,15 +584,24 @@ export function loadPflWindowFramework({ viewer }) {
         <div id="pfl-sel-name" style="color:#4ade80;margin-bottom:4px;font-size:10px">Click 3D avatar/chair/photo or chip above</div>
         <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px">
           <button type="button" class="pfl-std-cbtn" id="pfl-drag-place-btn" title="When ON, click anywhere on the ground/roof to place selected object there!">✋ Click-to-Place: OFF</button>
-          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="0,0.6">⬆️N</button>
-          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="0,-0.6">⬇️S</button>
-          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="-0.6,0">⬅️W</button>
-          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="0.6,0">➡️E</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-drag-speed-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Slow down mouse object dragging for precision placement (hold Shift for 0.10× ultra-fine)">🐢 Drag: Fine (0.30×)</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-nudge-step-btn" title="Cycle N/S/E/W step size (0.1m / 0.25m / 1.0m)">📏 Step: 0.25m</button>
+        </div>
+        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px">
+          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="0,1">⬆️N</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="0,-1">⬇️S</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="-1,0">⬅️W</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="1,0">➡️E</button>
         </div>
         <label style="display:flex;justify-content:space-between"><span>Heading (°)</span><span id="pfl-hdg-val">154°</span></label>
         <input type="range" id="pfl-hdg-slider" min="0" max="360" step="1" value="154" style="width:100%" />
-        <label style="display:flex;justify-content:space-between;margin-top:4px"><span>Height / Lift (m)</span><span id="pfl-alt-val">0.0m</span></label>
-        <input type="range" id="pfl-alt-slider" min="-5" max="18" step="0.25" value="0" style="width:100%" />
+        <label style="display:flex;justify-content:space-between;margin-top:4px"><span>Height / Lift (m)</span><span id="pfl-alt-val">0.00m</span></label>
+        <input type="range" id="pfl-alt-slider" min="-35" max="35" step="0.1" value="0" style="width:100%" title="Manual vertical height override (-35 m to +35 m)" />
+        <div style="display:flex;gap:3px;flex-wrap:wrap;margin:2px 0 4px">
+          <button type="button" class="pfl-std-cbtn" data-pfl-lift-delta="-0.25" title="Lower selected object by 0.25 m">⬇️ -0.25m</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-lift-zero-btn" style="border-color:#22c55e;color:#4ade80" title="Reset Height / Lift override to 0.00 m ground">🎯 Ground (0m)</button>
+          <button type="button" class="pfl-std-cbtn" data-pfl-lift-delta="0.25" title="Raise selected object by 0.25 m">⬆️ +0.25m</button>
+        </div>
         <label style="display:flex;justify-content:space-between;margin-top:4px"><span>📐 Size / Scale</span><span id="pfl-scale-val">1.00×</span></label>
         <input type="range" id="pfl-scale-slider" min="0.4" max="2.5" step="0.05" value="1" style="width:100%;accent-color:#fbbf24" title="Resize the selected photo / 3D model (0.4× – 2.5×)" />
         <div id="pfl-hotspot-actions" style="display:none;gap:3px;flex-wrap:wrap;margin-top:6px;padding:5px;border:1px solid rgba(250,204,21,0.6);border-radius:7px;background:rgba(250,204,21,0.08)">
@@ -610,6 +620,14 @@ export function loadPflWindowFramework({ viewer }) {
   let clickToPlaceMode = false;
   let houseDragLocked = true;
   let panDragMode = true;
+  let dragSpeedIdx = 0;
+  let nudgeStepIdx = 1;
+  let dragShiftHeld = false;
+  const padRepeatIntervals = new Set();
+  const clearAllPadRepeats = () => {
+    for (const tid of padRepeatIntervals) clearInterval(tid);
+    padRepeatIntervals.clear();
+  };
   let buildYard3dLandmarks = () => {};
   const HOUSE_DEFAULT_POSE = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0, scale: 1 };
   const MONACO_DEFAULT_POSE = { lat: 29.247510, lon: -95.231268, heading: 175, lift: 0 };
@@ -933,11 +951,14 @@ export function loadPflWindowFramework({ viewer }) {
 
   // Helper to resolve the ONE yard datum shared with yardFrames.js so photos, 3D House, Monaco, pads & AGL all agree
   function resolveLocalGroundM(lonDeg = -95.23144, latDeg = 29.24750) {
+    const nearLiverpool = Math.hypot(Number(latDeg) - 29.24755, Number(lonDeg) - -95.23140) < 0.08;
     try {
-      const d = activeYardDatumM(viewer, lonDeg, latDeg);
+      const d = nearLiverpool
+        ? activeYardDatumM(viewer, lonDeg, latDeg)
+        : resolveTerrainGroundM(viewer, lonDeg, latDeg, 0.0);
       if (Number.isFinite(d)) return d;
     } catch {}
-    return -26.19;
+    return nearLiverpool ? -26.19 : 0.0;
   }
 
   // 1S788 Holodeck Hallway Portal Window (:8766 Stargate Room Map & Launchpad — 100% CSP-Clean Native DOM)
@@ -1529,10 +1550,35 @@ export function loadPflWindowFramework({ viewer }) {
     placeBtn.style.borderColor = clickToPlaceMode ? '#facc15' : '';
   });
 
+  const DRAG_SPEED_PRESETS = [
+    { mult: 0.30, label: '🐢 Drag: Fine (0.30×)' },
+    { mult: 0.55, label: '🚶 Drag: Med (0.55×)' },
+    { mult: 1.0, label: '🐇 Drag: Fast (1.0×)' },
+  ];
+  const NUDGE_STEP_PRESETS = [0.1, 0.25, 1.0];
+
+  const dragSpeedBtn = compassWin.body.querySelector('#pfl-drag-speed-btn');
+  dragSpeedBtn?.addEventListener('click', () => {
+    dragSpeedIdx = (dragSpeedIdx + 1) % DRAG_SPEED_PRESETS.length;
+    const p = DRAG_SPEED_PRESETS[dragSpeedIdx];
+    dragSpeedBtn.textContent = p.label;
+    dragSpeedBtn.style.borderColor = dragSpeedIdx === 0 ? '#38bdf8' : dragSpeedIdx === 1 ? '#facc15' : '#f43f5e';
+    dragSpeedBtn.style.color = dragSpeedIdx === 0 ? '#7dd3fc' : dragSpeedIdx === 1 ? '#fde047' : '#fda4af';
+  });
+
+  const nudgeStepBtn = compassWin.body.querySelector('#pfl-nudge-step-btn');
+  nudgeStepBtn?.addEventListener('click', () => {
+    nudgeStepIdx = (nudgeStepIdx + 1) % NUDGE_STEP_PRESETS.length;
+    nudgeStepBtn.textContent = `📏 Step: ${NUDGE_STEP_PRESETS[nudgeStepIdx]}m`;
+  });
+
   compassWin.body.querySelectorAll('[data-pfl-obj-nudge]').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (!activeMovable) return;
-      const [dE, dN] = btn.getAttribute('data-pfl-obj-nudge').split(',').map(Number);
+      const stepM = NUDGE_STEP_PRESETS[nudgeStepIdx] || 0.25;
+      const [dirE, dirN] = btn.getAttribute('data-pfl-obj-nudge').split(',').map(Number);
+      const dE = dirE * stepM;
+      const dN = dirN * stepM;
       const st = activeMovable.getState();
       const newLat = st.lat + dN / 111320;
       const newLon = st.lon + dE / (111320 * Math.cos(Cesium.Math.toRadians(st.lat)));
@@ -2028,14 +2074,15 @@ export function loadPflWindowFramework({ viewer }) {
       try {
         let deltaX = 0;
         let deltaY = 0;
+        const dragMult = dragShiftHeld ? 0.10 : (DRAG_SPEED_PRESETS[dragSpeedIdx]?.mult ?? 0.30);
         if (sess.useRayDelta) {
           const curHit = computeDampedEnuRayPoint(pos, sess.invEnu);
           if (!curHit) return;
-          deltaX = curHit.x - sess.grabLocalX;
-          deltaY = curHit.y - sess.grabLocalY;
+          deltaX = (curHit.x - sess.grabLocalX) * dragMult;
+          deltaY = (curHit.y - sess.grabLocalY) * dragMult;
         } else {
-          const rightM = dx * sess.metersPerPx;
-          const fwdM = -dy * sess.metersPerPx * 1.35;
+          const rightM = dx * sess.metersPerPx * dragMult;
+          const fwdM = -dy * sess.metersPerPx * dragMult;
           deltaX = sess.camRightX * rightM + sess.camFwdX * fwdM;
           deltaY = sess.camRightY * rightM + sess.camFwdY * fwdM;
         }
@@ -2134,14 +2181,32 @@ export function loadPflWindowFramework({ viewer }) {
     syncActiveMovableGizmo();
   });
 
-  compassWin.body.querySelector('#pfl-alt-slider')?.addEventListener('input', (e) => {
-    const v = Number(e.target.value);
-    compassWin.body.querySelector('#pfl-alt-val').textContent = `${v.toFixed(2)}m`;
-    activeMovable?.update({ lift: v });
+  const applyActiveLift = (nextLift) => {
+    if (!activeMovable) return;
+    const clamped = Math.max(-35, Math.min(35, Math.round(Number(nextLift || 0) * 20) / 20));
+    const sl = compassWin.body.querySelector('#pfl-alt-slider');
+    const vl = compassWin.body.querySelector('#pfl-alt-val');
+    if (sl) sl.value = String(clamped);
+    if (vl) vl.textContent = `${clamped.toFixed(2)}m`;
+    activeMovable.update({ lift: clamped });
     syncActiveMovableGizmo();
-    if (droneOrbitState.active && activeMovable?.kind === droneOrbitState.targetKey) {
+    if (droneOrbitState.active && activeMovable.kind === droneOrbitState.targetKey) {
       applyDroneOrbit();
     }
+  };
+
+  compassWin.body.querySelector('#pfl-alt-slider')?.addEventListener('input', (e) => {
+    applyActiveLift(Number(e.target.value));
+  });
+  compassWin.body.querySelectorAll('[data-pfl-lift-delta]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!activeMovable) return;
+      const cur = Number(activeMovable.getState()?.lift || 0);
+      applyActiveLift(cur + Number(btn.getAttribute('data-pfl-lift-delta') || 0));
+    });
+  });
+  compassWin.body.querySelector('#pfl-lift-zero-btn')?.addEventListener('click', () => {
+    applyActiveLift(0);
   });
 
   compassWin.body.querySelector('#pfl-scale-slider')?.addEventListener('input', (e) => {
@@ -2820,34 +2885,34 @@ export function loadPflWindowFramework({ viewer }) {
     }
   }
 
-  // Add Street-Level Walk + Look/Turn + Vertical Elevator + Save/Undo Spot cleanly at TOP of 3D Compass Box:
+  // Add LiveWire 3D Walk Pad layout (matching LiveWire splat_stage.html 4x2 grid) inside 3D Compass Box:
   const walkBar = document.createElement('div');
-  walkBar.style.cssText = 'margin-top:4px;padding:6px;border:1px solid rgba(56,189,248,0.28);border-radius:7px;background:rgba(15,23,42,0.55);display:flex;flex-direction:column;gap:4px';
+  walkBar.style.cssText = 'margin-top:4px;padding:6px;border:1px solid rgba(56,189,248,0.32);border-radius:8px;background:rgba(15,23,42,0.68);display:flex;flex-direction:column;gap:5px';
   walkBar.innerHTML = `
-    <div style="color:#38bdf8;font-weight:700;font-size:10.5px">🚶 Street-Level Walk &amp; Change View:</div>
-    <div style="display:flex;gap:3px;flex-wrap:wrap">
-      <button type="button" class="pfl-std-cbtn" data-pfl-step="fwd">⬆️ Fwd</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-step="back">⬇️ Back</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-step="left">⬅️ Left</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-step="right">➡️ Right</button>
-      <button type="button" class="pfl-std-cbtn" id="pfl-wasd-toggle" title="Walk horizontally with W/A/S/D keys, Q/E for height">🚶 WASD: OFF</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+      <span style="color:#38bdf8;font-weight:700;font-size:10.5px;letter-spacing:0.04em">🧭 3D WALK PAD</span>
+      <button type="button" class="pfl-std-cbtn" id="pfl-wasd-toggle" style="font-size:9.5px;padding:2px 6px" title="Walk horizontally with W/A/S/D keys, Q/E for height">⌨️ WASD: OFF</button>
     </div>
-    <div style="display:flex;gap:3px;flex-wrap:wrap">
-      <button type="button" class="pfl-std-cbtn" data-pfl-look="left" title="Turn view 15° left in place">↶ Turn L</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-look="right" title="Turn view 15° right in place">↷ Turn R</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-look="up" title="Pitch view up 10°">🔼 Look Up</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-look="down" title="Pitch view down 10°">🔽 Look Dn</button>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
+      <button type="button" class="pfl-std-cbtn" data-pfl-look="left" style="min-height:30px;font-size:12px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Turn view 15° left in place">⟲L</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="fwd" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Walk forward">▲</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-look="right" style="min-height:30px;font-size:12px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Turn view 15° right in place">⟳R</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-elev="+2" style="min-height:30px;font-size:12px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Raise camera straight UP +2m without moving forward/back">⬆U</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="left" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Strafe left">◀</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="back" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Walk backward">▼</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="right" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Strafe right">▶</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-elev="-2" style="min-height:30px;font-size:12px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Lower camera straight DOWN -2m without pushing through photos">⬇D</button>
     </div>
-    <div style="display:flex;gap:3px;flex-wrap:wrap">
-      <button type="button" class="pfl-std-cbtn" data-pfl-elev="+2" title="Raise camera straight UP +2m without moving forward/back">⬆️ Up +2m</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-elev="-2" title="Lower camera straight DOWN -2m without pushing through photos">⬇️ Dn -2m</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-elev="eye" title="Drop straight to 1.8m walking eye level at this exact spot">👁️ Eye 1.8m</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-elev="balcony" title="Set height to 6.2m balcony level">🏠 6.2m</button>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">
+      <button type="button" class="pfl-std-cbtn" data-pfl-look="up" style="font-size:10px;padding:3px 2px" title="Pitch view up 10°">🔼 Up</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-look="down" style="font-size:10px;padding:3px 2px" title="Pitch view down 10°">🔽 Dn</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-elev="eye" style="font-size:10px;padding:3px 2px" title="Drop straight to 1.8m walking eye level at this exact spot">👁️ 1.8m</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-elev="balcony" style="font-size:10px;padding:3px 2px" title="Set height to 6.2m balcony level">🏠 6.2m</button>
     </div>
-    <div style="display:flex;gap:3px;flex-wrap:wrap">
-      <button type="button" class="pfl-std-cbtn" id="pfl-save-spot" title="Bookmark this exact camera position &amp; angle">📌 Save Spot</button>
-      <button type="button" class="pfl-std-cbtn" id="pfl-go-spot" title="Return to your saved spot">🎯 Go Spot</button>
-      <button type="button" class="pfl-std-cbtn" id="pfl-undo-jump" title="Undo accidental sky ejection">⏪ Undo Jump</button>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">
+      <button type="button" class="pfl-std-cbtn" id="pfl-save-spot" style="font-size:10px" title="Bookmark this exact camera position &amp; angle">📌 Save</button>
+      <button type="button" class="pfl-std-cbtn" id="pfl-go-spot" style="font-size:10px" title="Return to your saved spot">🎯 Go</button>
+      <button type="button" class="pfl-std-cbtn" id="pfl-undo-jump" style="font-size:10px" title="Undo accidental sky ejection">⏪ Undo</button>
     </div>
     <div id="pfl-walk-hint" style="display:none;font-size:9.5px;color:#4ade80;font-family:'JetBrains Mono',monospace">WASD active: W/A/S/D walk · Q/E height</div>
   `;
@@ -2871,64 +2936,101 @@ export function loadPflWindowFramework({ viewer }) {
     governorRequestRender('pfl-walk-step');
   }
 
-  walkBar.querySelectorAll('[data-pfl-elev]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      unlockDroneCamera();
-      const c = viewer.camera.positionCartographic;
-      if (!c) return;
-      enforceZeroAltitudeKickGuard();
-      const mode = btn.getAttribute('data-pfl-elev');
-      let gBase = 0;
-      try {
-        if (viewer.scene?.globe?.show !== false) {
-          const gh = viewer.scene.globe.getHeight(c);
-          if (Number.isFinite(gh)) gBase = gh;
-        } else {
-          gBase = -26.19;
-        }
-      } catch {}
-      const nextH =
-        mode === 'eye' ? gBase + 1.8 :
-        mode === 'balcony' ? gBase + 6.2 :
-        Math.max(gBase + 0.4, c.height + Number(mode));
-      viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, nextH),
-        orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
-      });
-      governorRequestRender('pfl-elev-step');
+  function applyElevationMode(mode) {
+    unlockDroneCamera();
+    const c = viewer.camera.positionCartographic;
+    if (!c) return;
+    enforceZeroAltitudeKickGuard();
+    const gBase = resolveLocalGroundM(Cesium.Math.toDegrees(c.longitude), Cesium.Math.toDegrees(c.latitude));
+    const nextH =
+      mode === 'eye' ? gBase + 1.8 :
+      mode === 'balcony' ? gBase + 6.2 :
+      Math.max(gBase + 0.4, c.height + Number(mode));
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, nextH),
+      orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
     });
+    governorRequestRender('pfl-elev-step');
+  }
+
+  function applyWalkStepDir(dir) {
+    if (dir === 'fwd') stepHorizontal(2.5, 0);
+    else if (dir === 'back') stepHorizontal(-2.5, 0);
+    else if (dir === 'left') stepHorizontal(0, -2.5);
+    else if (dir === 'right') stepHorizontal(0, 2.5);
+  }
+
+  function applyLookDir(dir) {
+    if (!viewer?.camera) return;
+    unlockDroneCamera();
+    const curH = viewer.camera.heading || 0;
+    const curP = viewer.camera.pitch || -0.35;
+    const nextH = dir === 'left' ? curH - Cesium.Math.toRadians(15)
+      : dir === 'right' ? curH + Cesium.Math.toRadians(15)
+      : curH;
+    const nextP = dir === 'up' ? Math.min(Cesium.Math.toRadians(15), curP + Cesium.Math.toRadians(10))
+      : dir === 'down' ? Math.max(Cesium.Math.toRadians(-89), curP - Cesium.Math.toRadians(10))
+      : curP;
+    viewer.camera.setView({
+      destination: viewer.camera.positionWC.clone(),
+      orientation: { heading: nextH, pitch: nextP, roll: 0 },
+    });
+    paintGlobe();
+    governorRequestRender('pfl-look-step');
+  }
+
+  function attachPadRepeat(btn, actionFn) {
+    let tid = 0;
+    let skipNextClick = false;
+    const stop = () => {
+      if (tid) {
+        clearInterval(tid);
+        padRepeatIntervals.delete(tid);
+        tid = 0;
+      }
+    };
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      stop();
+      skipNextClick = true;
+      actionFn();
+      tid = setInterval(actionFn, 160);
+      padRepeatIntervals.add(tid);
+    });
+    btn.addEventListener('pointerup', stop);
+    btn.addEventListener('pointercancel', stop);
+    btn.addEventListener('pointerleave', stop);
+    btn.addEventListener('blur', stop);
+    btn.addEventListener('click', () => {
+      if (skipNextClick) {
+        skipNextClick = false;
+        return;
+      }
+      actionFn();
+    });
+  }
+
+  walkBar.querySelectorAll('[data-pfl-elev]').forEach((btn) => {
+    const mode = btn.getAttribute('data-pfl-elev');
+    if (mode === '+2' || mode === '-2') {
+      attachPadRepeat(btn, () => applyElevationMode(mode));
+    } else {
+      btn.addEventListener('click', () => applyElevationMode(mode));
+    }
   });
 
   walkBar.querySelectorAll('[data-pfl-step]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const dir = btn.getAttribute('data-pfl-step');
-      if (dir === 'fwd') stepHorizontal(2.5, 0);
-      else if (dir === 'back') stepHorizontal(-2.5, 0);
-      else if (dir === 'left') stepHorizontal(0, -2.5);
-      else if (dir === 'right') stepHorizontal(0, 2.5);
-    });
+    const dir = btn.getAttribute('data-pfl-step');
+    attachPadRepeat(btn, () => applyWalkStepDir(dir));
   });
 
   walkBar.querySelectorAll('[data-pfl-look]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      if (!viewer?.camera) return;
-      unlockDroneCamera();
-      const dir = btn.getAttribute('data-pfl-look');
-      const curH = viewer.camera.heading || 0;
-      const curP = viewer.camera.pitch || -0.35;
-      const nextH = dir === 'left' ? curH - Cesium.Math.toRadians(15)
-        : dir === 'right' ? curH + Cesium.Math.toRadians(15)
-        : curH;
-      const nextP = dir === 'up' ? Math.min(Cesium.Math.toRadians(15), curP + Cesium.Math.toRadians(10))
-        : dir === 'down' ? Math.max(Cesium.Math.toRadians(-89), curP - Cesium.Math.toRadians(10))
-        : curP;
-      viewer.camera.setView({
-        destination: viewer.camera.positionWC.clone(),
-        orientation: { heading: nextH, pitch: nextP, roll: 0 },
-      });
-      paintGlobe();
-      governorRequestRender('pfl-look-step');
-    });
+    const dir = btn.getAttribute('data-pfl-look');
+    if (dir === 'left' || dir === 'right') {
+      attachPadRepeat(btn, () => applyLookDir(dir));
+    } else {
+      btn.addEventListener('click', () => applyLookDir(dir));
+    }
   });
 
   let wasdWalkOn = false;
@@ -2936,7 +3038,7 @@ export function loadPflWindowFramework({ viewer }) {
   const walkHintEl = walkBar.querySelector('#pfl-walk-hint');
   wasdBtn?.addEventListener('click', () => {
     wasdWalkOn = !wasdWalkOn;
-    wasdBtn.textContent = wasdWalkOn ? '🚶 WASD: ON' : '🚶 WASD: OFF';
+    wasdBtn.textContent = wasdWalkOn ? '⌨️ WASD: ON' : '⌨️ WASD: OFF';
     wasdBtn.style.borderColor = wasdWalkOn ? '#4ade80' : '';
     if (walkHintEl) walkHintEl.style.display = wasdWalkOn ? 'block' : 'none';
   });
@@ -2949,8 +3051,8 @@ export function loadPflWindowFramework({ viewer }) {
     else if (k === 's') { e.preventDefault(); stepHorizontal(-2.0, 0); }
     else if (k === 'a') { e.preventDefault(); stepHorizontal(0, -2.0); }
     else if (k === 'd') { e.preventDefault(); stepHorizontal(0, 2.0); }
-    else if (k === 'e') { e.preventDefault(); walkBar.querySelector('[data-pfl-elev="+2"]')?.click(); }
-    else if (k === 'q') { e.preventDefault(); walkBar.querySelector('[data-pfl-elev="-2"]')?.click(); }
+    else if (k === 'e') { e.preventDefault(); applyElevationMode('+2'); }
+    else if (k === 'q') { e.preventDefault(); applyElevationMode('-2'); }
   };
   window.addEventListener('keydown', wasdKeydownHandler);
 
@@ -2962,13 +3064,14 @@ export function loadPflWindowFramework({ viewer }) {
       lon: c.longitude, lat: c.latitude, height: c.height,
       heading: viewer.camera.heading, pitch: viewer.camera.pitch,
     }));
-    e.currentTarget.textContent = '✅ Saved!';
-    setTimeout(() => { e.currentTarget.textContent = '📌 Save Spot'; }, 1200);
+    const targetBtn = e.currentTarget;
+    targetBtn.textContent = '✅ Saved!';
+    setTimeout(() => { targetBtn.textContent = '📌 Save'; }, 1200);
   });
   walkBar.querySelector('#pfl-go-spot')?.addEventListener('click', () => {
     try {
       unlockDroneCamera();
-      const gDatum = viewer?.scene?.globe?.show !== false ? 0 : -24.8;
+      const gDatum = resolveLocalGroundM(-95.23125, 29.24782);
       const sp = JSON.parse(localStorage.getItem(SAVED_SPOT_KEY) || 'null') || {
         lon: Cesium.Math.toRadians(-95.23125),
         lat: Cesium.Math.toRadians(29.24782),
@@ -3005,8 +3108,8 @@ export function loadPflWindowFramework({ viewer }) {
   const kalshiWin = createStandardBox({
     id: 'pfl-win-kalshi-arena',
     title: '📈 KALSHI WEATHER & MACRO PAPER ARENA ($100 LIVE SEATS)',
-    defaultLeft: 12,
-    defaultTop: Math.max(200, (window.innerHeight || 900) - 158),
+    defaultLeft: 8,
+    defaultTop: Math.max(200, (window.innerHeight || 900) - 124),
     defaultWidth: 365,
     defaultMinimized: true,
   });
@@ -3249,8 +3352,8 @@ export function loadPflWindowFramework({ viewer }) {
   const vaultWin = createStandardBox({
     id: 'pfl-win-local-vault',
     title: '🏛️ LOCAL MEMORY PALACE, UPLOADED SPLATS & WYZE CAMERAS',
-    defaultLeft: Math.min(390, Math.max(12, (window.innerWidth || 1440) - 480)),
-    defaultTop: Math.max(240, (window.innerHeight || 900) - 118),
+    defaultLeft: Math.min(390, Math.max(8, (window.innerWidth || 1440) - 480)),
+    defaultTop: Math.max(240, (window.innerHeight || 900) - 86),
     defaultWidth: 460,
   });
   vaultWin.box.style.display = 'none';
@@ -3341,8 +3444,8 @@ export function loadPflWindowFramework({ viewer }) {
   const patrolWin = createStandardBox({
     id: 'pfl-win-wyze-patrol',
     title: '🎥 PFL LIVE WYZE VIDEO PATROL & MOTION EVENTS',
-    defaultLeft: 12,
-    defaultTop: Math.max(240, (window.innerHeight || 900) - 118),
+    defaultLeft: 8,
+    defaultTop: Math.max(240, (window.innerHeight || 900) - 86),
     defaultWidth: 365,
     defaultMinimized: true,
   });
@@ -3809,13 +3912,7 @@ export function loadPflWindowFramework({ viewer }) {
     for (const id of yardLandmarkIds) viewer.entities.removeById(id);
     yardLandmarkIds.length = 0;
 
-    let gBase = -26.19;
-    try {
-      if (viewer.scene?.globe?.show !== false) {
-        const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(-95.23138, 29.24768));
-        if (Number.isFinite(h)) gBase = h;
-      }
-    } catch {}
+    const gBase = resolveLocalGroundM(-95.23138, 29.24768);
 
     const oaks = [
       // West Live Oak (left trunk in Cam2 view, framing the left edge of dock & water)
@@ -3897,13 +3994,7 @@ export function loadPflWindowFramework({ viewer }) {
     pctx.arc(128, 128, 72, 0, Math.PI * 2);
     pctx.stroke();
 
-    let portalGround = gBase;
-    try {
-      if (viewer.scene?.globe?.show !== false) {
-        const ph = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(-95.231435, 29.247518));
-        if (Number.isFinite(ph)) portalGround = ph;
-      }
-    } catch {}
+    const portalGround = resolveLocalGroundM(-95.231435, 29.247518);
     const makeWorldTagCanvas = (text, borderHex, fgHex) => {
       const c = document.createElement('canvas');
       c.width = 320;
@@ -4247,7 +4338,7 @@ export function loadPflWindowFramework({ viewer }) {
           (savedHouse.lat - DEFAULT_HOUSE_STATE.lat) * 111320,
           (savedHouse.lon - DEFAULT_HOUSE_STATE.lon) * 97200,
         );
-        const safeLift = Math.abs(Number(savedHouse.lift || 0)) <= 4.5 ? Number(savedHouse.lift || 0) : 0;
+        const safeLift = Math.abs(Number(savedHouse.lift || 0)) <= 35 ? Number(savedHouse.lift || 0) : 0;
         if (driftM <= 32) {
           houseState = { ...houseState, ...savedHouse, lift: safeLift };
         }
@@ -4342,9 +4433,30 @@ export function loadPflWindowFramework({ viewer }) {
     }
   }
   buildYard3dLandmarks();
-  const onMapOrTilesSettled = () => setTimeout(buildYard3dLandmarks, 400);
+  let lastGroundedDatumM = resolveLocalGroundM(-95.23138, 29.24768);
+  let terrainSyncTimer = null;
+  const scheduleTerrainReground = (force = false, delayMs = 220) => {
+    if (terrainSyncTimer) clearTimeout(terrainSyncTimer);
+    terrainSyncTimer = setTimeout(() => {
+      terrainSyncTimer = null;
+      const nextDatum = resolveLocalGroundM(-95.23138, 29.24768);
+      if (!force && Math.abs(nextDatum - lastGroundedDatumM) <= 0.15) return;
+      lastGroundedDatumM = nextDatum;
+      try { buildYard3dLandmarks(); } catch {}
+      try { window.__pflMovables?.lisa?.update?.({}); } catch {}
+      try { window.__pflMovables?.chair?.update?.({}); } catch {}
+      try { syncActiveMovableGizmo(); } catch {}
+    }, delayMs);
+  };
+  const onMapOrTilesSettled = () => scheduleTerrainReground(true, 350);
   window.addEventListener('gev:map-stack-changed', onMapOrTilesSettled);
   window.addEventListener('gev:google3d-settled', onMapOrTilesSettled);
+  const terrainProviderUnsub = viewer?.scene?.terrainProviderChanged?.addEventListener?.(() => {
+    scheduleTerrainReground(true, 200);
+  }) || null;
+  const globeTileProgressUnsub = viewer?.scene?.globe?.tileLoadProgressEvent?.addEventListener?.((pending) => {
+    if (pending === 0) scheduleTerrainReground(false, 220);
+  }) || null;
 
   playPatrolStream('wyze-cam-v4', 'Wyze Cam V4 (Front Yard & Driveway)');
   refreshWyzePatrol(false);
@@ -4468,13 +4580,7 @@ export function loadPflWindowFramework({ viewer }) {
   viewer.scene.primitives.add(always3dHost);
 
   function computePflQuadPose(cam) {
-    let gBase = -26.19;
-    try {
-      if (viewer.scene?.globe?.show !== false) {
-        const h = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(cam.lon, cam.lat));
-        if (Number.isFinite(h)) gBase = h;
-      }
-    } catch {}
+    const gBase = resolveLocalGroundM(cam.lon, cam.lat);
     const R = cam.rangeM;
     const pitch = Cesium.Math.toRadians(cam.pitchDeg);
     const hFov = Cesium.Math.toRadians(cam.fovDeg);
@@ -5364,12 +5470,23 @@ export function loadPflWindowFramework({ viewer }) {
     if (vhfWin.box.style.display !== 'none') syncMarineVhfLayerBadges();
   }, 1500);
 
+  const onDragShiftDown = (e) => { if (e.key === 'Shift') dragShiftHeld = true; };
+  const onDragShiftUp = (e) => { if (e.key === 'Shift') dragShiftHeld = false; };
+  const onDragShiftBlur = () => { dragShiftHeld = false; clearAllPadRepeats(); };
+  window.addEventListener('keydown', onDragShiftDown);
+  window.addEventListener('keyup', onDragShiftUp);
+  window.addEventListener('blur', onDragShiftBlur);
+
   return {
     destroy() {
       unlockDroneCamera();
       stopMlsAutoTour();
       endDragMovableSession();
       endPanDragSession();
+      clearAllPadRepeats();
+      if (terrainSyncTimer) clearTimeout(terrainSyncTimer);
+      try { if (typeof terrainProviderUnsub === 'function') terrainProviderUnsub(); } catch {}
+      try { if (typeof globeTileProgressUnsub === 'function') globeTileProgressUnsub(); } catch {}
       sexWorldDemo.destroy();
       clearInterval(timer);
       clearInterval(kalshiPoll);
@@ -5379,6 +5496,9 @@ export function loadPflWindowFramework({ viewer }) {
       clearInterval(alarmPollTimer);
       clearInterval(vhfBadgeTimer);
       window.removeEventListener('keydown', wasdKeydownHandler);
+      window.removeEventListener('keydown', onDragShiftDown);
+      window.removeEventListener('keyup', onDragShiftUp);
+      window.removeEventListener('blur', onDragShiftBlur);
       window.removeEventListener('gev:search-pin', onGevSearchPin);
       window.removeEventListener('gev:map-stack-changed', onMapOrTilesSettled);
       window.removeEventListener('gev:google3d-settled', onMapOrTilesSettled);

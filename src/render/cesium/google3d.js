@@ -112,7 +112,9 @@ export function configureAndGuardGoogleTileset(tileset) {
   try { tileset.maximumScreenSpaceError = 16; } catch {}
   try { tileset.loadSiblings = false; } catch {}
   try { tileset.preferLeaves = false; } catch {}
-  try { tileset.foveatedScreenSpaceError = false; } catch {}
+  try { tileset.foveatedScreenSpaceError = true; } catch {}
+  try { tileset.foveatedConeSize = 0.25; } catch {}
+  try { tileset.foveatedTimeDelay = 0.1; } catch {}
   try { tileset.preloadFlightDestinations = true; } catch {}
 
   if (tileset._pflStreamGuarded) return tileset;

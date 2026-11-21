@@ -21,7 +21,7 @@ import {
   spawnNeighborPosition,
   stepNeo4jForceSimulation,
 } from './neo4jForceGraph.js';
-import { STORED_GROUND_HEIGHT_M } from './placedObjects.js';
+import { STORED_GROUND_HEIGHT_M, isFlatEllipsoidGlobe } from './placedObjects.js';
 
 /**
  * Canonical 5 Top-Level PFL / Neo4j Qualifiers from `public.entity_taxonomy` (level = 0).
@@ -1736,8 +1736,18 @@ export async function loadNeo4jPersonalLayer({
   function resolveClusterAlt(cluster, rawAlt) {
     if (cluster.id === 'starbase') return rawAlt;
     if (viewer?.scene?.globe && viewer.scene.globe.show !== false) {
-      const datumShift = cluster.id === 'birdpond' ? 16.0 : -STORED_GROUND_HEIGHT_M;
-      return rawAlt + datumShift;
+      if (isFlatEllipsoidGlobe(viewer)) {
+        const datumShift = cluster.id === 'birdpond' ? 16.0 : -STORED_GROUND_HEIGHT_M;
+        return rawAlt + datumShift;
+      }
+      const refNode = cluster.nodes?.[0];
+      if (refNode && Number.isFinite(refNode.lon) && Number.isFinite(refNode.lat)) {
+        const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(refNode.lon, refNode.lat));
+        if (Number.isFinite(gh) && Math.abs(gh) > 0.05) {
+          const refBase = cluster.id === 'birdpond' ? -16.0 : STORED_GROUND_HEIGHT_M;
+          return rawAlt + (gh - refBase);
+        }
+      }
     }
     return rawAlt;
   }
@@ -2002,7 +2012,7 @@ export async function loadNeo4jPersonalLayer({
               Cesium.Cartesian3.fromDegrees(
                 (a.lon + b.lon) * 0.5,
                 (a.lat + b.lat) * 0.5,
-                (a.alt + b.alt) * 0.5,
+                resolveClusterAlt(cluster, (a.alt + b.alt) * 0.5),
               ),
             false,
           );

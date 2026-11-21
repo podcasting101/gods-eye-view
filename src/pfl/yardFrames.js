@@ -1,5 +1,5 @@
 import * as Cesium from 'cesium';
-import { STORED_GROUND_HEIGHT_M } from './placedObjects.js';
+import { STORED_GROUND_HEIGHT_M, resolveTerrainGroundM } from './placedObjects.js';
 import {
   holdContinuousRender,
   releaseContinuousRender,
@@ -397,8 +397,7 @@ function loadSavedLayout() {
 export function activeYardDatumM(viewer, lon, lat) {
   if (!viewer) return STORED_GROUND_HEIGHT_M;
   if (viewer?.scene?.globe?.show) {
-    const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
-    return Number.isFinite(gh) ? gh : 0.0;
+    return resolveTerrainGroundM(viewer, lon, lat, STORED_GROUND_HEIGHT_M);
   }
   try {
     const sh = viewer?.scene?.sampleHeight?.(Cesium.Cartographic.fromDegrees(lon, lat));
@@ -724,6 +723,7 @@ function saveLayout() {
 }
 
 let viewTiltUnsub = null;
+let yardDatumCleanup = null;
 
 /**
  * Frustum-true v2 renderer. Saved Arrange-mode params merge over the built-in values.
@@ -852,13 +852,43 @@ export function loadYardFrames({ viewer }) {
   }
   viewer.creditDisplay.addStaticCredit(FRAME_CREDIT);
   installArrangeToggle(viewer);
-  if (typeof window !== 'undefined') {
-    const onStack = () => {
-      setTimeout(() => {
+  {
+    let lastYardDatumM = activeYardDatumM(viewer, -95.23144, 29.24752);
+    let datumTimer = null;
+    const unsubs = [];
+    const scheduleRebuildAll = (force = false) => {
+      if (datumTimer) clearTimeout(datumTimer);
+      datumTimer = setTimeout(() => {
+        datumTimer = null;
+        const nextDatumM = activeYardDatumM(viewer, -95.23144, 29.24752);
+        if (!force && Math.abs(nextDatumM - lastYardDatumM) <= 0.15) return;
+        lastYardDatumM = nextDatumM;
         for (const id of frameState.keys()) rebuildFrame(viewer, id);
-      }, 350);
+      }, 250);
     };
-    window.addEventListener('gev:map-stack-changed', onStack);
+    const onStack = () => scheduleRebuildAll(true);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('gev:map-stack-changed', onStack);
+      window.addEventListener('gev:google3d-settled', onStack);
+    }
+    if (viewer?.scene?.terrainProviderChanged?.addEventListener) {
+      unsubs.push(viewer.scene.terrainProviderChanged.addEventListener(() => scheduleRebuildAll(true)));
+    }
+    if (viewer?.scene?.globe?.tileLoadProgressEvent?.addEventListener) {
+      unsubs.push(viewer.scene.globe.tileLoadProgressEvent.addEventListener((pending) => {
+        if (pending === 0) scheduleRebuildAll(false);
+      }));
+    }
+    yardDatumCleanup = () => {
+      if (datumTimer) clearTimeout(datumTimer);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('gev:map-stack-changed', onStack);
+        window.removeEventListener('gev:google3d-settled', onStack);
+      }
+      for (const u of unsubs) {
+        try { if (typeof u === 'function') u(); } catch {}
+      }
+    };
   }
   return {
     entities: viewer.entities,
@@ -868,6 +898,12 @@ export function loadYardFrames({ viewer }) {
 
 /** Remove every yard-frame entity and editor surface owned by this module. */
 export function destroyYardFrames(viewer) {
+  if (typeof yardDatumCleanup === 'function') {
+    try {
+      yardDatumCleanup();
+    } catch {}
+    yardDatumCleanup = null;
+  }
   if (typeof viewTiltUnsub === 'function') {
     try {
       viewTiltUnsub();

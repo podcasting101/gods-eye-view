@@ -4,6 +4,7 @@ import {
   loadPlacedObjects,
   PLACEMENT_LIFT_M,
   STORED_GROUND_HEIGHT_M,
+  resolveTerrainGroundM,
 } from './placedObjects.js';
 import { loadYardFrames } from './yardFrames.js';
 import { loadBrazoriaCadPlugin } from './brazoriaCadPlugin.js';
@@ -32,13 +33,12 @@ export function sovereignAnchorHeight() {
 }
 
 function resolveAnchorGroundM(viewer) {
-  if (viewer?.scene?.globe?.show) {
-    const gh = viewer.scene.globe.getHeight(
-      Cesium.Cartographic.fromDegrees(SOVEREIGN_ANCHOR.longitude, SOVEREIGN_ANCHOR.latitude),
-    );
-    return Number.isFinite(gh) ? gh : 0.0;
-  }
-  return STORED_GROUND_HEIGHT_M;
+  return resolveTerrainGroundM(
+    viewer,
+    SOVEREIGN_ANCHOR.longitude,
+    SOVEREIGN_ANCHOR.latitude,
+    STORED_GROUND_HEIGHT_M,
+  );
 }
 
 const CUSTOM_OBJ_KEY = 'pfl_custom_objects_v1';
@@ -68,9 +68,7 @@ function addSovereignAnchor(viewer) {
     lift: 0,
   });
   const applyEntityPose = (ent) => {
-    const gM = viewer?.scene?.globe?.show
-      ? (viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(state.lon, state.lat)) || 0)
-      : STORED_GROUND_HEIGHT_M;
+    const gM = resolveTerrainGroundM(viewer, state.lon, state.lat, STORED_GROUND_HEIGHT_M);
     const pos = Cesium.Cartesian3.fromDegrees(
       state.lon,
       state.lat,
@@ -98,8 +96,9 @@ function addSovereignAnchor(viewer) {
       heightReference: Cesium.HeightReference.NONE,
       minimumPixelSize: 0,
       maximumScale: 50,
-      lightColor: new Cesium.Color(4.8, 4.4, 3.9, 1.0),
-      imageBasedLightingFactor: new Cesium.Cartesian2(1.0, 1.0),
+      lightColor: new Cesium.Color(6.2, 5.8, 5.4, 1.0),
+      imageBasedLightingFactor: new Cesium.Cartesian2(1.4, 1.4),
+      shadows: Cesium.ShadowMode.DISABLED,
       silhouetteColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.28),
       silhouetteSize: 1.0,
     },
@@ -163,9 +162,17 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
   let polymarket = null;
   let winFramework = null;
   let destroyed = false;
+  let lisaSyncTimer = null;
+  let lisaSyncCleanup = null;
   const destroy = () => {
     if (destroyed) return;
     destroyed = true;
+    if (lisaSyncTimer) {
+      clearTimeout(lisaSyncTimer);
+      lisaSyncTimer = null;
+    }
+    try { lisaSyncCleanup?.(); } catch {}
+    lisaSyncCleanup = null;
     winFramework?.destroy?.();
     polymarket?.destroy?.();
     starship?.destroy?.();
@@ -182,14 +189,57 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
   try {
     try {
       anchor = addSovereignAnchor(viewer);
-      if (typeof window !== 'undefined' && anchor) {
-        window.addEventListener('gev:map-stack-changed', () => {
-          setTimeout(() => {
+      if (anchor) {
+        const anchorSt = anchor._pflMovable?.getState?.() || {};
+        let lastLisaGroundM = resolveTerrainGroundM(
+          viewer,
+          anchorSt.lon ?? SOVEREIGN_ANCHOR.longitude,
+          anchorSt.lat ?? SOVEREIGN_ANCHOR.latitude,
+          STORED_GROUND_HEIGHT_M,
+        );
+        const scheduleLisaDatumSync = (force = false, delayMs = 220) => {
+          if (destroyed || !anchor) return;
+          if (lisaSyncTimer) clearTimeout(lisaSyncTimer);
+          lisaSyncTimer = setTimeout(() => {
+            lisaSyncTimer = null;
             if (!anchor || destroyed) return;
+            const stNow = anchor._pflMovable?.getState?.() || {};
+            const nextG = resolveTerrainGroundM(
+              viewer,
+              stNow.lon ?? SOVEREIGN_ANCHOR.longitude,
+              stNow.lat ?? SOVEREIGN_ANCHOR.latitude,
+              STORED_GROUND_HEIGHT_M,
+            );
+            if (!force && Math.abs(nextG - lastLisaGroundM) <= 0.15) return;
+            lastLisaGroundM = nextG;
             anchor._pflMovable?.update({});
             governorRequestRender('lisa-muse-datum-sync');
-          }, 400);
-        });
+          }, delayMs);
+        };
+        const onMapStackSync = () => scheduleLisaDatumSync(true, 350);
+        const onGoogle3dSettledSync = () => scheduleLisaDatumSync(true, 250);
+        const terrainUnsubs = [];
+        if (typeof window !== 'undefined') {
+          window.addEventListener('gev:map-stack-changed', onMapStackSync);
+          window.addEventListener('gev:google3d-settled', onGoogle3dSettledSync);
+        }
+        if (viewer?.scene?.terrainProviderChanged?.addEventListener) {
+          terrainUnsubs.push(viewer.scene.terrainProviderChanged.addEventListener(() => scheduleLisaDatumSync(true, 200)));
+        }
+        if (viewer?.scene?.globe?.tileLoadProgressEvent?.addEventListener) {
+          terrainUnsubs.push(viewer.scene.globe.tileLoadProgressEvent.addEventListener((pending) => {
+            if (pending === 0) scheduleLisaDatumSync(false, 200);
+          }));
+        }
+        lisaSyncCleanup = () => {
+          if (typeof window !== 'undefined') {
+            window.removeEventListener('gev:map-stack-changed', onMapStackSync);
+            window.removeEventListener('gev:google3d-settled', onGoogle3dSettledSync);
+          }
+          for (const unsub of terrainUnsubs) {
+            try { if (typeof unsub === 'function') unsub(); } catch {}
+          }
+        };
       }
     } catch (error) {
       rethrowAbort(signal, error);
