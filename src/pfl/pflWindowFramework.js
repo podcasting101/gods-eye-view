@@ -638,58 +638,53 @@ export function loadPflWindowFramework({ viewer }) {
       </div>
       <div id="pfl-dual-pads-grid">
         <div id="pfl-camera-pad-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
-            <span style="color:#38bdf8;font-weight:700;font-size:10.5px;letter-spacing:0.03em">🧭 CAMERA &amp; WALK</span>
-            <span style="font-size:9px;color:#94a3b8">N/S/E/W/UP</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;min-height:24px">
+            <span style="color:#38bdf8;font-weight:700;font-size:10.5px;letter-spacing:0.03em">🧭 CAMERA</span>
+            <button type="button" class="pfl-std-cbtn" id="pfl-wasd-toggle" style="font-size:9.5px;padding:2px 6px" title="Walk horizontally with W/A/S/D keys, Q/E for height">⌨️ WASD: OFF</button>
           </div>
+          <div style="height:18px;line-height:18px;font-size:9.5px;color:#7dd3fc;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Orbit Ball · Click Axis</div>
           <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
             <canvas id="pfl-axis-globe" width="136" height="136" style="cursor:grab;touch-action:none;border-radius:50%" title="Drag anywhere on ball to orbit/tilt camera, or click N/S/E/W/UP"></canvas>
-            <div style="font-size:8.5px;color:#94a3b8;text-align:center">Orbit Ball · Click Axis</div>
+            <div style="font-size:8.5px;color:#94a3b8;text-align:center;line-height:1.25">N/S/E/W/UP Orbit</div>
           </div>
           <div id="pfl-walk-nav-slot" style="min-width:0"></div>
         </div>
         <div id="pfl-object-pad-card" style="border:1px solid rgba(251,191,36,0.38);background:rgba(15,23,42,0.72)">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap">
-            <span style="color:#fbbf24;font-weight:700;font-size:10.5px;letter-spacing:0.03em">🎯 OBJECT PAD</span>
-            <button type="button" class="pfl-std-cbtn" id="pfl-publish-layout-btn" style="font-size:9.5px;padding:2px 6px;border-color:#22c55e;color:#4ade80" title="Publish current House, Monaco RV, Lisa, Chair positions to Sex-World.ai for all visitors (Admin Only)">💾 Save Site</button>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;min-height:24px">
+            <span style="color:#fbbf24;font-weight:700;font-size:10.5px;letter-spacing:0.03em">🎯 OBJECT</span>
+            <div style="display:flex;align-items:center;gap:3px">
+              <a id="pfl-obj-login-link" href="https://sex-world.ai/wp-login.php" class="pfl-std-cbtn" style="display:none;font-size:9.5px;padding:2px 6px;border-color:#f59e0b;color:#fde047;text-decoration:none" title="Admin login to edit shared scene objects">🔐 Login</a>
+              <button type="button" class="pfl-std-cbtn" id="pfl-publish-layout-btn" style="font-size:9.5px;padding:2px 6px;border-color:#22c55e;color:#4ade80" title="Publish current scene layout to Sex-World.ai for all visitors (Admin Only)">💾 Save</button>
+            </div>
           </div>
-          <div id="pfl-obj-rbac-banner" style="font-size:9.5px;line-height:1.3;padding:3px 5px;border-radius:5px;border:1px solid rgba(56,189,248,0.35);background:rgba(15,23,42,0.85);color:#7dd3fc">Role: Admin (Edit &amp; Publish Enabled)</div>
-          <div id="pfl-obj-chips-row" style="display:flex;gap:3px;flex-wrap:wrap">
-            <button type="button" class="pfl-std-cbtn" data-pfl-pick="lisa" title="Select Lisa Muse avatar">👑 Lisa</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-pick="chair" title="Select Wooden Chair &amp; Sign">🪑 Chair</button>
-            <button type="button" class="pfl-std-cbtn" id="pfl-pick-house" data-pfl-pick="house" title="Select 3D 417 Palm Drive Yellow House">🏠 House</button>
-            <button type="button" class="pfl-std-cbtn" id="pfl-pick-monaco" data-pfl-pick="monaco" title="Select 3D Monaco 40ft Coach RV">🚌 Monaco</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-pick="bed-station-20261012" title="Select Paul &amp; Lisa Bed Photo">🛏️ Bed</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-pick="garage-carport-20261117" title="Select Garage Carport Photo">🚗 Garage</button>
-          </div>
-          <div id="pfl-sel-name" style="color:#4ade80;font-size:9.5px;line-height:1.25">Click 3D object/photo or chip above</div>
+          <div id="pfl-sel-name" style="height:18px;line-height:18px;color:#4ade80;font-size:9.5px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🗺️ Map (Click any object)</div>
           <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
             <canvas id="pfl-obj-move-ball" width="128" height="128" style="cursor:grab;touch-action:none;border-radius:50%" title="Drag inner puck to slide object on ground (relative to view); drag outer cyan ring to spin heading 0°–360°"></canvas>
-            <div style="font-size:8.5px;color:#94a3b8;text-align:center">Inner: Drag XY · Outer Ring: Spin 360°</div>
+            <div style="font-size:8.5px;color:#94a3b8;text-align:center;line-height:1.25">XY Move · Outer Ring Spin</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="-15" style="min-height:30px;font-size:11px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Rotate selected object -15° CCW">⟲ L</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="0,1" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object away from camera">▲</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="15" style="min-height:30px;font-size:11px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Rotate selected object +15° CW">⟳ R</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-lift-delta="0.25" style="min-height:30px;font-size:11px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Raise selected object +0.25m">⬆ Up</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="-1,0" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object screen-left">◀</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="0,-1" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object toward camera">▼</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="1,0" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object screen-right">▶</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-lift-delta="-0.25" style="min-height:30px;font-size:11px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Lower selected object -0.25m">⬇ Dn</button>
           </div>
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">
-            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="-15" style="min-height:28px;font-size:10.5px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Rotate selected object -15° CCW">⟲15</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="0,1" style="min-height:28px;font-size:12px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object away from camera">▲</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="15" style="min-height:28px;font-size:10.5px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Rotate selected object +15° CW">⟳15</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-lift-delta="0.25" style="min-height:28px;font-size:10.5px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Raise selected object +0.25m">⬆.25</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="-1,0" style="min-height:28px;font-size:12px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object screen-left">◀</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="0,-1" style="min-height:28px;font-size:12px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object toward camera">▼</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="1,0" style="min-height:28px;font-size:12px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object screen-right">▶</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-lift-delta="-0.25" style="min-height:28px;font-size:10.5px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Lower selected object -0.25m">⬇.25</button>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">
-            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="-5" title="Fine rotate -5° CCW">↺5°</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="5" title="Fine rotate +5° CW">↻5°</button>
-            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="90" title="Rotate +90°">🔄90°</button>
-            <button type="button" class="pfl-std-cbtn" id="pfl-lift-zero-btn" style="border-color:#22c55e;color:#4ade80" title="Reset Height / Lift override to 0.00m ground">🎯0m</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="-5" style="font-size:10px;padding:3px 2px" title="Fine rotate -5° CCW">↺5°</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="5" style="font-size:10px;padding:3px 2px" title="Fine rotate +5° CW">↻5°</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="90" style="font-size:10px;padding:3px 2px" title="Rotate +90°">🔄90°</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-lift-zero-btn" style="font-size:10px;padding:3px 2px;border-color:#22c55e;color:#4ade80" title="Reset Height / Lift override to 0.00m ground">🎯0m</button>
           </div>
           <div style="display:flex;gap:3px;flex-wrap:wrap">
+            <button type="button" class="pfl-std-cbtn" id="pfl-reset-selected-btn" style="border-color:#fbbf24;color:#fde047" title="Reset just the currently selected object back to where it was before you moved it">↺ Reset</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-lock-house-btn" style="border-color:#22c55e;color:#4ade80" title="Lock 417 Palm Dr House against accidental mouse drags">🔒 House</button>
-            <button type="button" class="pfl-std-cbtn" id="pfl-reset-house-btn" title="Snap 417 Palm Dr House back to surveyed lot coordinates">↺ House</button>
-            <button type="button" class="pfl-std-cbtn" id="pfl-reset-all-objects-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Reset House, Monaco RV, Lisa, Chair &amp; Yard Photos back to surveyed positions">↺ All</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-drag-place-btn" title="When ON, click anywhere on ground/roof to drop object">✋ Drop</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-nudge-step-btn" title="Cycle move step size (0.1m / 0.25m / 1.0m)">📏 .25m</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-drag-speed-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Cycle mouse drag sensitivity">🐢 0.30×</button>
-            <button type="button" class="pfl-std-cbtn" id="pfl-nudge-step-btn" title="Cycle step size (0.1m / 0.25m / 1.0m)">📏 .25m</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-reset-all-objects-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Reset House, Monaco RV, Lisa, Chair &amp; Yard Photos back to surveyed positions">↺ All</button>
           </div>
           <label style="display:flex;justify-content:space-between;font-size:10px"><span>Heading (°)</span><span id="pfl-hdg-val">154°</span></label>
           <input type="range" id="pfl-hdg-slider" min="0" max="360" step="1" value="154" style="width:100%" />
@@ -1087,6 +1082,7 @@ export function loadPflWindowFramework({ viewer }) {
     const pill = document.getElementById('pfl-rbac-pill');
     const authLink = document.getElementById('pfl-portal-auth-link');
     const pubBtn = compassWin.body.querySelector('#pfl-publish-layout-btn');
+    const objLoginLink = compassWin.body.querySelector('#pfl-obj-login-link');
     const banner = compassWin.body.querySelector('#pfl-obj-rbac-banner');
     const loginHref = `https://sex-world.ai/wp-login.php?redirect_to=${encodeURIComponent(window.location.href || 'https://sex-world.ai/gods-eye-view/')}`;
 
@@ -1123,6 +1119,10 @@ export function loadPflWindowFramework({ viewer }) {
     if (pubBtn) {
       pubBtn.style.display = canEdit ? 'inline-block' : 'none';
     }
+    if (objLoginLink) {
+      objLoginLink.href = loginHref;
+      objLoginLink.style.display = canEdit ? 'none' : 'inline-block';
+    }
     if (banner) {
       if (canEdit) {
         banner.innerHTML = IS_LOCAL_NODE
@@ -1142,10 +1142,13 @@ export function loadPflWindowFramework({ viewer }) {
   }
 
   function flashRbacLockBanner() {
-    const banner = compassWin.body.querySelector('#pfl-obj-rbac-banner');
-    if (!banner) return;
-    banner.style.boxShadow = '0 0 0 2px #f59e0b';
-    setTimeout(() => { banner.style.boxShadow = ''; }, 900);
+    const target =
+      compassWin.body.querySelector('#pfl-obj-rbac-banner') ||
+      compassWin.body.querySelector('#pfl-obj-login-link') ||
+      compassWin.body.querySelector('#pfl-sel-name');
+    if (!target) return;
+    target.style.boxShadow = '0 0 0 2px #f59e0b';
+    setTimeout(() => { target.style.boxShadow = ''; }, 900);
   }
 
   const SCENE_LAYOUT_TS_KEY = 'pfl_scene_layout_synced_ts_v1';
@@ -1199,8 +1202,8 @@ export function loadPflWindowFramework({ viewer }) {
     }
     if (IS_LOCAL_NODE) {
       if (btnEl) {
-        btnEl.textContent = '✅ Local Saved';
-        setTimeout(() => { btnEl.textContent = '💾 Save Site'; }, 1400);
+        btnEl.textContent = '✅ Saved!';
+        setTimeout(() => { btnEl.textContent = '💾 Save'; }, 1400);
       }
       return;
     }
@@ -1221,18 +1224,18 @@ export function loadPflWindowFramework({ viewer }) {
         try { localStorage.setItem(SCENE_LAYOUT_TS_KEY, String(data.layout?.updatedAtMs || Date.now())); } catch {}
         if (btnEl) {
           btnEl.textContent = '✅ Published!';
-          setTimeout(() => { btnEl.textContent = '💾 Save Site'; }, 1600);
+          setTimeout(() => { btnEl.textContent = '💾 Save'; }, 1600);
         }
       } else {
         if (btnEl) {
           btnEl.textContent = `❌ ${res.status || 'Err'}`;
-          setTimeout(() => { btnEl.textContent = '💾 Save Site'; }, 1800);
+          setTimeout(() => { btnEl.textContent = '💾 Save'; }, 1800);
         }
       }
     } catch {
       if (btnEl) {
         btnEl.textContent = '❌ Net Err';
-        setTimeout(() => { btnEl.textContent = '💾 Save Site'; }, 1800);
+        setTimeout(() => { btnEl.textContent = '💾 Save'; }, 1800);
       }
     }
   }
@@ -1862,7 +1865,7 @@ export function loadPflWindowFramework({ viewer }) {
     }
     const selEl = compassWin.body.querySelector('#pfl-sel-name');
     if (selEl) {
-      selEl.textContent = `✅ Selected: ${mov.label} (${hdg}°)`;
+      selEl.textContent = `${mov.label} · ${hdg}°`;
       selEl.style.color = '#fde047';
     }
     const orbSelBtn = compassWin.body.querySelector('#pfl-drone-orbit-selected');
@@ -1918,8 +1921,17 @@ export function loadPflWindowFramework({ viewer }) {
     applyActiveObjectPatch({ heading: next });
   }
 
+  let selectedInitialPose = null;
   function bindMovable(mov) {
     if (!mov) return;
+    if (mov !== activeMovable) {
+      try {
+        const st = mov.getState?.();
+        selectedInitialPose = st ? { ...st } : null;
+      } catch {
+        selectedInitialPose = null;
+      }
+    }
     activeMovable = mov;
     syncObjectSliders(mov);
     const bar = compassWin.body.querySelector('#pfl-hotspot-actions');
@@ -1931,17 +1943,45 @@ export function loadPflWindowFramework({ viewer }) {
 
   function clearActiveMovableSelection() {
     activeMovable = null;
+    selectedInitialPose = null;
     for (const id of [GIZMO_ENTITY_ID, BORDER_ENTITY_ID]) {
       try { viewer.entities.removeById(id); } catch {}
     }
     const bar = compassWin.body.querySelector('#pfl-hotspot-actions');
     if (bar) bar.style.display = 'none';
-    compassWin.body.querySelector('#pfl-sel-name').textContent = 'Click 3D object/photo or chip above';
+    const selEl = compassWin.body.querySelector('#pfl-sel-name');
+    if (selEl) {
+      selEl.textContent = '🗺️ Map (Click any object)';
+      selEl.style.color = '#4ade80';
+    }
     const orbSelBtn = compassWin.body.querySelector('#pfl-drone-orbit-selected');
     if (orbSelBtn) orbSelBtn.textContent = '🎯 Orbit Selected';
     paintObjMoveBall();
     governorRequestRender('pfl-movable-clear');
   }
+
+  compassWin.body.querySelector('#pfl-reset-selected-btn')?.addEventListener('click', () => {
+    if (!activeMovable) return;
+    if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
+    const k = String(activeMovable.kind || '');
+    const SURVEY_DEFAULTS = {
+      house: { ...HOUSE_DEFAULT_POSE },
+      monaco: { ...MONACO_DEFAULT_POSE },
+      lisa: { lat: 29.247436, lon: -95.231445, heading: 192, lift: 0, scale: 1, opacity: 1 },
+      chair: { lat: 29.247434, lon: -95.231426, heading: 192, lift: 0, scale: 1, opacity: 1 },
+    };
+    const cur = activeMovable.getState?.() || {};
+    const snapDiffers =
+      selectedInitialPose &&
+      (Math.abs((cur.lat || 0) - (selectedInitialPose.lat || 0)) > 1e-7 ||
+        Math.abs((cur.lon || 0) - (selectedInitialPose.lon || 0)) > 1e-7 ||
+        Math.abs((cur.heading || 0) - (selectedInitialPose.heading || 0)) > 0.5 ||
+        Math.abs((cur.lift || 0) - (selectedInitialPose.lift || 0)) > 0.01 ||
+        Math.abs((cur.scale || 1) - (selectedInitialPose.scale || 1)) > 0.01 ||
+        Math.abs((cur.opacity ?? 1) - (selectedInitialPose.opacity ?? 1)) > 0.01);
+    const targetPose = snapDiffers ? selectedInitialPose : SURVEY_DEFAULTS[k] || selectedInitialPose;
+    if (targetPose) applyActiveObjectPatch(targetPose);
+  });
 
   compassWin.body.querySelectorAll('[data-pfl-pick]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -2721,7 +2761,15 @@ export function loadPflWindowFramework({ viewer }) {
     } catch {}
 
     const hit = drillFindTarget(movement.position);
-    if (!hit) return;
+    if (!hit) {
+      let pickedNeo4j = false;
+      try {
+        const np = viewer.scene.drillPick(movement.position, 10) || [];
+        pickedNeo4j = np.some((p) => String(p?.id?.id || '').startsWith('pfl-neo4j-'));
+      } catch {}
+      if (!pickedNeo4j && activeMovable) clearActiveMovableSelection();
+      return;
+    }
     if (hit.type === 'portal') {
       openHolodeckHallway();
       return;
@@ -2737,6 +2785,20 @@ export function loadPflWindowFramework({ viewer }) {
       }
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  window.addEventListener('pfl:neo4j-selected', (ev) => {
+    const d = ev?.detail;
+    const selEl = compassWin.body.querySelector('#pfl-sel-name');
+    if (!selEl) return;
+    if (d && d.label) {
+      if (activeMovable) clearActiveMovableSelection();
+      selEl.textContent = `🕸️ ${d.label} (${d.type || 'Neo4j'})`;
+      selEl.style.color = '#7dd3fc';
+    } else if (!activeMovable) {
+      selEl.textContent = '🗺️ Map (Click any object)';
+      selEl.style.color = '#4ade80';
+    }
+  });
 
   compassWin.body.querySelector('#pfl-hdg-slider')?.addEventListener('input', (e) => {
     applyActiveObjectPatch({ heading: Number(e.target.value) });
@@ -2910,16 +2972,6 @@ export function loadPflWindowFramework({ viewer }) {
     window.__pflMovables[kind] = mov;
     const ent = syncEntity();
     if (ent) ent._pflMovable = mov;
-    const chipsRow = compassWin.body.querySelector('#pfl-obj-chips-row');
-    if (chipsRow) {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'pfl-std-cbtn';
-      chip.textContent = `📦 #${idNum}`;
-      chip.title = label;
-      chip.addEventListener('click', () => bindMovable(mov));
-      chipsRow.appendChild(chip);
-    }
     bindMovable(mov);
     governorRequestRender('pfl-spawn-custom-glb');
     return mov;
@@ -3782,21 +3834,17 @@ export function loadPflWindowFramework({ viewer }) {
 
   // Add LiveWire 3D Walk Pad layout (matching LiveWire splat_stage.html 4x2 grid) inside left Camera & Walk card:
   const walkBar = document.createElement('div');
-  walkBar.style.cssText = 'margin-top:2px;padding-top:6px;border-top:1px solid rgba(56,189,248,0.25);display:flex;flex-direction:column;gap:5px';
+  walkBar.style.cssText = 'display:flex;flex-direction:column;gap:4px';
   walkBar.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
-      <span style="color:#38bdf8;font-weight:700;font-size:10.5px;letter-spacing:0.04em">🧭 3D WALK PAD</span>
-      <button type="button" class="pfl-std-cbtn" id="pfl-wasd-toggle" style="font-size:9.5px;padding:2px 6px" title="Walk horizontally with W/A/S/D keys, Q/E for height">⌨️ WASD: OFF</button>
-    </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
-      <button type="button" class="pfl-std-cbtn" data-pfl-look="left" style="min-height:30px;font-size:12px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Turn view 15° left in place">⟲L</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-look="left" style="min-height:30px;font-size:11px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Turn view 15° left in place">⟲ L</button>
       <button type="button" class="pfl-std-cbtn" data-pfl-step="fwd" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Walk forward">▲</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-look="right" style="min-height:30px;font-size:12px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Turn view 15° right in place">⟳R</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-elev="+2" style="min-height:30px;font-size:12px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Raise camera straight UP +2m without moving forward/back">⬆U</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-look="right" style="min-height:30px;font-size:11px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Turn view 15° right in place">⟳ R</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-elev="+2" style="min-height:30px;font-size:11px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Raise camera straight UP +2m without moving forward/back">⬆ Up</button>
       <button type="button" class="pfl-std-cbtn" data-pfl-step="left" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Strafe left">◀</button>
       <button type="button" class="pfl-std-cbtn" data-pfl-step="back" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Walk backward">▼</button>
       <button type="button" class="pfl-std-cbtn" data-pfl-step="right" style="min-height:30px;font-size:13px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Strafe right">▶</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-elev="-2" style="min-height:30px;font-size:12px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Lower camera straight DOWN -2m without pushing through photos">⬇D</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-elev="-2" style="min-height:30px;font-size:11px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Lower camera straight DOWN -2m without pushing through photos">⬇ Dn</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">
       <button type="button" class="pfl-std-cbtn" data-pfl-look="up" style="font-size:10px;padding:3px 2px" title="Pitch view up 10°">🔼 Up</button>
@@ -3953,7 +4001,7 @@ export function loadPflWindowFramework({ viewer }) {
   });
 
   let wasdWalkOn = false;
-  const wasdBtn = walkBar.querySelector('#pfl-wasd-toggle');
+  const wasdBtn = compassWin.body.querySelector('#pfl-wasd-toggle');
   const walkHintEl = walkBar.querySelector('#pfl-walk-hint');
   wasdBtn?.addEventListener('click', () => {
     wasdWalkOn = !wasdWalkOn;
@@ -4860,12 +4908,50 @@ export function loadPflWindowFramework({ viewer }) {
         position: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, gBase + t.trunkH + t.crownH * 0.38),
         ellipsoid: {
           radii: new Cesium.Cartesian3(t.crownR, t.crownR * 0.92, t.crownH * 0.52),
-          material: Cesium.Color.fromCssColorString('#1e4620').withAlpha(0.52),
+          material: viewer._pflOakMirrorCanvas
+            ? new Cesium.ImageMaterialProperty({
+                image: viewer._pflOakMirrorCanvas,
+                color: Cesium.Color.WHITE.withAlpha(0.84),
+                transparent: true,
+              })
+            : Cesium.Color.fromCssColorString('#1e4620').withAlpha(0.52),
           outline: true,
           outlineColor: Cesium.Color.fromCssColorString('#4ade80').withAlpha(0.35),
         },
       });
       yardLandmarkIds.push(tid, cid);
+    }
+
+    const applyOakMirrorMaterial = (canvas) => {
+      if (!canvas) return;
+      for (const cid of ['pfl-oak-west-crown', 'pfl-oak-east-crown']) {
+        const ent = viewer?.entities?.getById?.(cid);
+        if (ent?.ellipsoid && !ent._pflOakLiveTextured) {
+          ent.ellipsoid.material = new Cesium.ImageMaterialProperty({
+            image: canvas,
+            color: Cesium.Color.WHITE.withAlpha(0.84),
+            transparent: true,
+          });
+        }
+      }
+      governorRequestRender('pfl-oak-mirror-ready');
+    };
+    if (!viewer._pflOakMirrorCanvas && typeof Image !== 'undefined') {
+      const oakImg = new Image();
+      oakImg.onload = () => {
+        try {
+          const mirrorOakCanvas = document.createElement('canvas');
+          mirrorOakCanvas.width = 960;
+          mirrorOakCanvas.height = 540;
+          const mctx = mirrorOakCanvas.getContext('2d');
+          mctx.filter = 'contrast(1.14) saturate(1.12) brightness(1.03)';
+          mctx.drawImage(oakImg, 0, 0, 960, 540);
+          mctx.filter = 'none';
+          viewer._pflOakMirrorCanvas = mirrorOakCanvas;
+          applyOakMirrorMaterial(mirrorOakCanvas);
+        } catch {}
+      };
+      oakImg.src = '/yard-frames/back-yard-cam2-2026-10-12.jpg';
     }
 
     // Wooden Bayou Dock at exact ortho shoreline (29.24779, -95.23138)
@@ -5421,6 +5507,9 @@ export function loadPflWindowFramework({ viewer }) {
       if (nearYard) {
         ctrl.enableCollisionDetection = false;
         ctrl.minimumZoomDistance = 0.25;
+        if (viewer.scene?._depthPlane) {
+          viewer.scene._depthPlane._ellipsoidOffset = -500;
+        }
         if (viewer.scene?.globe && c.height < 220) {
           viewer.scene.globe.depthTestAgainstTerrain = false;
         }
@@ -5675,12 +5764,12 @@ export function loadPflWindowFramework({ viewer }) {
       if (r.ok) {
         const blob = await r.blob();
         const bmp = await createImageBitmap(blob);
-        // Preserve Paul Prime's dreamlike mirrored Live Oak sphere reflection ONCE (non-blinking!)
+        // Preserve Paul Prime's dreamlike mirrored Live Oak sphere reflection (upgrading static mirror to live Cam2 frames when local backend is up)
         if (rt.cam.src === 'back-yard-cam2') {
           for (const cid of ['pfl-oak-west-crown', 'pfl-oak-east-crown']) {
             const ent = viewer?.entities?.getById?.(cid);
-            if (ent?.ellipsoid && !ent._pflOakTextured) {
-              ent._pflOakTextured = true;
+            if (ent?.ellipsoid && !ent._pflOakLiveTextured) {
+              ent._pflOakLiveTextured = true;
               const mirrorOakCanvas = document.createElement('canvas');
               mirrorOakCanvas.width = 960;
               mirrorOakCanvas.height = 540;
@@ -5688,6 +5777,7 @@ export function loadPflWindowFramework({ viewer }) {
               mctx.filter = 'contrast(1.14) saturate(1.12) brightness(1.03)';
               mctx.drawImage(bmp, 0, 0, 960, 540);
               mctx.filter = 'none';
+              viewer._pflOakMirrorCanvas = mirrorOakCanvas;
               ent.ellipsoid.material = new Cesium.ImageMaterialProperty({
                 image: mirrorOakCanvas,
                 color: Cesium.Color.WHITE.withAlpha(0.84),

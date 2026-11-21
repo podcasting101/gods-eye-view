@@ -81,6 +81,8 @@ export function applicationViewerOptions(
     creditContainer,
     // Cesium's 1 is no multisampling.
     msaaSamples: msaa || 1,
+    // Liverpool / Brazoria coast sits ~26m below WGS84 ellipsoid zero; keep DepthPlane 500m below so it never slices terrain-clamped models/photos at 140-200ft AGL.
+    depthPlaneEllipsoidOffset: -500,
     contextOptions: { webgl: { preserveDrawingBuffer: true } },
     showRenderLoopErrors,
   };

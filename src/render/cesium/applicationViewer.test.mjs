@@ -80,6 +80,7 @@ test('the viewer options take multisampling, by default 4, and keep the drawing 
   const credits = {};
   const plain = applicationViewerOptions(credits);
   assert.equal(plain.msaaSamples, 4);
+  assert.equal(plain.depthPlaneEllipsoidOffset, -500);
   assert.equal(plain.contextOptions.webgl.preserveDrawingBuffer, true);
   const given = applicationViewerOptions(credits, { msaa: 0 });
   assert.equal(given.msaaSamples, 1, 'Cesium’s 1 is off');

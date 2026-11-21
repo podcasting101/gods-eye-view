@@ -123,6 +123,7 @@ export const NEO4J_ANCHOR_ORIGINS = Object.freeze({
 });
 
 const STORAGE_PREFIX = 'pfl_neo4j_cluster_v2_';
+const LOCAL_NEO4J_GRAPH_URL = '/api/neo4j-graph.php';
 const NEO4J_LOOKUP_URL = 'https://elitespyworlds.com/birdpond/neo4j_lookup.php';
 
 const EXTERNAL_ENTITY_NODE_MAP = Object.freeze({
@@ -378,34 +379,41 @@ function makeNodeBadgeCanvas(
   return c;
 }
 
-function makeEdgeRelCanvas(relText, accentHex, isHighlighted = false) {
+function makeEdgeRelCanvas(relFwd, relRev, accentHex, isHighlighted = false) {
   if (typeof document === 'undefined') return null;
   const c = document.createElement('canvas');
-  c.width = 224;
-  c.height = 34;
+  c.width = 252;
+  c.height = 46;
   const ctx = c.getContext('2d');
   if (!ctx) return null;
 
   ctx.fillStyle = isHighlighted
-    ? 'rgba(15, 23, 42, 0.94)'
-    : 'rgba(10, 15, 28, 0.80)';
+    ? 'rgba(15, 23, 42, 0.96)'
+    : 'rgba(10, 15, 28, 0.86)';
   ctx.beginPath();
-  ctx.roundRect(2, 2, 220, 30, 8);
+  ctx.roundRect(2, 2, 248, 42, 8);
   ctx.fill();
 
   ctx.strokeStyle = isHighlighted
     ? '#fde047'
-    : accentHex || 'rgba(56, 189, 248, 0.55)';
+    : accentHex || 'rgba(56, 189, 248, 0.60)';
   ctx.lineWidth = isHighlighted ? 2.2 : 1.4;
   ctx.beginPath();
-  ctx.roundRect(2, 2, 220, 30, 8);
+  ctx.roundRect(2, 2, 248, 42, 8);
   ctx.stroke();
 
-  ctx.fillStyle = isHighlighted ? '#fef08a' : '#cbd5e1';
-  ctx.font = '600 12px "JetBrains Mono", monospace';
+  const fwdText = `→ ${String(relFwd || '').slice(0, 21)}`;
+  const revText = `← ${String(relRev || relFwd || '').slice(0, 21)}`;
+
+  ctx.fillStyle = isHighlighted ? '#fef08a' : '#7dd3fc';
+  ctx.font = '700 11.5px "JetBrains Mono", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`${String(relText || '').slice(0, 21)} ⟷`, 112, 17);
+  ctx.fillText(fwdText, 126, 14);
+
+  ctx.fillStyle = isHighlighted ? '#86efac' : '#c4b5fd';
+  ctx.font = '600 10.5px "JetBrains Mono", monospace';
+  ctx.fillText(revText, 126, 32);
   return c;
 }
 
@@ -1828,7 +1836,7 @@ export async function loadNeo4jPersonalLayer({
         ev.lineEnt.polyline.width = isHi ? 5.5 : 3.4;
       }
       if (ev.relEnt?.billboard) {
-        const relCanvas = makeEdgeRelCanvas(ev.edge.relFwd, ev.edgeColor, isHi);
+        const relCanvas = makeEdgeRelCanvas(ev.edge.relFwd, ev.edge.relRev, ev.edgeColor, isHi);
         if (relCanvas) ev.relEnt.billboard.image = relCanvas;
       }
     }
@@ -1846,13 +1854,13 @@ export async function loadNeo4jPersonalLayer({
     const restCore = isMacro ? 310 : 6.4;
     const restLeaf = isMacro ? 360 : 7.4;
     const repulsionK = isMacro ? 42000 : 26.0;
-    const maxStepXY = isMacro ? 14.0 : 0.35;
-    const maxStepZ = isMacro ? 4.5 : 0.18;
+    const maxStepXY = isMacro ? 14.0 : 0.42;
+    const maxStepZ = isMacro ? 4.5 : 0.20;
 
     let ticks = 0;
     holdContinuousRender('pfl-neo4j-sim');
     simTimer = setInterval(() => {
-      if (destroyed || ticks >= 26) {
+      if (destroyed || ticks >= 45) {
         clearInterval(simTimer);
         simTimer = null;
         releaseContinuousRender('pfl-neo4j-sim');
@@ -1925,7 +1933,7 @@ export async function loadNeo4jPersonalLayer({
         const sphereEnt = viewer.entities.add({
           id: sphereId,
           name: `[${node.type}] ${node.label}`,
-          show: Boolean(node.active),
+          show: visible && Boolean(node.active),
           position: dynamicPos,
           billboard: sphereCanvas
             ? {
@@ -1988,7 +1996,7 @@ export async function loadNeo4jPersonalLayer({
 
         const lineEnt = viewer.entities.add({
           id: `pfl-neo4j-edge-${cluster.id}-${i}`,
-          show: showInitial,
+          show: visible && showInitial,
           polyline: {
             positions: linePositions,
             width: 3.4,
@@ -2005,7 +2013,7 @@ export async function loadNeo4jPersonalLayer({
         entities.push(lineEnt);
 
         let relEnt = null;
-        const relCanvas = makeEdgeRelCanvas(edge.relFwd, edgeColor, false);
+        const relCanvas = makeEdgeRelCanvas(edge.relFwd, edge.relRev, edgeColor, false);
         if (relCanvas) {
           const midPos = new Cesium.CallbackProperty(
             () =>
@@ -2019,12 +2027,12 @@ export async function loadNeo4jPersonalLayer({
           const relId = `pfl-neo4j-rel-${cluster.id}-${i}`;
           relEnt = viewer.entities.add({
             id: relId,
-            show: showInitial,
+            show: false,
             position: midPos,
             billboard: {
               image: relCanvas,
-              width: 126,
-              height: 20,
+              width: 148,
+              height: 28,
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
               distanceDisplayCondition: new Cesium.DistanceDisplayCondition(
                 0,
@@ -2137,19 +2145,65 @@ export async function loadNeo4jPersonalLayer({
   async function fetchLiveNeo4jDetails(bpId) {
     if (!bpId || !fetchImpl) return null;
     if (liveLookupCache.has(bpId)) return liveLookupCache.get(bpId);
-    try {
-      const url = `${NEO4J_LOOKUP_URL}?bp_id=${encodeURIComponent(bpId)}`;
-      const res = await fetchImpl(url, { signal });
-      if (!res?.ok) return null;
-      const json = await res.json();
-      if (json && json.ok !== false) {
-        liveLookupCache.set(bpId, json);
-        return json;
+    const urls =
+      typeof window !== 'undefined'
+        ? [
+            `${LOCAL_NEO4J_GRAPH_URL}?bp_id=${encodeURIComponent(bpId)}`,
+            `${NEO4J_LOOKUP_URL}?bp_id=${encodeURIComponent(bpId)}`,
+          ]
+        : [`${NEO4J_LOOKUP_URL}?bp_id=${encodeURIComponent(bpId)}`];
+    for (const url of urls) {
+      try {
+        const res = await fetchImpl(url, { signal });
+        if (!res?.ok) continue;
+        const json = await res.json();
+        if (json && json.ok !== false && json.status === 'ok') {
+          liveLookupCache.set(bpId, json);
+          return json;
+        }
+      } catch {
+        // Cross-origin or offline fallback stays clean
       }
-    } catch {
-      // Cross-origin or offline fallback stays clean
     }
     return null;
+  }
+
+  let liveHydrationStarted = false;
+  async function hydrateLiveGraphFromApi() {
+    if (liveHydrationStarted || !fetchImpl || typeof window === 'undefined' || destroyed) return;
+    liveHydrationStarted = true;
+    try {
+      const res = await fetchImpl(`${LOCAL_NEO4J_GRAPH_URL}?cluster=all&limit=45`, { signal });
+      if (!res?.ok) return;
+      const data = await res.json();
+      if (!data || data.status !== 'ok' || !Array.isArray(data.edges)) return;
+      const bpCluster = clusters.find((c) => c.id === 'birdpond');
+      if (!bpCluster) return;
+      const byBpId = new Map(bpCluster.nodes.filter((n) => n.bpId).map((n) => [n.bpId, n]));
+      let updated = false;
+      for (const row of data.edges) {
+        const fromNode = byBpId.get(row.from);
+        const toNode = byBpId.get(row.to);
+        if (fromNode && toNode) {
+          const existing = bpCluster.edges.find(
+            (e) => (e.from === fromNode.id && e.to === toNode.id) || (e.from === toNode.id && e.to === fromNode.id),
+          );
+          if (existing && row.relFwd && existing.relFwd === 'CONNECTED_TO') {
+            existing.relFwd = row.relFwd;
+            if (row.relRev) existing.relRev = row.relRev;
+            updated = true;
+          }
+        }
+        if (row.from && row.summary && byBpId.has(row.from)) {
+          const target = byBpId.get(row.from);
+          if (row.summary.length > 10 && !target.dossier.includes(row.summary)) {
+            target.dossier = `${target.dossier} [Neo4j Live: ${row.summary}]`;
+            updated = true;
+          }
+        }
+      }
+      if (updated) refreshClusterVisuals(bpCluster);
+    } catch {}
   }
 
   // =========================================================================
@@ -2211,7 +2265,11 @@ export async function loadNeo4jPersonalLayer({
       ctx.fillStyle = isHi ? '#fef08a' : '#94a3b8';
       ctx.font = '600 9.5px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(e.relFwd.slice(0, 16), mx, my - 4);
+      ctx.fillText(
+        `${String(e.relFwd || '').slice(0, 13)} ⇄ ${String(e.relRev || e.relFwd || '').slice(0, 13)}`,
+        mx,
+        my - 4,
+      );
     }
 
     // Nodes
@@ -2326,7 +2384,7 @@ export async function loadNeo4jPersonalLayer({
               );
               return `
           <button type="button" class="pfl-n4j-rel-row" data-n4j-jump="${escapeHtml(nb.id)}">
-            <span class="pfl-n4j-rel-verb">──[${escapeHtml(item.relOut)} ⟷]──▶</span>
+            <span class="pfl-n4j-rel-verb">OUT → [${escapeHtml(item.relOut)}] · IN ← [${escapeHtml(item.relIn || item.relOut)}]</span>
             <span class="pfl-n4j-rel-target">
               <span class="pfl-n4j-dot" style="background:${escapeHtml(nb.color)}"></span>
               <span>${escapeHtml(nb.label)}</span>
@@ -2483,6 +2541,16 @@ export async function loadNeo4jPersonalLayer({
       });
     }
 
+    if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
+      try {
+        window.dispatchEvent(
+          new CustomEvent('pfl:neo4j-selected', {
+            detail: { id: node.id, label: node.label, type: node.type, clusterId: cluster.id },
+          }),
+        );
+      } catch {}
+    }
+
     return {
       node,
       clusterId: cluster.id,
@@ -2501,8 +2569,9 @@ export async function loadNeo4jPersonalLayer({
       <style>
         #pfl-neo4j-hud {
           position: fixed;
-          top: 76px;
-          right: 16px;
+          top: 86px;
+          left: 16px;
+          right: auto;
           width: min(395px, calc(100vw - 28px));
           max-height: calc(100vh - 150px);
           background: rgba(8, 13, 25, 0.95);
@@ -2512,7 +2581,7 @@ export async function loadNeo4jPersonalLayer({
           backdrop-filter: blur(14px);
           color: #f8fafc;
           font-family: "Inter", system-ui, -apple-system, sans-serif;
-          z-index: 980;
+          z-index: 9720;
           display: none;
           flex-direction: column;
           overflow: hidden;
@@ -2722,7 +2791,7 @@ export async function loadNeo4jPersonalLayer({
           border-radius: 14px;
           box-shadow: 0 18px 44px rgba(0, 0, 0, 0.76);
           backdrop-filter: blur(12px);
-          z-index: 975;
+          z-index: 9710;
           display: none;
           flex-direction: column;
           overflow: hidden;
@@ -2774,6 +2843,9 @@ export async function loadNeo4jPersonalLayer({
       hudEl.classList.remove('open');
       refreshClusterVisuals();
       draw2dDrawer();
+      if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
+        try { window.dispatchEvent(new CustomEvent('pfl:neo4j-selected', { detail: null })); } catch {}
+      }
     });
 
     domRoot
@@ -2897,16 +2969,15 @@ export async function loadNeo4jPersonalLayer({
 
   function resolvePickedNodeId(windowPosition, { allowDrill = true } = {}) {
     if (!viewer?.scene || !windowPosition) return null;
-    const topPick = viewer.scene.pick(windowPosition);
-    const direct = matchNodeFromPicked(topPick);
-    if (direct) return direct;
-    if (!allowDrill || !viewer.scene.drillPick) return null;
-    const drill = viewer.scene.drillPick(windowPosition, 8) || [];
-    for (const picked of drill) {
-      const hit = matchNodeFromPicked(picked);
-      if (hit) return hit;
+    if (allowDrill && viewer.scene.drillPick) {
+      const drill = viewer.scene.drillPick(windowPosition, 16) || [];
+      for (const picked of drill) {
+        const hit = matchNodeFromPicked(picked);
+        if (hit) return hit;
+      }
     }
-    return null;
+    const topPick = viewer.scene.pick(windowPosition);
+    return matchNodeFromPicked(topPick);
   }
 
   if (viewer?.scene?.canvas && Cesium.ScreenSpaceEventHandler) {
@@ -2928,17 +2999,6 @@ export async function loadNeo4jPersonalLayer({
       const entry = nodeIndex.get(nodeId);
       if (!entry) return;
 
-      const compIds = getConnectedComponentIds(
-        entry.cluster.nodes,
-        entry.cluster.edges,
-        nodeId,
-      );
-      const startCoords = new Map();
-      for (const cid of compIds) {
-        const cn = entry.cluster.nodes.find((x) => x.id === cid);
-        if (cn) startCoords.set(cid, { lat: cn.lat, lon: cn.lon, alt: cn.alt });
-      }
-
       lockCamForDrag(true);
       dragState = {
         nodeId,
@@ -2948,7 +3008,11 @@ export async function loadNeo4jPersonalLayer({
         moved: false,
         lease: null,
         camLocked: true,
-        startCoords,
+        startNodePos: {
+          lat: entry.node.lat,
+          lon: entry.node.lon,
+          alt: entry.node.alt,
+        },
       };
     }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
 
@@ -3023,13 +3087,29 @@ export async function loadNeo4jPersonalLayer({
           const dLat = northM / METERS_PER_DEG_LAT;
           const dLon = eastM / metersPerDegLon(anchorNode.lat);
 
-          for (const [cid, orig] of dragState.startCoords.entries()) {
-            const cn = cluster.nodes.find((x) => x.id === cid);
-            if (cn) {
-              cn.lat = orig.lat + dLat;
-              cn.lon = orig.lon + dLon;
-            }
-          }
+          anchorNode.lat = dragState.startNodePos.lat + dLat;
+          anchorNode.lon = dragState.startNodePos.lon + dLon;
+          anchorNode._vx = 0;
+          anchorNode._vy = 0;
+          anchorNode._vz = 0;
+          const isMacro = cluster.id === 'starbase';
+          stepNeo4jForceSimulation({
+            nodes: cluster.nodes,
+            edges: cluster.edges,
+            dt: 0.028,
+            origin: cluster.origin,
+            pinnedIds: new Set([nodeId]),
+            params: {
+              repulsionK: isMacro ? 42000 : 26.0,
+              restLengthCore: isMacro ? 310 : 6.4,
+              restLengthLeaf: isMacro ? 360 : 7.4,
+              maxStepXY: isMacro ? 14.0 : 0.45,
+              maxStepZ: isMacro ? 4.5 : 0.22,
+              minAlt: cluster.origin.minAlt,
+              maxAlt: cluster.origin.maxAlt,
+            },
+          });
+          draw2dDrawer();
           governorRequestRender('pfl-neo4j-drag');
         }
       }
@@ -3050,6 +3130,7 @@ export async function loadNeo4jPersonalLayer({
       }
 
       if (finished.moved) {
+        runRelaxationBurst(finished.cluster, new Set([finished.nodeId]));
         saveClusterState(finished.cluster);
         draw2dDrawer();
         governorRequestRender('pfl-neo4j-drag-end');
@@ -3079,6 +3160,10 @@ export async function loadNeo4jPersonalLayer({
   const setVisible = (next) => {
     visible = Boolean(next);
     if (!visible && hudEl) hudEl.classList.remove('open');
+    if (visible) hydrateLiveGraphFromApi();
+    else if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
+      try { window.dispatchEvent(new CustomEvent('pfl:neo4j-selected', { detail: null })); } catch {}
+    }
     refreshClusterVisuals();
     return visible;
   };
@@ -3139,6 +3224,7 @@ export async function loadNeo4jPersonalLayer({
   if (typeof window !== 'undefined') {
     window.__pflNeo4jLayer = api;
   }
+  refreshClusterVisuals();
   governorRequestRender('pfl-neo4j-load');
   return api;
 }

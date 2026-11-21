@@ -2282,6 +2282,15 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
     const telemEl = hudRoot.querySelector('[data-pfl-telem-readout]');
     const phaseEl = hudRoot.querySelector('[data-pfl-phase-readout]');
     const neo4jBtn = hudRoot.querySelector('[data-pfl-toggle-neo4j]');
+    const syncNeo4jBtn = () => {
+      const layer = neo4jLayer || window.__pflNeo4jLayer;
+      const isOn = Boolean(layer?.isVisible?.());
+      if (neo4jBtn) {
+        neo4jBtn.textContent = `Neo4j 3D: ${isOn ? 'ON' : 'OFF'}`;
+        neo4jBtn.classList.toggle('active', isOn);
+      }
+    };
+    syncNeo4jBtn();
 
     const marshRenderer =
       marshCanvas?.getContext &&
