@@ -110,13 +110,21 @@ function withTimeout(promise, ms, route) {
 export function configureAndGuardGoogleTileset(tileset) {
   if (!tileset || typeof tileset !== 'object') return tileset;
   try { tileset.maximumScreenSpaceError = 16; } catch {}
+  try { tileset.dynamicScreenSpaceError = true; } catch {}
+  try { tileset.dynamicScreenSpaceErrorDensity = 2.0e-4; } catch {}
+  try { tileset.dynamicScreenSpaceErrorFactor = 24.0; } catch {}
+  try { tileset.dynamicScreenSpaceErrorHeightFalloff = 0.25; } catch {}
+  // Disable foveated center-cone LOD pulsing and timeout starvation under requestRenderMode
+  // while keeping dynamic horizon SSE and skip-level traversal for street-level views.
+  try { tileset.foveatedScreenSpaceError = false; } catch {}
+  try { tileset.foveatedTimeDelay = 0.0; } catch {}
+  try { tileset.skipLevelOfDetail = true; } catch {}
+  try { tileset.baseScreenSpaceError = 1024; } catch {}
+  try { tileset.skipScreenSpaceErrorFactor = 16; } catch {}
+  try { tileset.skipLevels = 1; } catch {}
+  try { tileset.immediatelyLoadDesiredLevelOfDetail = false; } catch {}
   try { tileset.loadSiblings = false; } catch {}
   try { tileset.preferLeaves = false; } catch {}
-  // Disable foveated center-cone LOD pulsing so continental tiles (US / CA)
-  // never swell or breathe at planetary scale while rotating or resting.
-  try { tileset.foveatedScreenSpaceError = false; } catch {}
-  try { tileset.dynamicScreenSpaceError = false; } catch {}
-  try { tileset.skipLevelOfDetail = false; } catch {}
   try { tileset.cullWithChildrenBounds = true; } catch {}
   try { tileset.preloadFlightDestinations = true; } catch {}
 

@@ -65,14 +65,31 @@ export function loadPflWindowFramework({ viewer }) {
     #pfl-dual-pads-grid {
       width: 100%;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
       gap: 6px;
-      align-items: start;
+      align-items: stretch;
     }
-    @media (max-width: 440px) {
-      #pfl-dual-pads-grid {
-        grid-template-columns: 1fr;
-      }
+    #pfl-camera-pad-card,
+    #pfl-object-pad-card {
+      min-width: 0;
+      padding: 6px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      box-sizing: border-box;
+    }
+    #pfl-camera-pad-card {
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      background: rgba(15, 23, 42, 0.72);
+    }
+    #pfl-axis-globe,
+    #pfl-obj-move-ball {
+      width: min(128px, 100%);
+      height: auto;
+      aspect-ratio: 1 / 1;
+      flex-shrink: 0;
+      display: block;
     }
     @media (max-width: 1180px) {
       .pfl-std-box.pfl-minimized {
@@ -613,22 +630,31 @@ export function loadPflWindowFramework({ viewer }) {
   compassWin.box.style.zIndex = '9660';
   compassWin.box.style.maxHeight = 'calc(100vh - 76px)';
   compassWin.body.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#cbd5e1">
-      <div id="pfl-eye-elev-banner" style="width:100%;box-sizing:border-box;background:rgba(6,78,59,0.55);border:1.5px solid rgba(74,222,128,0.75);border-radius:7px;padding:6px 8px;text-align:center;font-size:13.5px;font-weight:800;color:#4ade80;letter-spacing:0.02em;line-height:1.25" title="Live Camera Height Above Ground Level (Meters &amp; Feet) + Optical Lens FOV">EYE: 1.8 m (5.9 ft) AGL · FOV: 60°</div>
-      <canvas id="pfl-axis-globe" width="136" height="136" style="cursor:grab;touch-action:none;border-radius:50%" title="Drag anywhere on ball to orbit/tilt camera, or click N/S/E/W/UP"></canvas>
-      <div id="pfl-cam-readout" style="text-align:center;font-size:10px;color:#94a3b8;line-height:1.35">CAM READY</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#cbd5e1">
+      <div id="pfl-eye-elev-banner" style="width:100%;box-sizing:border-box;background:rgba(6,78,59,0.55);border:1.5px solid rgba(74,222,128,0.75);border-radius:7px;padding:5px 8px;text-align:center;font-size:13px;font-weight:800;color:#4ade80;letter-spacing:0.02em;line-height:1.25" title="Live Camera Height Above Ground Level (Meters &amp; Feet) + Optical Lens FOV">EYE: 1.8 m (5.9 ft) AGL · FOV: 60°</div>
+      <div id="pfl-cam-readout" style="text-align:center;font-size:10px;color:#94a3b8;line-height:1.3">CAM READY</div>
       <div id="pfl-drag-pan-row" style="width:100%;display:flex;gap:4px">
-        <button type="button" class="pfl-std-cbtn" id="pfl-drag-pan-toggle" style="flex:1;border-color:#22c55e;color:#4ade80" title="Lock Yaw on Left-Drag near houses (Google Maps flat pan — use Ctrl+Drag or Compass Ball above to rotate)">✋ Drag: PAN (Flat)</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drag-pan-toggle" style="flex:1;border-color:#22c55e;color:#4ade80" title="Lock Yaw on Left-Drag near houses (Google Maps flat pan — use Ctrl+Drag or Compass Ball below to rotate)">✋ Drag: PAN (Flat)</button>
       </div>
       <div id="pfl-dual-pads-grid">
-        <div id="pfl-walk-nav-slot" style="min-width:0"></div>
-        <div id="pfl-object-pad-card" style="min-width:0;margin-top:4px;padding:6px;border:1px solid rgba(251,191,36,0.38);border-radius:8px;background:rgba(15,23,42,0.72);display:flex;flex-direction:column;gap:5px">
+        <div id="pfl-camera-pad-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+            <span style="color:#38bdf8;font-weight:700;font-size:10.5px;letter-spacing:0.03em">🧭 CAMERA &amp; WALK</span>
+            <span style="font-size:9px;color:#94a3b8">N/S/E/W/UP</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <canvas id="pfl-axis-globe" width="136" height="136" style="cursor:grab;touch-action:none;border-radius:50%" title="Drag anywhere on ball to orbit/tilt camera, or click N/S/E/W/UP"></canvas>
+            <div style="font-size:8.5px;color:#94a3b8;text-align:center">Orbit Ball · Click Axis</div>
+          </div>
+          <div id="pfl-walk-nav-slot" style="min-width:0"></div>
+        </div>
+        <div id="pfl-object-pad-card" style="border:1px solid rgba(251,191,36,0.38);background:rgba(15,23,42,0.72)">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap">
             <span style="color:#fbbf24;font-weight:700;font-size:10.5px;letter-spacing:0.03em">🎯 OBJECT PAD</span>
             <button type="button" class="pfl-std-cbtn" id="pfl-publish-layout-btn" style="font-size:9.5px;padding:2px 6px;border-color:#22c55e;color:#4ade80" title="Publish current House, Monaco RV, Lisa, Chair positions to Sex-World.ai for all visitors (Admin Only)">💾 Save Site</button>
           </div>
           <div id="pfl-obj-rbac-banner" style="font-size:9.5px;line-height:1.3;padding:3px 5px;border-radius:5px;border:1px solid rgba(56,189,248,0.35);background:rgba(15,23,42,0.85);color:#7dd3fc">Role: Admin (Edit &amp; Publish Enabled)</div>
-          <div style="display:flex;gap:3px;flex-wrap:wrap">
+          <div id="pfl-obj-chips-row" style="display:flex;gap:3px;flex-wrap:wrap">
             <button type="button" class="pfl-std-cbtn" data-pfl-pick="lisa" title="Select Lisa Muse avatar">👑 Lisa</button>
             <button type="button" class="pfl-std-cbtn" data-pfl-pick="chair" title="Select Wooden Chair &amp; Sign">🪑 Chair</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-pick-house" data-pfl-pick="house" title="Select 3D 417 Palm Drive Yellow House">🏠 House</button>
@@ -691,6 +717,25 @@ export function loadPflWindowFramework({ viewer }) {
             <button type="button" class="pfl-std-cbtn" id="pfl-hs-spin" title="Rotate selected object 90°">🔄 90°</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-hs-resize" title="Focus Size slider">📐 Size</button>
           </div>
+          <details id="pfl-sketchfab-box" style="margin-top:4px;padding:5px;border:1px solid rgba(168,85,247,0.45);border-radius:7px;background:rgba(15,23,42,0.8)">
+            <summary style="cursor:pointer;color:#e9d5ff;font-weight:700;font-size:10px;list-style:none">📦 Sketchfab &amp; Local GLB Loader ▾</summary>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-top:5px">
+              <div style="display:flex;gap:3px">
+                <input type="text" id="pfl-sf-query" placeholder="Search Sketchfab 3D..." style="flex:1;min-width:0;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:2px 5px;font-size:10px" />
+                <button type="button" class="pfl-std-cbtn" id="pfl-sf-search-btn" style="border-color:#a855f7;color:#e9d5ff">🔍</button>
+              </div>
+              <div style="display:flex;gap:3px;align-items:center">
+                <input type="password" id="pfl-sf-token" placeholder="Sketchfab API Token (saved locally)" style="flex:1;min-width:0;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:2px 5px;font-size:9.5px" />
+                <a href="https://sketchfab.com/settings/password" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none;border-color:#38bdf8;color:#7dd3fc" title="Open your Sketchfab account settings to copy your personal API Token">🔑</a>
+              </div>
+              <div style="display:flex;gap:3px;align-items:center">
+                <input type="file" id="pfl-glb-file-input" accept=".glb,.gltf" style="display:none" />
+                <button type="button" class="pfl-std-cbtn" id="pfl-glb-file-btn" style="flex:1;border-color:#22c55e;color:#86efac" title="Drop any local .glb / .gltf (Mixamo, Ready Player Me, Blender) onto the current view">📁 Drop Local .glb</button>
+              </div>
+              <div id="pfl-sf-status" style="font-size:9px;color:#94a3b8;line-height:1.25">Search downloadable models or drop a local .glb</div>
+              <div id="pfl-sf-results" style="display:flex;flex-direction:column;gap:3px;max-height:130px;overflow:auto"></div>
+            </div>
+          </details>
         </div>
       </div>
       <div id="pfl-nav-pins-box" style="width:100%;border-top:1px solid rgba(56,189,248,0.25);padding-top:6px">
@@ -2026,33 +2071,37 @@ export function loadPflWindowFramework({ viewer }) {
 
   let objBallPtr = null;
   if (objBallCanvas) {
+    const toObjBallCoords = (e) => {
+      const r = objBallCanvas.getBoundingClientRect();
+      return {
+        mx: ((e.clientX - r.left) * 128) / Math.max(1, r.width),
+        my: ((e.clientY - r.top) * 128) / Math.max(1, r.height),
+      };
+    };
     objBallCanvas.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || !activeMovable) return;
       if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
-      const r = objBallCanvas.getBoundingClientRect();
-      const mx = e.clientX - r.left;
-      const my = e.clientY - r.top;
+      const { mx, my } = toObjBallCoords(e);
       const dx = mx - 64;
       const dy = my - 64;
       const dist = Math.hypot(dx, dy);
+      const startAngleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+      const startHeading = Number(activeMovable.getState?.()?.heading || 0);
       objBallMode = dist >= 36 ? 'spin' : 'xy';
-      objBallPtr = { id: e.pointerId, lastX: mx, lastY: my };
+      objBallPtr = { id: e.pointerId, lastX: mx, lastY: my, startAngleDeg, startHeading };
       objBallCanvas.style.cursor = 'grabbing';
       try { objBallCanvas.setPointerCapture(e.pointerId); } catch {}
       holdContinuousRender('pfl-obj-ball');
-      if (objBallMode === 'spin') {
-        const deg = (((Math.atan2(dy, dx) * 180) / Math.PI + 90) % 360 + 360) % 360;
-        applyActiveObjectPatch({ heading: Math.round(deg) });
-      }
     });
     objBallCanvas.addEventListener('pointermove', (e) => {
       if (!objBallPtr || e.pointerId !== objBallPtr.id || !activeMovable) return;
-      const r = objBallCanvas.getBoundingClientRect();
-      const mx = e.clientX - r.left;
-      const my = e.clientY - r.top;
+      const { mx, my } = toObjBallCoords(e);
       if (objBallMode === 'spin') {
-        const deg = (((Math.atan2(my - 64, mx - 64) * 180) / Math.PI + 90) % 360 + 360) % 360;
-        applyActiveObjectPatch({ heading: Math.round(deg) });
+        const curAngleDeg = (Math.atan2(my - 64, mx - 64) * 180) / Math.PI;
+        const deltaDeg = ((curAngleDeg - objBallPtr.startAngleDeg + 540) % 360) - 180;
+        applyActiveObjectPatch({
+          heading: Math.round(((objBallPtr.startHeading + deltaDeg) % 360 + 360) % 360),
+        });
       } else if (objBallMode === 'xy') {
         const ddx = mx - objBallPtr.lastX;
         const ddy = my - objBallPtr.lastY;
@@ -2496,10 +2545,29 @@ export function loadPflWindowFramework({ viewer }) {
   function antiEjectionTick() {
     try {
       const c = viewer?.camera?.positionCartographic;
-      if (!c || !lastSafeYardPose) return;
+      if (!c) return;
       const now = Date.now();
       const lat = Cesium.Math.toDegrees(c.latitude);
       const lon = Cesium.Math.toDegrees(c.longitude);
+      const nearYard =
+        Math.hypot(lat - 29.24755, lon - -95.23140) < 0.02 ||
+        Math.hypot(lat - 29.13910, lon - -95.80480) < 0.02;
+      if (nearYard) {
+        enforceZeroAltitudeKickGuard();
+        if (viewer?.camera?.frustum && 'near' in viewer.camera.frustum && c.height < 140) {
+          viewer.camera.frustum.near = 0.08;
+        }
+        const floorH = resolveLocalGroundM(lon, lat) + 0.85;
+        if (!droneOrbitState.active && c.height < floorH) {
+          viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, floorH),
+            orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
+          });
+          governorRequestRender('pfl-ground-floor');
+          return;
+        }
+      }
+      if (!lastSafeYardPose) return;
       const agl = c.height - resolveLocalGroundM(lon, lat);
       const isZooming =
         rightButtonDown ||
@@ -2743,6 +2811,196 @@ export function loadPflWindowFramework({ viewer }) {
       }
     }
     startDroneOrbit(orbitKeyForMovable(activeMovable));
+  });
+
+  // ---- Sketchfab Model Search/Download + Local GLB Dropper into Object Pad ----
+  const SKETCHFAB_TOKEN_KEY = 'pfl_sketchfab_token';
+  const sfQueryIn = compassWin.body.querySelector('#pfl-sf-query');
+  const sfTokenIn = compassWin.body.querySelector('#pfl-sf-token');
+  const sfSearchBtn = compassWin.body.querySelector('#pfl-sf-search-btn');
+  const sfStatusEl = compassWin.body.querySelector('#pfl-sf-status');
+  const sfResultsEl = compassWin.body.querySelector('#pfl-sf-results');
+  const glbFileIn = compassWin.body.querySelector('#pfl-glb-file-input');
+  const glbFileBtn = compassWin.body.querySelector('#pfl-glb-file-btn');
+  const createdGlbUrls = [];
+  let customGlbCounter = 0;
+
+  try {
+    const savedTok = localStorage.getItem(SKETCHFAB_TOKEN_KEY) || '';
+    if (sfTokenIn && savedTok) sfTokenIn.value = savedTok;
+  } catch {}
+  sfTokenIn?.addEventListener('change', () => {
+    try { localStorage.setItem(SKETCHFAB_TOKEN_KEY, String(sfTokenIn.value || '').trim()); } catch {}
+  });
+
+  function currentDropLatLon() {
+    try {
+      const canvas = viewer?.scene?.canvas;
+      if (canvas) {
+        const centerPx = new Cesium.Cartesian2(canvas.clientWidth * 0.5, canvas.clientHeight * 0.5);
+        const ray = viewer.camera.getPickRay(centerPx);
+        const pick = ray ? viewer.scene.globe?.pick?.(ray, viewer.scene) : null;
+        if (pick) {
+          const cg = Cesium.Cartographic.fromCartesian(pick);
+          const lat = Cesium.Math.toDegrees(cg.latitude);
+          const lon = Cesium.Math.toDegrees(cg.longitude);
+          if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+        }
+      }
+      const cc = viewer?.camera?.positionCartographic;
+      if (cc && cc.height < 8000) {
+        return { lat: Cesium.Math.toDegrees(cc.latitude), lon: Cesium.Math.toDegrees(cc.longitude) };
+      }
+    } catch {}
+    return { lat: 29.24755, lon: -95.23142 };
+  }
+
+  function spawnCustomGlbMovable({ label, uri }) {
+    const idNum = ++customGlbCounter;
+    const kind = `custom-glb-${idNum}`;
+    const entityId = `pfl-${kind}`;
+    const drop = currentDropLatLon();
+    const state = { lat: drop.lat, lon: drop.lon, heading: 0, lift: 0, scale: 1, opacity: 1 };
+    const syncEntity = () => {
+      const g = resolveLocalGroundM(state.lon, state.lat);
+      const pos = Cesium.Cartesian3.fromDegrees(state.lon, state.lat, g + Number(state.lift || 0));
+      const ori = Cesium.Transforms.headingPitchRollQuaternion(
+        pos,
+        new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(state.heading || 0), 0, 0),
+      );
+      const sc = Math.max(0.1, Math.min(20, Number(state.scale) > 0 ? Number(state.scale) : 1));
+      const op = Math.max(0.05, Math.min(1, Number(state.opacity ?? 1)));
+      const ex = viewer.entities.getById(entityId);
+      if (ex?.model) {
+        ex.position = pos;
+        ex.orientation = ori;
+        ex.model.scale = sc;
+        ex.model.color = Cesium.Color.WHITE.withAlpha(op);
+        return ex;
+      }
+      const ent = viewer.entities.add({
+        id: entityId,
+        name: label,
+        position: pos,
+        orientation: ori,
+        model: {
+          uri,
+          scale: sc,
+          color: Cesium.Color.WHITE.withAlpha(op),
+          heightReference: Cesium.HeightReference.NONE,
+          minimumPixelSize: 16,
+          maximumScale: 80,
+        },
+      });
+      yardLandmarkIds.push(entityId);
+      return ent;
+    };
+    const mov = {
+      kind,
+      label: `📦 ${label}`.slice(0, 32),
+      getState: () => ({ ...state }),
+      update: (patch) => {
+        Object.assign(state, patch);
+        const e = syncEntity();
+        if (e) e._pflMovable = mov;
+        governorRequestRender('pfl-move-custom-glb');
+      },
+    };
+    window.__pflMovables = window.__pflMovables || {};
+    window.__pflMovables[kind] = mov;
+    const ent = syncEntity();
+    if (ent) ent._pflMovable = mov;
+    const chipsRow = compassWin.body.querySelector('#pfl-obj-chips-row');
+    if (chipsRow) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'pfl-std-cbtn';
+      chip.textContent = `📦 #${idNum}`;
+      chip.title = label;
+      chip.addEventListener('click', () => bindMovable(mov));
+      chipsRow.appendChild(chip);
+    }
+    bindMovable(mov);
+    governorRequestRender('pfl-spawn-custom-glb');
+    return mov;
+  }
+
+  async function runSketchfabSearch() {
+    const q = String(sfQueryIn?.value || '').trim();
+    if (!q) {
+      if (sfStatusEl) sfStatusEl.textContent = 'Enter a search term (e.g. "RV", "chair", "tree").';
+      return;
+    }
+    if (sfStatusEl) sfStatusEl.textContent = 'Searching Sketchfab...';
+    if (sfResultsEl) sfResultsEl.innerHTML = '';
+    try {
+      const url = `https://api.sketchfab.com/v3/search?type=models&downloadable=true&count=8&q=${encodeURIComponent(q)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const rows = Array.isArray(data?.results) ? data.results : [];
+      if (sfStatusEl) sfStatusEl.textContent = rows.length ? `Found ${rows.length} downloadable model(s):` : 'No downloadable models found.';
+      for (const m of rows) {
+        const uid = String(m?.uid || '');
+        const mName = String(m?.name || uid || 'Sketchfab Model').slice(0, 34);
+        const rowEl = document.createElement('div');
+        rowEl.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:9.5px;background:rgba(30,41,59,0.7);padding:2px 4px;border-radius:4px';
+        const lbl = document.createElement('span');
+        lbl.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;color:#e2e8f0';
+        lbl.textContent = mName;
+        const dropBtn = document.createElement('button');
+        dropBtn.type = 'button';
+        dropBtn.className = 'pfl-std-cbtn';
+        dropBtn.textContent = '⬇ Drop';
+        dropBtn.style.cssText = 'flex-shrink:0;border-color:#a855f7;color:#e9d5ff;padding:1px 5px';
+        dropBtn.addEventListener('click', async () => {
+          const tok = String(sfTokenIn?.value || '').trim();
+          if (!tok) {
+            if (sfStatusEl) sfStatusEl.textContent = 'Paste your personal Sketchfab API token above (click 🔑) to download GLBs.';
+            sfTokenIn?.focus();
+            return;
+          }
+          try { localStorage.setItem(SKETCHFAB_TOKEN_KEY, tok); } catch {}
+          if (sfStatusEl) sfStatusEl.textContent = `Fetching "${mName}" GLB...`;
+          try {
+            const dlRes = await fetch(`https://api.sketchfab.com/v3/models/${encodeURIComponent(uid)}/download`, {
+              headers: { Authorization: `Token ${tok}` },
+            });
+            if (!dlRes.ok) throw new Error(`Sketchfab download HTTP ${dlRes.status}`);
+            const dlJson = await dlRes.json();
+            const glbUrl = dlJson?.glb?.url || dlJson?.gltf?.url || '';
+            if (!glbUrl) throw new Error('No GLB archive available for this model');
+            const binRes = await fetch(glbUrl);
+            if (!binRes.ok) throw new Error(`GLB CDN HTTP ${binRes.status}`);
+            const blob = await binRes.blob();
+            const objUrl = URL.createObjectURL(blob);
+            createdGlbUrls.push(objUrl);
+            spawnCustomGlbMovable({ label: mName, uri: objUrl });
+            if (sfStatusEl) sfStatusEl.textContent = `Dropped "${mName}"! Use Object Pad to place & size.`;
+          } catch (dlErr) {
+            if (sfStatusEl) sfStatusEl.textContent = `Sketchfab drop failed: ${dlErr?.message || dlErr}`;
+          }
+        });
+        rowEl.append(lbl, dropBtn);
+        sfResultsEl?.appendChild(rowEl);
+      }
+    } catch (err) {
+      if (sfStatusEl) sfStatusEl.textContent = `Sketchfab search error: ${err?.message || err}`;
+    }
+  }
+  sfSearchBtn?.addEventListener('click', runSketchfabSearch);
+  sfQueryIn?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); runSketchfabSearch(); }
+  });
+  glbFileBtn?.addEventListener('click', () => glbFileIn?.click());
+  glbFileIn?.addEventListener('change', () => {
+    const file = glbFileIn.files?.[0];
+    if (!file) return;
+    const objUrl = URL.createObjectURL(file);
+    createdGlbUrls.push(objUrl);
+    spawnCustomGlbMovable({ label: file.name, uri: objUrl });
+    if (sfStatusEl) sfStatusEl.textContent = `Loaded local model: ${file.name}`;
+    glbFileIn.value = '';
   });
 
   // Render the 3D Axis Compass Ball (ported directly from Bird Pond adventure.html)
@@ -3522,9 +3780,9 @@ export function loadPflWindowFramework({ viewer }) {
     }
   }
 
-  // Add LiveWire 3D Walk Pad layout (matching LiveWire splat_stage.html 4x2 grid) inside 3D Compass Box:
+  // Add LiveWire 3D Walk Pad layout (matching LiveWire splat_stage.html 4x2 grid) inside left Camera & Walk card:
   const walkBar = document.createElement('div');
-  walkBar.style.cssText = 'margin-top:4px;padding:6px;border:1px solid rgba(56,189,248,0.32);border-radius:8px;background:rgba(15,23,42,0.68);display:flex;flex-direction:column;gap:5px';
+  walkBar.style.cssText = 'margin-top:2px;padding-top:6px;border-top:1px solid rgba(56,189,248,0.25);display:flex;flex-direction:column;gap:5px';
   walkBar.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
       <span style="color:#38bdf8;font-weight:700;font-size:10.5px;letter-spacing:0.04em">🧭 3D WALK PAD</span>
@@ -5012,7 +5270,7 @@ export function loadPflWindowFramework({ viewer }) {
           (savedHouse.lon - DEFAULT_HOUSE_STATE.lon) * 97200,
         );
         const safeLift = Math.abs(Number(savedHouse.lift || 0)) <= 35 ? Number(savedHouse.lift || 0) : 0;
-        if (driftM <= 32) {
+        if (driftM <= 250) {
           houseState = { ...houseState, ...savedHouse, lift: safeLift };
         }
       }
@@ -6218,6 +6476,7 @@ export function loadPflWindowFramework({ viewer }) {
       try { for (const id of yardLandmarkIds) viewer?.entities?.removeById?.(id); } catch {}
       try { viewer.scene.primitives.remove(always3dHost); } catch {}
       cancelAnimationFrame(rafId);
+      try { for (const u of createdGlbUrls) URL.revokeObjectURL(u); createdGlbUrls.length = 0; } catch {}
       pickHandler.destroy();
       for (const el of createdEls) el.remove();
     },
