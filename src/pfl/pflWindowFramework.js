@@ -5135,6 +5135,26 @@ export function loadPflWindowFramework({ viewer }) {
       oakImg.src = '/yard-frames/back-yard-cam2-2026-10-12.jpg';
     }
 
+    function makeWorldTagCanvas(text, borderHex, fgHex) {
+      const c = document.createElement('canvas');
+      c.width = 320;
+      c.height = 38;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = 'rgba(9, 14, 26, 0.86)';
+      ctx.strokeStyle = borderHex;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(2, 2, 316, 34, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = fgHex;
+      ctx.font = '700 13px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 160, 19);
+      return c;
+    }
+
     // Wooden Bayou Dock at Brazoria CAD Lot 23 shoreline, aligned straight out into Chocolate Bayou (14° NNE axis) — clickable & draggable
     const DOCK_POSE_KEY = 'pfl_dock_pose_v1';
     let dockState = { ...DOCK_DEFAULT_POSE };
@@ -5222,25 +5242,6 @@ export function loadPflWindowFramework({ viewer }) {
 
     const portalGeo = houseLocalToGeo(8.2, -4.8);
     const portalGround = resolveLocalGroundM(portalGeo.lon, portalGeo.lat);
-    const makeWorldTagCanvas = (text, borderHex, fgHex) => {
-      const c = document.createElement('canvas');
-      c.width = 320;
-      c.height = 38;
-      const ctx = c.getContext('2d');
-      ctx.fillStyle = 'rgba(9, 14, 26, 0.86)';
-      ctx.strokeStyle = borderHex;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.roundRect(2, 2, 316, 34, 7);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = fgHex;
-      ctx.font = '700 13px "JetBrains Mono", monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, 160, 19);
-      return c;
-    };
 
     const portalId = 'pfl-holodeck-portal-1s788';
     viewer.entities.add({
