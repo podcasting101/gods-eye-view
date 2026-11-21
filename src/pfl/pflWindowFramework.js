@@ -326,6 +326,7 @@ export function loadPflWindowFramework({ viewer }) {
     const extraRow = document.createElement('div');
     extraRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(56,189,248,0.22);';
     extraRow.innerHTML = `
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-open-compass" style="border-color:#38bdf8;color:#7dd3fc;font-weight:700" title="Open 3D Compass Ball, Walk/WASD Controls, Rotate/Spin &amp; Object Mover">🧭 3D Compass, Walk &amp; Move Objects</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-walk-inside-house" style="border-color:#fbbf24;color:#fde047;font-weight:700" title="Open interactive 32-photo 2-story floor plan &amp; guided room-by-room 3D walkthrough of 417 Palm Drive">🏠 Walk Inside 417 Palm Dr (32-Photo Floor Plan &amp; ▶ Auto-Tour)</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-marine-vhf" style="border-color:#22d3ee;color:#67e8f9;font-weight:700" title="Open USCG Houston-Galveston / Chocolate Bayou Marine VHF &amp; Live AIS / Radio Browser Scanner">📻 Marine VHF &amp; Chocolate Bayou Scanner</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-kalshi-inline" style="border-color:#22c55e;color:#4ade80;font-weight:700">📈 Kalshi Paper Arena (Show / Hide)</button>
@@ -456,6 +457,22 @@ export function loadPflWindowFramework({ viewer }) {
     if (typeof window.__pflPolymarketVisible === 'function') {
       syncPolymarketButtons(window.__pflPolymarketVisible());
     }
+    extraRow.querySelector('#pfl-btn-open-compass')?.addEventListener('click', () => {
+      compassWin.box.style.display = 'flex';
+      compassWin.box.classList.remove('pfl-minimized');
+      const mb = compassWin.box.querySelector('[data-act="min"]');
+      if (mb) mb.textContent = '—';
+      compassWin.box.style.zIndex = '9698';
+      const vw = window.innerWidth || 1440;
+      const vh = window.innerHeight || 900;
+      const w = compassWin.box.offsetWidth || 292;
+      const left = Math.max(8, Math.min(parseInt(compassWin.box.style.left, 10) || (vw - w - 18), vw - w - 12));
+      const top = Math.max(48, Math.min(parseInt(compassWin.box.style.top, 10) || 118, vh - 120));
+      compassWin.box.style.left = `${left}px`;
+      compassWin.box.style.top = `${top}px`;
+      paintGlobe();
+      compassWin.body.scrollTop = 0;
+    });
     extraRow.querySelector('#pfl-btn-walk-inside-house')?.addEventListener('click', () => {
       openMlsWalkthrough();
     });
@@ -487,10 +504,17 @@ export function loadPflWindowFramework({ viewer }) {
   compassWin.body.innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#cbd5e1">
       <div id="pfl-eye-elev-banner" style="width:100%;box-sizing:border-box;background:rgba(6,78,59,0.55);border:1.5px solid rgba(74,222,128,0.75);border-radius:7px;padding:6px 8px;text-align:center;font-size:13.5px;font-weight:800;color:#4ade80;letter-spacing:0.02em;line-height:1.25" title="Live Camera Height Above Ground Level (Meters &amp; Feet) + Optical Lens FOV">EYE: 1.8 m (5.9 ft) AGL · FOV: 60°</div>
-      <canvas id="pfl-axis-globe" width="136" height="136" style="cursor:pointer;border-radius:50%" title="Click N/S/E/W/UP or drag to orbit camera"></canvas>
+      <canvas id="pfl-axis-globe" width="136" height="136" style="cursor:grab;touch-action:none;border-radius:50%" title="Drag anywhere on ball to orbit/tilt camera, or click N/S/E/W/UP"></canvas>
       <div id="pfl-cam-readout" style="text-align:center;font-size:10px;color:#94a3b8;line-height:1.35">CAM READY</div>
+      <div id="pfl-walk-nav-slot" style="width:100%"></div>
       <div style="width:100%;border-top:1px solid rgba(56,189,248,0.25);padding-top:6px">
-        <div style="color:#fbbf24;font-weight:700;margin-bottom:4px">🎯 Move Object / Memory Photo:</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px">
+          <span style="color:#fbbf24;font-weight:700">🎯 Move / Rotate Object:</span>
+          <div style="display:flex;gap:3px">
+            <button type="button" class="pfl-std-cbtn" id="pfl-lock-house-btn" style="border-color:#22c55e;color:#4ade80" title="Lock 417 Palm Dr House against accidental mouse drags">🔒 House: LOCKED</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-reset-house-btn" title="Snap 417 Palm Dr House back to surveyed lot coordinates">↺ Reset House</button>
+          </div>
+        </div>
         <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px">
           <button type="button" class="pfl-std-cbtn" data-pfl-pick="lisa" title="Select Lisa Muse avatar">👑 Lisa</button>
           <button type="button" class="pfl-std-cbtn" data-pfl-pick="chair" title="Select Wooden Chair & Sign">🪑 Chair</button>
@@ -527,6 +551,25 @@ export function loadPflWindowFramework({ viewer }) {
 
   let activeMovable = null;
   let clickToPlaceMode = false;
+  let houseDragLocked = true;
+  const HOUSE_DEFAULT_POSE = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0, scale: 1 };
+
+  compassWin.body.querySelector('#pfl-lock-house-btn')?.addEventListener('click', (e) => {
+    houseDragLocked = !houseDragLocked;
+    e.currentTarget.textContent = houseDragLocked ? '🔒 House: LOCKED' : '🔓 House: UNLOCKED';
+    e.currentTarget.style.borderColor = houseDragLocked ? '#22c55e' : '#f59e0b';
+    e.currentTarget.style.color = houseDragLocked ? '#4ade80' : '#fde047';
+  });
+
+  compassWin.body.querySelector('#pfl-reset-house-btn')?.addEventListener('click', () => {
+    try { localStorage.removeItem('pfl_house_pose_v3'); } catch {}
+    const hMov = window.__pflMovables?.house;
+    if (hMov) {
+      hMov.update({ ...HOUSE_DEFAULT_POSE });
+      if (activeMovable?.kind === 'house') bindMovable(hMov);
+    }
+    governorRequestRender('pfl-reset-house');
+  });
 
   // Helper to resolve the ONE yard datum shared with yardFrames.js so photos, 3D House, Monaco, pads & AGL all agree
   function resolveLocalGroundM(lonDeg = -95.23144, latDeg = 29.24750) {
@@ -996,8 +1039,15 @@ export function loadPflWindowFramework({ viewer }) {
   }
 
   function setOutlineEntity(entityId, positions, hex, width) {
-    try { viewer.entities.removeById(entityId); } catch {}
-    if (!positions) return;
+    if (!positions) {
+      try { viewer.entities.removeById(entityId); } catch {}
+      return;
+    }
+    const existing = viewer.entities.getById(entityId);
+    if (existing?.polyline) {
+      existing.polyline.positions = positions;
+      return;
+    }
     const col = Cesium.Color.fromCssColorString(hex);
     viewer.entities.add({
       id: entityId,
@@ -1076,7 +1126,11 @@ export function loadPflWindowFramework({ viewer }) {
     if (!mov) return;
     activeMovable = mov;
     const st = mov.getState();
-    compassWin.body.querySelector('#pfl-sel-name').textContent = `Selected: ${mov.label}`;
+    const selEl = compassWin.body.querySelector('#pfl-sel-name');
+    if (selEl) {
+      selEl.textContent = `✅ Selected: ${mov.label} (${Math.round(st.heading || 0)}°)`;
+      selEl.style.color = '#fde047';
+    }
     compassWin.body.querySelector('#pfl-hdg-slider').value = String(Math.round(st.heading || 0));
     compassWin.body.querySelector('#pfl-hdg-val').textContent = `${Math.round(st.heading || 0)}°`;
     compassWin.body.querySelector('#pfl-alt-slider').value = String(st.lift || 0);
@@ -1171,6 +1225,9 @@ export function loadPflWindowFramework({ viewer }) {
     for (const p of list) {
       const ent = p?.id;
       const eid = String(ent?.id || '');
+      if (eid.startsWith('pfl-neo4j-')) {
+        return null;
+      }
       if (eid === GIZMO_ENTITY_ID && activeMovable) {
         return { type: 'movable', mov: activeMovable, viaGizmo: true };
       }
@@ -1197,6 +1254,8 @@ export function loadPflWindowFramework({ viewer }) {
 
   let dragMovableSession = null;
   let lastDragReleaseMs = 0;
+  let dragRafId = 0;
+  let pendingDragEndPos = null;
 
   function computeDampedEnuRayPoint(screenPos, invEnu) {
     const ray = viewer?.camera?.getPickRay?.(screenPos);
@@ -1218,6 +1277,11 @@ export function loadPflWindowFramework({ viewer }) {
   }
 
   function endDragMovableSession() {
+    if (dragRafId) {
+      cancelAnimationFrame(dragRafId);
+      dragRafId = 0;
+    }
+    pendingDragEndPos = null;
     if (!dragMovableSession) return;
     const wasMoved = dragMovableSession.moved;
     dragMovableSession = null;
@@ -1238,6 +1302,7 @@ export function loadPflWindowFramework({ viewer }) {
     const hit = drillFindTarget(downEv.position);
     if (hit?.type !== 'movable' || !hit.mov) return;
     bindMovable(hit.mov);
+    if (houseDragLocked && hit.mov.kind === 'house') return;
     const st = hit.mov.getState();
     const planeAlt = resolveLocalGroundM(st.lon, st.lat) + Number(st.lift || 0);
     const anchorCart = Cesium.Cartesian3.fromDegrees(st.lon, st.lat, planeAlt);
@@ -1460,42 +1525,50 @@ export function loadPflWindowFramework({ viewer }) {
       return;
     }
     if (!moveEv?.endPosition) return;
-    const dx = moveEv.endPosition.x - dragMovableSession.startX;
-    const dy = moveEv.endPosition.y - dragMovableSession.startY;
-    if (!dragMovableSession.moved && Math.hypot(dx, dy) < 4) return;
-    dragMovableSession.moved = true;
-    try {
-      let deltaX = 0;
-      let deltaY = 0;
-      if (dragMovableSession.useRayDelta) {
-        const curHit = computeDampedEnuRayPoint(moveEv.endPosition, dragMovableSession.invEnu);
-        if (!curHit) return;
-        deltaX = curHit.x - dragMovableSession.grabLocalX;
-        deltaY = curHit.y - dragMovableSession.grabLocalY;
-      } else {
-        const rightM = dx * dragMovableSession.metersPerPx;
-        const fwdM = -dy * dragMovableSession.metersPerPx * 1.35;
-        deltaX = dragMovableSession.camRightX * rightM + dragMovableSession.camFwdX * fwdM;
-        deltaY = dragMovableSession.camRightY * rightM + dragMovableSession.camFwdY * fwdM;
-      }
-      const distMove = Math.hypot(deltaX, deltaY);
-      if (distMove > 25) {
-        const clampScale = 25 / distMove;
-        deltaX *= clampScale;
-        deltaY *= clampScale;
-      }
-      const hitLocal = new Cesium.Cartesian3(deltaX, deltaY, 0);
-      const hitWorld = Cesium.Matrix4.multiplyByPoint(dragMovableSession.enu, hitLocal, new Cesium.Cartesian3());
-      const cg = Cesium.Cartographic.fromCartesian(hitWorld);
-      dragMovableSession.mov.update({
-        lat: Cesium.Math.toDegrees(cg.latitude),
-        lon: Cesium.Math.toDegrees(cg.longitude),
-      });
-      syncActiveMovableGizmo();
-      if (droneOrbitState.active && dragMovableSession.mov.kind === droneOrbitState.targetKey) {
-        applyDroneOrbit();
-      }
-    } catch {}
+    pendingDragEndPos = { x: moveEv.endPosition.x, y: moveEv.endPosition.y };
+    if (dragRafId) return;
+    dragRafId = requestAnimationFrame(() => {
+      dragRafId = 0;
+      const sess = dragMovableSession;
+      const pos = pendingDragEndPos;
+      if (!sess || !pos) return;
+      const dx = pos.x - sess.startX;
+      const dy = pos.y - sess.startY;
+      if (!sess.moved && Math.hypot(dx, dy) < 4) return;
+      sess.moved = true;
+      try {
+        let deltaX = 0;
+        let deltaY = 0;
+        if (sess.useRayDelta) {
+          const curHit = computeDampedEnuRayPoint(pos, sess.invEnu);
+          if (!curHit) return;
+          deltaX = curHit.x - sess.grabLocalX;
+          deltaY = curHit.y - sess.grabLocalY;
+        } else {
+          const rightM = dx * sess.metersPerPx;
+          const fwdM = -dy * sess.metersPerPx * 1.35;
+          deltaX = sess.camRightX * rightM + sess.camFwdX * fwdM;
+          deltaY = sess.camRightY * rightM + sess.camFwdY * fwdM;
+        }
+        const distMove = Math.hypot(deltaX, deltaY);
+        if (distMove > 25) {
+          const clampScale = 25 / distMove;
+          deltaX *= clampScale;
+          deltaY *= clampScale;
+        }
+        const hitLocal = new Cesium.Cartesian3(deltaX, deltaY, 0);
+        const hitWorld = Cesium.Matrix4.multiplyByPoint(sess.enu, hitLocal, new Cesium.Cartesian3());
+        const cg = Cesium.Cartographic.fromCartesian(hitWorld);
+        sess.mov.update({
+          lat: Cesium.Math.toDegrees(cg.latitude),
+          lon: Cesium.Math.toDegrees(cg.longitude),
+        });
+        syncActiveMovableGizmo();
+        if (droneOrbitState.active && sess.mov.kind === droneOrbitState.targetKey) {
+          applyDroneOrbit();
+        }
+      } catch {}
+    });
   }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
   pickHandler.setInputAction(() => {
@@ -1505,7 +1578,7 @@ export function loadPflWindowFramework({ viewer }) {
 
   pickHandler.setInputAction((movement) => {
     if (Date.now() - lastDragReleaseMs < 260) return;
-    if (clickToPlaceMode && activeMovable) {
+    if (clickToPlaceMode && activeMovable && !(houseDragLocked && activeMovable.kind === 'house')) {
       let cart = null;
       try {
         cart = viewer.scene.pickPositionSupported ? viewer.scene.pickPosition(movement.position) : null;
@@ -1725,7 +1798,66 @@ export function loadPflWindowFramework({ viewer }) {
     }
   }
 
+  let axisDrag = null;
+  let axisJustDraggedAt = 0;
+  gCanvas.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    axisDrag = {
+      id: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      moved: false,
+    };
+    gCanvas.style.cursor = 'grabbing';
+    try { gCanvas.setPointerCapture(e.pointerId); } catch {}
+  });
+  gCanvas.addEventListener('pointermove', (e) => {
+    if (!axisDrag || e.pointerId !== axisDrag.id) return;
+    const totalMove = Math.hypot(e.clientX - axisDrag.startX, e.clientY - axisDrag.startY);
+    if (!axisDrag.moved && totalMove < 4) return;
+    if (!axisDrag.moved) {
+      axisDrag.moved = true;
+      holdContinuousRender('pfl-axis-drag');
+    }
+    const dx = e.clientX - axisDrag.lastX;
+    const dy = e.clientY - axisDrag.lastY;
+    axisDrag.lastX = e.clientX;
+    axisDrag.lastY = e.clientY;
+    if (droneOrbitState.active) {
+      droneOrbitState.azimuthDeg = ((droneOrbitState.azimuthDeg + dx * 0.65) % 360 + 360) % 360;
+      droneOrbitState.pitchDeg = Math.max(-75, Math.min(5, droneOrbitState.pitchDeg - dy * 0.45));
+      applyDroneOrbit();
+    } else if (viewer?.camera) {
+      const nextHdg = (viewer.camera.heading || 0) + Cesium.Math.toRadians(dx * 0.55);
+      const nextPitch = Math.max(
+        Cesium.Math.toRadians(-89),
+        Math.min(Cesium.Math.toRadians(15), (viewer.camera.pitch || -0.4) - Cesium.Math.toRadians(dy * 0.4)),
+      );
+      viewer.camera.setView({
+        destination: viewer.camera.positionWC.clone(),
+        orientation: { heading: nextHdg, pitch: nextPitch, roll: 0 },
+      });
+    }
+    paintGlobe();
+    governorRequestRender('pfl-axis-drag');
+  });
+  const endAxisDrag = (e) => {
+    if (!axisDrag || (e && e.pointerId !== undefined && e.pointerId !== axisDrag.id)) return;
+    const wasMoved = axisDrag.moved;
+    axisDrag = null;
+    gCanvas.style.cursor = 'grab';
+    if (wasMoved) {
+      axisJustDraggedAt = Date.now();
+      releaseContinuousRender('pfl-axis-drag');
+    }
+  };
+  gCanvas.addEventListener('pointerup', endAxisDrag);
+  gCanvas.addEventListener('pointercancel', endAxisDrag);
+
   gCanvas.addEventListener('click', (e) => {
+    if (Date.now() - axisJustDraggedAt < 260) return;
     const r = gCanvas.getBoundingClientRect();
     const mx = e.clientX - r.left, my = e.clientY - r.top;
     for (let i = hitTargets.length - 1; i >= 0; i--) {
@@ -2185,30 +2317,38 @@ export function loadPflWindowFramework({ viewer }) {
     }
   }
 
-  // Add Vertical Elevator (Up/Down without backing through photos) + Walk Steps + Save/Undo Spot in 3D Compass Box:
+  // Add Street-Level Walk + Look/Turn + Vertical Elevator + Save/Undo Spot cleanly at TOP of 3D Compass Box:
   const walkBar = document.createElement('div');
-  walkBar.style.cssText = 'margin-top:6px;padding-top:6px;border-top:1px solid rgba(56,189,248,0.25);display:flex;flex-direction:column;gap:4px';
+  walkBar.style.cssText = 'margin-top:4px;padding:6px;border:1px solid rgba(56,189,248,0.28);border-radius:7px;background:rgba(15,23,42,0.55);display:flex;flex-direction:column;gap:4px';
   walkBar.innerHTML = `
+    <div style="color:#38bdf8;font-weight:700;font-size:10.5px">🚶 Street-Level Walk &amp; Change View:</div>
+    <div style="display:flex;gap:3px;flex-wrap:wrap">
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="fwd">⬆️ Fwd</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="back">⬇️ Back</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="left">⬅️ Left</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-step="right">➡️ Right</button>
+      <button type="button" class="pfl-std-cbtn" id="pfl-wasd-toggle" title="Walk horizontally with W/A/S/D keys, Q/E for height">🚶 WASD: OFF</button>
+    </div>
+    <div style="display:flex;gap:3px;flex-wrap:wrap">
+      <button type="button" class="pfl-std-cbtn" data-pfl-look="left" title="Turn view 15° left in place">↶ Turn L</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-look="right" title="Turn view 15° right in place">↷ Turn R</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-look="up" title="Pitch view up 10°">🔼 Look Up</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-look="down" title="Pitch view down 10°">🔽 Look Dn</button>
+    </div>
     <div style="display:flex;gap:3px;flex-wrap:wrap">
       <button type="button" class="pfl-std-cbtn" data-pfl-elev="+2" title="Raise camera straight UP +2m without moving forward/back">⬆️ Up +2m</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-elev="-2" title="Lower camera straight DOWN -2m without pushing through photos">⬇️ Down -2m</button>
+      <button type="button" class="pfl-std-cbtn" data-pfl-elev="-2" title="Lower camera straight DOWN -2m without pushing through photos">⬇️ Dn -2m</button>
       <button type="button" class="pfl-std-cbtn" data-pfl-elev="eye" title="Drop straight to 1.8m walking eye level at this exact spot">👁️ Eye 1.8m</button>
       <button type="button" class="pfl-std-cbtn" data-pfl-elev="balcony" title="Set height to 6.2m balcony level">🏠 6.2m</button>
     </div>
     <div style="display:flex;gap:3px;flex-wrap:wrap">
-      <button type="button" class="pfl-std-cbtn" data-pfl-step="fwd">⬆️ Step Fwd</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-step="back">⬇️ Back</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-step="left">⬅️ Left</button>
-      <button type="button" class="pfl-std-cbtn" data-pfl-step="right">➡️ Right</button>
-      <button type="button" class="pfl-std-cbtn" id="pfl-wasd-toggle" title="Walk horizontally at constant altitude with WASD">🚶 WASD: OFF</button>
-    </div>
-    <div style="display:flex;gap:3px;flex-wrap:wrap">
-      <button type="button" class="pfl-std-cbtn" id="pfl-save-spot" title="Bookmark this exact camera position & angle">📌 Save Spot</button>
+      <button type="button" class="pfl-std-cbtn" id="pfl-save-spot" title="Bookmark this exact camera position &amp; angle">📌 Save Spot</button>
       <button type="button" class="pfl-std-cbtn" id="pfl-go-spot" title="Return to your saved spot">🎯 Go Spot</button>
       <button type="button" class="pfl-std-cbtn" id="pfl-undo-jump" title="Undo accidental sky ejection">⏪ Undo Jump</button>
     </div>
+    <div id="pfl-walk-hint" style="display:none;font-size:9.5px;color:#4ade80;font-family:'JetBrains Mono',monospace">WASD active: W/A/S/D walk · Q/E height</div>
   `;
-  compassWin.body.appendChild(walkBar);
+  (compassWin.body.querySelector('#pfl-walk-nav-slot') || compassWin.body).appendChild(walkBar);
 
   function stepHorizontal(fwdM, rightM) {
     unlockDroneCamera();
@@ -2266,12 +2406,36 @@ export function loadPflWindowFramework({ viewer }) {
     });
   });
 
+  walkBar.querySelectorAll('[data-pfl-look]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!viewer?.camera) return;
+      unlockDroneCamera();
+      const dir = btn.getAttribute('data-pfl-look');
+      const curH = viewer.camera.heading || 0;
+      const curP = viewer.camera.pitch || -0.35;
+      const nextH = dir === 'left' ? curH - Cesium.Math.toRadians(15)
+        : dir === 'right' ? curH + Cesium.Math.toRadians(15)
+        : curH;
+      const nextP = dir === 'up' ? Math.min(Cesium.Math.toRadians(15), curP + Cesium.Math.toRadians(10))
+        : dir === 'down' ? Math.max(Cesium.Math.toRadians(-89), curP - Cesium.Math.toRadians(10))
+        : curP;
+      viewer.camera.setView({
+        destination: viewer.camera.positionWC.clone(),
+        orientation: { heading: nextH, pitch: nextP, roll: 0 },
+      });
+      paintGlobe();
+      governorRequestRender('pfl-look-step');
+    });
+  });
+
   let wasdWalkOn = false;
   const wasdBtn = walkBar.querySelector('#pfl-wasd-toggle');
+  const walkHintEl = walkBar.querySelector('#pfl-walk-hint');
   wasdBtn?.addEventListener('click', () => {
     wasdWalkOn = !wasdWalkOn;
     wasdBtn.textContent = wasdWalkOn ? '🚶 WASD: ON' : '🚶 WASD: OFF';
     wasdBtn.style.borderColor = wasdWalkOn ? '#4ade80' : '';
+    if (walkHintEl) walkHintEl.style.display = wasdWalkOn ? 'block' : 'none';
   });
   const wasdKeydownHandler = (e) => {
     if (!wasdWalkOn) return;
@@ -3437,6 +3601,13 @@ export function loadPflWindowFramework({ viewer }) {
       const frame = Cesium.Transforms.headingPitchRollToFixedFrame(origin, hpr);
       const pos = Cesium.Matrix4.multiplyByPoint(frame, new Cesium.Cartesian3(localX * sc, localY * sc, localZ * sc), new Cesium.Cartesian3());
       const ori = Cesium.Transforms.headingPitchRollQuaternion(pos, hpr);
+      const existing = viewer.entities.getById(id);
+      if (existing?.box) {
+        existing.position = pos;
+        existing.orientation = ori;
+        existing.box.dimensions = new Cesium.Cartesian3(dims.x * sc, dims.y * sc, dims.z * sc);
+        return existing;
+      }
       const ent = viewer.entities.add({
         id,
         name,
@@ -3450,12 +3621,11 @@ export function loadPflWindowFramework({ viewer }) {
         },
         ...(billboardSpec ? { billboard: billboardSpec } : {}),
       });
-      yardLandmarkIds.push(id);
+      if (!yardLandmarkIds.includes(id)) yardLandmarkIds.push(id);
       return ent;
     };
 
     const renderMonacoParts = () => {
-      for (const mid of monacoIds) viewer.entities.removeById(mid);
       rvGround = resolveLocalGroundM(monacoState.lon, monacoState.lat);
       const parts = [
         // Main 40ft (12.2m) × 8.5ft (2.59m) × 12ft (3.65m roof) Champagne/Cream Coach Body

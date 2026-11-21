@@ -2890,7 +2890,7 @@ export async function loadNeo4jPersonalLayer({
     const topPick = viewer.scene.pick(windowPosition);
     const direct = matchNodeFromPicked(topPick);
     if (direct) return direct;
-    if (!allowDrill || !topPick || !viewer.scene.drillPick) return null;
+    if (!allowDrill || !viewer.scene.drillPick) return null;
     const drill = viewer.scene.drillPick(windowPosition, 8) || [];
     for (const picked of drill) {
       const hit = matchNodeFromPicked(picked);
@@ -2901,6 +2901,15 @@ export async function loadNeo4jPersonalLayer({
 
   if (viewer?.scene?.canvas && Cesium.ScreenSpaceEventHandler) {
     eventHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
+    const lockCamForDrag = (locked) => {
+      const sc = viewer?.scene?.screenSpaceCameraController;
+      if (!sc) return;
+      sc.enableRotate = !locked;
+      sc.enableTranslate = !locked;
+      sc.enableTilt = !locked;
+      if (!locked) sc.enableInputs = true;
+    };
 
     eventHandler.setInputAction((downEvent) => {
       if (!visible || !isPointerFree()) return;
@@ -2920,6 +2929,7 @@ export async function loadNeo4jPersonalLayer({
         if (cn) startCoords.set(cid, { lat: cn.lat, lon: cn.lon, alt: cn.alt });
       }
 
+      lockCamForDrag(true);
       dragState = {
         nodeId,
         cluster: entry.cluster,
@@ -2927,6 +2937,7 @@ export async function loadNeo4jPersonalLayer({
         lastPos: Cesium.Cartesian2.clone(downEvent.position),
         moved: false,
         lease: null,
+        camLocked: true,
         startCoords,
       };
     }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
@@ -2956,14 +2967,16 @@ export async function loadNeo4jPersonalLayer({
       }
 
       const distPx = Cesium.Cartesian2.distance(dragState.startPos, endPos);
-      if (!dragState.moved && distPx > 6) {
+      if (!dragState.moved && distPx > 4) {
         const lease = claimPointer('pfl-neo4j-drag');
         if (!lease) {
+          lockCamForDrag(false);
           dragState = null;
           return;
         }
         dragState.lease = lease;
         dragState.moved = true;
+        holdContinuousRender('pfl-neo4j-drag');
         if (viewer.scene.screenSpaceCameraController) {
           viewer.scene.screenSpaceCameraController.enableInputs = false;
         }
@@ -3013,13 +3026,14 @@ export async function loadNeo4jPersonalLayer({
       dragState.lastPos = Cesium.Cartesian2.clone(endPos);
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-    eventHandler.setInputAction((upEvent) => {
+    const finishDragState = (triggerSelectOnClick = true) => {
       if (!dragState) return;
       const finished = dragState;
       dragState = null;
 
-      if (viewer?.scene?.screenSpaceCameraController) {
-        viewer.scene.screenSpaceCameraController.enableInputs = true;
+      lockCamForDrag(false);
+      if (finished.moved) {
+        try { releaseContinuousRender('pfl-neo4j-drag'); } catch {}
       }
       if (finished.lease) {
         releasePointer(finished.lease);
@@ -3029,10 +3043,18 @@ export async function loadNeo4jPersonalLayer({
         saveClusterState(finished.cluster);
         draw2dDrawer();
         governorRequestRender('pfl-neo4j-drag-end');
-      } else {
+      } else if (triggerSelectOnClick) {
         selectNode(finished.nodeId, { expand: true, openHud: true });
       }
-    }, Cesium.ScreenSpaceEventType.LEFT_UP);
+    };
+
+    eventHandler.setInputAction(() => finishDragState(true), Cesium.ScreenSpaceEventType.LEFT_UP);
+    if (typeof window !== 'undefined') {
+      const onSafetyUp = () => finishDragState(false);
+      const safetySig = hoverListenerController?.signal;
+      window.addEventListener('pointerup', onSafetyUp, { passive: true, ...(safetySig ? { signal: safetySig } : {}) });
+      window.addEventListener('blur', onSafetyUp, { passive: true, ...(safetySig ? { signal: safetySig } : {}) });
+    }
 
     // Fallback click handler for touch/synthetic clicks where LEFT_DOWN was not armed
     eventHandler.setInputAction((clickEvent) => {

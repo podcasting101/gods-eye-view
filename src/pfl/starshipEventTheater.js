@@ -1830,10 +1830,10 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
     // When Google 3D Tileset is hidden and the Esri/OSM globe is visible, sample live globe height (0m on ellipsoid, or terrain height).
     if (viewer?.scene?.globe?.show) {
       const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
-      return Number.isFinite(gh) ? gh : 0.0;
+      return Number.isFinite(gh) && gh > -80 && gh < 5000 ? gh : 0.0;
     }
     const sh = viewer?.scene?.sampleHeight?.(Cesium.Cartographic.fromDegrees(lon, lat));
-    return Number.isFinite(sh) ? sh : photorealFallbackM;
+    return Number.isFinite(sh) && sh > -80 && sh < 5000 ? sh : (Number.isFinite(photorealFallbackM) ? photorealFallbackM : 0.0);
   }
 
   function flyToLiverpoolNode() {
