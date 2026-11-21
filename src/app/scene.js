@@ -221,11 +221,32 @@ export async function createApplicationScene({
 
   loaderStatus.textContent = t('Initializing systems...');
 
+  const createPhotorealTileset =
+    !tileset &&
+    !PHOTOREAL_AT_STARTUP &&
+    typeof engine.loadPhotoreal === 'function' &&
+    (googleApiKey || googleTokens || cesiumToken)
+      ? async () => {
+          const res = await engine.loadPhotoreal(viewer, {
+            googleApiKey,
+            googleTokens,
+            cesiumToken,
+            enabled: true,
+          });
+          if (!res?.tileset) {
+            const err = res?.errors?.at(-1);
+            throw err || new Error('Google 3D tiles unavailable');
+          }
+          return res.tileset;
+        }
+      : null;
+
   const mapStackController = new MapController(viewer, {
     requestRender: governorRequestRender,
     ...mapOptions,
     engine,
     googleTileset: tileset,
+    createPhotorealTileset,
     cesiumToken,
     initialStack: tileset ? 'photoreal' : 'esri-imagery',
     // Task 5 (height-datum fix): rebroadcast stack changes as a window

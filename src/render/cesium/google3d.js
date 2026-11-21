@@ -40,7 +40,11 @@ export async function loadPhotorealisticTileset(
   if (!enabled) return { tileset: null, route: 'osm', errors };
 
   const attempts = [];
-  if (googleKey)
+  const isGoogleKeyUsable =
+    Boolean(googleKey) &&
+    googleKey !== ionToken &&
+    !googleKey.startsWith('eyJ');
+  if (isGoogleKeyUsable)
     attempts.push({
       route: 'google-direct',
       create: () => createGoogleDirectTileset(Cesium, googleKey),

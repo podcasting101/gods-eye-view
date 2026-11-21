@@ -13,6 +13,7 @@ import { ESRI_ATTRIBUTION_HTML } from './attribution.js';
  */
 export function createDefaultMapSources({
   googleTileset = null,
+  createPhotorealTileset = null,
   cesiumToken = '',
   googleApiKey = '',
   engine = null,
@@ -47,10 +48,11 @@ export function createDefaultMapSources({
       if (descriptor.kind === 'photoreal')
         return {
           ...common,
-          available: Boolean(googleTileset),
+          available: Boolean(googleTileset || createPhotorealTileset),
           unavailableReason: () =>
             photorealUnavailableReason(hasIon || hasGoogle),
           tileset: googleTileset,
+          ...(createPhotorealTileset ? { createTileset: createPhotorealTileset } : {}),
         };
       const imagery =
         descriptor.kind === 'ion'
