@@ -718,52 +718,46 @@ export function loadPflWindowFramework({ viewer }) {
             <button type="button" class="pfl-std-cbtn" id="pfl-hs-spin" title="Rotate selected object 90°">🔄 90°</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-hs-resize" title="Focus Size slider">📐 Size</button>
           </div>
-          <details id="pfl-photo-align-box" style="margin-top:4px;padding:5px;border:1px solid rgba(34,211,238,0.5);border-radius:7px;background:rgba(8,47,73,0.45)">
-            <summary style="cursor:pointer;color:#67e8f9;font-weight:700;font-size:10px;list-style:none">📷 Photo / 360° / 3D &amp; 4D Time Machine ▾</summary>
-            <div style="display:flex;flex-direction:column;gap:4px;margin-top:5px">
-              <div style="display:flex;gap:3px;flex-wrap:wrap">
-                <input type="file" id="pfl-photo-file-input" accept="image/*,.jpg,.jpeg,.png,.webp" multiple style="display:none" />
-                <button type="button" class="pfl-std-cbtn" id="pfl-photo-drop-btn" style="flex:1;border-color:#22d3ee;color:#67e8f9" title="Drop 2D, 3D Stereo, or 360° equirectangular photos — extracts EXIF GPS/DateTimeOriginal/GPano &amp; auto-aligns via visual feature vectors">📷 Drop Photos / 360° / 3D</button>
-              </div>
-              <div style="display:flex;gap:3px;align-items:center">
-                <span style="font-size:9.5px;color:#94a3b8;white-space:nowrap">🕰️ 4D Era:</span>
-                <select id="pfl-era-select" style="flex:1;min-width:0;background:#0f172a;color:#fde047;border:1px solid #334155;border-radius:4px;padding:2px 4px;font-size:9.5px">
-                  <option value="all">All Eras (2018 + Live 2026)</option>
-                  <option value="2026">Live 2026 Survey</option>
-                  <option value="2018-11-04">Nov 4, 2018 (21× LG-R105 360°)</option>
-                </select>
-              </div>
-              <div style="display:flex;gap:3px;flex-wrap:wrap">
-                <button type="button" class="pfl-std-cbtn" id="pfl-360-orbs-toggle" style="flex:1;border-color:#38bdf8;color:#7dd3fc" title="Show/hide clickable floating 360° Time Orbs around 417 Palm Dr">🌐 360° Orbs: ON</button>
-                <button type="button" class="pfl-std-cbtn" id="pfl-time-machine-spot-btn" style="flex:1;border-color:#facc15;color:#fde047" title="Find nearest 360° spheres at your current standing position &amp; play 2018 → 2026 over time">▶️ Play Spot Time</button>
-              </div>
-              <div style="display:flex;gap:3px">
-                <button type="button" class="pfl-std-cbtn" id="pfl-photo-lock-btn" style="flex:1;border-color:#4ade80;color:#86efac" title="Lock &amp; index selected photo vector pose locally">🔗 Lock &amp; Index Selected</button>
-              </div>
-              <div id="pfl-photo-align-status" style="font-size:9px;color:#a5f3fc;line-height:1.25">21× Nov 4 2018 360° spheres indexed · Click any orb or Drop Photos</div>
-            </div>
-          </details>
-          <details id="pfl-sketchfab-box" style="margin-top:4px;padding:5px;border:1px solid rgba(168,85,247,0.45);border-radius:7px;background:rgba(15,23,42,0.8)">
-            <summary style="cursor:pointer;color:#e9d5ff;font-weight:700;font-size:10px;list-style:none">📦 Sketchfab &amp; Local GLB Loader ▾</summary>
-            <div style="display:flex;flex-direction:column;gap:4px;margin-top:5px">
-              <div style="display:flex;gap:3px">
-                <input type="text" id="pfl-sf-query" placeholder="Search Sketchfab 3D..." style="flex:1;min-width:0;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:2px 5px;font-size:10px" />
-                <button type="button" class="pfl-std-cbtn" id="pfl-sf-search-btn" style="border-color:#a855f7;color:#e9d5ff">🔍</button>
-              </div>
-              <div style="display:flex;gap:3px;align-items:center">
-                <input type="password" id="pfl-sf-token" placeholder="Sketchfab API Token (saved locally)" style="flex:1;min-width:0;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:2px 5px;font-size:9.5px" />
-                <a href="https://sketchfab.com/settings/password" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none;border-color:#38bdf8;color:#7dd3fc" title="Open your Sketchfab account settings to copy your personal API Token">🔑</a>
-              </div>
-              <div style="display:flex;gap:3px;align-items:center">
-                <input type="file" id="pfl-glb-file-input" accept=".glb,.gltf" style="display:none" />
-                <button type="button" class="pfl-std-cbtn" id="pfl-glb-file-btn" style="flex:1;border-color:#22c55e;color:#86efac" title="Drop any local .glb / .gltf (Mixamo, Ready Player Me, Blender) onto the current view">📁 Drop Local .glb</button>
-              </div>
-              <div id="pfl-sf-status" style="font-size:9px;color:#94a3b8;line-height:1.25">Search downloadable models or drop a local .glb</div>
-              <div id="pfl-sf-results" style="display:flex;flex-direction:column;gap:3px;max-height:130px;overflow:auto"></div>
-            </div>
-          </details>
         </div>
       </div>
+      <details id="pfl-photo-align-box" style="width:100%;box-sizing:border-box;padding:5px;border:1px solid rgba(34,211,238,0.5);border-radius:7px;background:rgba(8,47,73,0.45)">
+        <summary style="cursor:pointer;color:#67e8f9;font-weight:700;font-size:10px;list-style:none">📷 Photo / 360° / 3D &amp; 4D Time Machine ▾</summary>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-top:5px">
+          <div style="display:flex;gap:3px;flex-wrap:wrap">
+            <input type="file" id="pfl-photo-file-input" accept="image/*,.jpg,.jpeg,.png,.webp" multiple style="display:none" />
+            <button type="button" class="pfl-std-cbtn" id="pfl-photo-drop-btn" style="flex:1;border-color:#22d3ee;color:#67e8f9" title="Drop 2D, 3D Stereo, or 360° equirectangular photos — extracts EXIF GPS/DateTimeOriginal/GPano &amp; auto-aligns via visual feature vectors">📷 Drop Photos / 360° / 3D</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-photo-lock-btn" style="border-color:#4ade80;color:#86efac" title="Lock &amp; index selected photo vector pose locally">🔗 Lock &amp; Index Selected</button>
+          </div>
+          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+            <span style="font-size:9.5px;color:#94a3b8;white-space:nowrap">🕰️ 4D Era:</span>
+            <select id="pfl-era-select" style="flex:1;min-width:140px;background:#0f172a;color:#fde047;border:1px solid #334155;border-radius:4px;padding:2px 4px;font-size:9.5px">
+              <option value="all">All Eras (2018 + Live 2026)</option>
+              <option value="2026">Live 2026 Survey</option>
+              <option value="2018-11-04">Nov 4, 2018 (21× LG-R105 360°)</option>
+            </select>
+            <button type="button" class="pfl-std-cbtn" id="pfl-360-orbs-toggle" style="border-color:#38bdf8;color:#7dd3fc" title="Show/hide clickable floating 360° Time Orbs around 417 Palm Dr">🌐 360° Orbs: ON</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-time-machine-spot-btn" style="border-color:#facc15;color:#fde047" title="Find nearest 360° spheres at your current standing position &amp; play 2018 → 2026 over time">▶️ Play Spot Time</button>
+          </div>
+          <div id="pfl-photo-align-status" style="font-size:9px;color:#a5f3fc;line-height:1.25">21× Nov 4 2018 360° spheres indexed · Click any orb or Drop Photos</div>
+        </div>
+      </details>
+      <details id="pfl-sketchfab-box" style="width:100%;box-sizing:border-box;padding:5px;border:1px solid rgba(168,85,247,0.45);border-radius:7px;background:rgba(15,23,42,0.8)">
+        <summary style="cursor:pointer;color:#e9d5ff;font-weight:700;font-size:10px;list-style:none">📦 Sketchfab &amp; Local GLB Loader ▾</summary>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-top:5px">
+          <div style="display:flex;gap:3px">
+            <input type="text" id="pfl-sf-query" placeholder="Search Sketchfab 3D..." style="flex:1;min-width:0;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:2px 5px;font-size:10px" />
+            <button type="button" class="pfl-std-cbtn" id="pfl-sf-search-btn" style="border-color:#a855f7;color:#e9d5ff">🔍</button>
+            <input type="file" id="pfl-glb-file-input" accept=".glb,.gltf" style="display:none" />
+            <button type="button" class="pfl-std-cbtn" id="pfl-glb-file-btn" style="border-color:#22c55e;color:#86efac" title="Drop any local .glb / .gltf (Mixamo, Ready Player Me, Blender) onto the current view">📁 Drop Local .glb</button>
+          </div>
+          <div style="display:flex;gap:3px;align-items:center">
+            <input type="password" id="pfl-sf-token" placeholder="Sketchfab API Token (saved locally)" style="flex:1;min-width:0;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:2px 5px;font-size:9.5px" />
+            <a href="https://sketchfab.com/settings/password" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none;border-color:#38bdf8;color:#7dd3fc" title="Open your Sketchfab account settings to copy your personal API Token">🔑</a>
+          </div>
+          <div id="pfl-sf-status" style="font-size:9px;color:#94a3b8;line-height:1.25">Search downloadable models or drop a local .glb</div>
+          <div id="pfl-sf-results" style="display:flex;flex-direction:column;gap:3px;max-height:130px;overflow:auto"></div>
+        </div>
+      </details>
       <div id="pfl-nav-pins-box" style="width:100%;border-top:1px solid rgba(56,189,248,0.25);padding-top:6px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;margin-bottom:4px">
           <span id="pfl-nav-pins-hdr" style="color:#38bdf8;font-weight:700">📍 Navigation Pins (Personal)</span>
@@ -792,6 +786,7 @@ export function loadPflWindowFramework({ viewer }) {
   let walkCollisionsOn = true;
   const HOUSE_DEFAULT_POSE = { lat: 29.247585, lon: -95.231378, heading: 104, lift: 0, scale: 1, opacity: 1 };
   const MONACO_DEFAULT_POSE = { lat: 29.247515, lon: -95.231255, heading: 194, lift: 0, scale: 1, opacity: 1 };
+  const DOCK_DEFAULT_POSE = { lat: 29.247786, lon: -95.231388, heading: 14, lift: 0, scale: 1, opacity: 1 };
 
   function houseLocalToGeo(localEastM, localNorthM, hState = null) {
     const hs = hState || window.__pflMovables?.house?.getState?.() || HOUSE_DEFAULT_POSE;
@@ -1351,11 +1346,12 @@ export function loadPflWindowFramework({ viewer }) {
 
   compassWin.body.querySelector('#pfl-reset-all-objects-btn')?.addEventListener('click', () => {
     if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
-    for (const k of ['pfl_house_pose_v3', 'pfl_house_pose_v4', 'pfl_monaco_pose_v2', 'pfl_monaco_pose_v3', 'pfl_custom_objects_v1', 'pfl_movable_scales_v1', 'gev-yardframes-layout-v1']) {
+    for (const k of ['pfl_house_pose_v3', 'pfl_house_pose_v4', 'pfl_monaco_pose_v2', 'pfl_monaco_pose_v3', 'pfl_dock_pose_v1', 'pfl_custom_objects_v1', 'pfl_movable_scales_v1', 'gev-yardframes-layout-v1']) {
       try { localStorage.removeItem(k); } catch {}
     }
     try { window.__pflMovables?.house?.update?.({ ...HOUSE_DEFAULT_POSE }); } catch {}
     try { window.__pflMovables?.monaco?.update?.({ ...MONACO_DEFAULT_POSE }); } catch {}
+    try { window.__pflMovables?.dock?.update?.({ ...DOCK_DEFAULT_POSE }); } catch {}
     try { window.__pflMovables?.lisa?.update?.({ lat: 29.247436, lon: -95.231445, heading: 192, lift: 0, scale: 1, opacity: 1 }); } catch {}
     try { window.__pflMovables?.chair?.update?.({ lat: 29.247434, lon: -95.231426, heading: 192, lift: 0, scale: 1, opacity: 1 }); } catch {}
     try { buildYard3dLandmarks(); } catch {}
@@ -1785,8 +1781,8 @@ export function loadPflWindowFramework({ viewer }) {
       const liftM = Number(st.lift || 0);
       const baseAlt = gM + liftM + 0.16;
       const scaleK = Number(st.scale) > 0 ? Number(st.scale) : 1;
-      const radiusM = scaleK * (activeMovable.kind === 'house' ? 8.2 : activeMovable.kind === 'monaco' ? 6.4 : String(activeMovable.kind || '').startsWith('yardframe:') ? 2.4 : 1.45);
-      const badgeLift = scaleK * (activeMovable.kind === 'house' ? 8.6 : activeMovable.kind === 'monaco' ? 4.2 : String(activeMovable.kind || '').startsWith('yardframe:') ? 2.1 : 2.35);
+      const radiusM = scaleK * (activeMovable.kind === 'house' ? 8.2 : activeMovable.kind === 'monaco' ? 6.4 : activeMovable.kind === 'dock' ? 4.2 : String(activeMovable.kind || '').startsWith('yardframe:') ? 2.4 : 1.45);
+      const badgeLift = scaleK * (activeMovable.kind === 'house' ? 8.6 : activeMovable.kind === 'monaco' ? 4.2 : activeMovable.kind === 'dock' ? 2.2 : String(activeMovable.kind || '').startsWith('yardframe:') ? 2.1 : 2.35);
       let giz = viewer.entities.getById(GIZMO_ENTITY_ID);
       const pos = Cesium.Cartesian3.fromDegrees(st.lon, st.lat, baseAlt + badgeLift);
       if (!giz) {
@@ -1848,7 +1844,7 @@ export function loadPflWindowFramework({ viewer }) {
     const st = mov.getState?.();
     if (!st || !Number.isFinite(st.lat) || !Number.isFinite(st.lon)) return null;
     const scaleK = Number(st.scale) > 0 ? Number(st.scale) : 1;
-    const baseR = kind === 'house' ? 8.4 : kind === 'monaco' ? 6.6 : 1.5;
+    const baseR = kind === 'house' ? 8.4 : kind === 'monaco' ? 6.6 : kind === 'dock' ? 4.2 : 1.5;
     const r = baseR * scaleK;
     const alt = resolveLocalGroundM(st.lon, st.lat) + Number(st.lift || 0) + raiseM + 0.1;
     const mLon = 111320 * Math.cos(Cesium.Math.toRadians(st.lat));
@@ -2073,6 +2069,7 @@ export function loadPflWindowFramework({ viewer }) {
     const SURVEY_DEFAULTS = {
       house: { ...HOUSE_DEFAULT_POSE },
       monaco: { ...MONACO_DEFAULT_POSE },
+      dock: { ...DOCK_DEFAULT_POSE },
       lisa: { lat: 29.247436, lon: -95.231445, heading: 192, lift: 0, scale: 1, opacity: 1 },
       chair: { lat: 29.247434, lon: -95.231426, heading: 192, lift: 0, scale: 1, opacity: 1 },
     };
@@ -5138,24 +5135,64 @@ export function loadPflWindowFramework({ viewer }) {
       oakImg.src = '/yard-frames/back-yard-cam2-2026-10-12.jpg';
     }
 
-    // Wooden Bayou Dock at Brazoria CAD Lot 23 shoreline, aligned straight out into Chocolate Bayou (14° NNE axis)
+    // Wooden Bayou Dock at Brazoria CAD Lot 23 shoreline, aligned straight out into Chocolate Bayou (14° NNE axis) — clickable & draggable
+    const DOCK_POSE_KEY = 'pfl_dock_pose_v1';
+    let dockState = { ...DOCK_DEFAULT_POSE };
+    try {
+      const savedDock = JSON.parse(localStorage.getItem(DOCK_POSE_KEY) || 'null');
+      if (savedDock && Number.isFinite(savedDock.lat) && Number.isFinite(savedDock.lon)) {
+        dockState = { ...dockState, ...savedDock };
+      }
+    } catch {}
     const dockId = 'pfl-bayou-dock-3d';
-    viewer.entities.add({
-      id: dockId,
-      name: '⚓ 417 Palm Dr Chocolate Bayou Dock',
-      position: Cesium.Cartesian3.fromDegrees(-95.231388, 29.247786, gBase + 0.35),
-      orientation: Cesium.Transforms.headingPitchRollQuaternion(
-        Cesium.Cartesian3.fromDegrees(-95.231388, 29.247786, gBase + 0.35),
-        new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(14), 0, 0),
-      ),
-      box: {
-        dimensions: new Cesium.Cartesian3(3.8, 6.2, 0.35),
-        material: Cesium.Color.fromCssColorString('#7c5c3e').withAlpha(0.85),
-        outline: true,
-        outlineColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.75),
+    const renderDockEntity = () => {
+      const dGround = resolveLocalGroundM(dockState.lon, dockState.lat);
+      const dScale = Math.max(0.25, Math.min(3.5, Number(dockState.scale) > 0 ? Number(dockState.scale) : 1));
+      const dOp = Math.max(0.05, Math.min(1, Number(dockState.opacity ?? 1)));
+      const dPos = Cesium.Cartesian3.fromDegrees(dockState.lon, dockState.lat, dGround + Number(dockState.lift || 0) + 0.35 * dScale);
+      const dOri = Cesium.Transforms.headingPitchRollQuaternion(
+        dPos,
+        new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(dockState.heading ?? 14), 0, 0),
+      );
+      viewer.entities.removeById(dockId);
+      const dEnt = viewer.entities.add({
+        id: dockId,
+        name: '⚓ 417 Palm Dr Chocolate Bayou Dock',
+        position: dPos,
+        orientation: dOri,
+        box: {
+          dimensions: new Cesium.Cartesian3(3.8 * dScale, 6.2 * dScale, 0.35 * dScale),
+          material: Cesium.Color.fromCssColorString('#7c5c3e').withAlpha(0.85 * dOp),
+          outline: true,
+          outlineColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.75 * dOp),
+        },
+        billboard: {
+          image: makeWorldTagCanvas('⚓ BAYOU DOCK', '#38bdf8', '#7dd3fc'),
+          width: 112,
+          height: 17,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -14),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 120),
+        },
+      });
+      if (!yardLandmarkIds.includes(dockId)) yardLandmarkIds.push(dockId);
+      dEnt._pflMovable = dockMovable;
+      return dEnt;
+    };
+    const dockMovable = {
+      kind: 'dock',
+      label: '⚓ 417 Palm Dr Bayou Dock',
+      getState: () => ({ ...dockState }),
+      update: (patch) => {
+        Object.assign(dockState, patch);
+        try { localStorage.setItem(DOCK_POSE_KEY, JSON.stringify(dockState)); } catch {}
+        renderDockEntity();
+        governorRequestRender('pfl-move-dock');
       },
-    });
-    yardLandmarkIds.push(dockId);
+    };
+    renderDockEntity();
+    window.__pflMovables = window.__pflMovables || {};
+    window.__pflMovables.dock = dockMovable;
 
     // Glowing 3D Cyan/Purple Holodeck Portal Ring under 1S788 Carport Entry (29.247518, -95.231435)
     const portalCanvas = document.createElement('canvas');
@@ -5580,7 +5617,7 @@ export function loadPflWindowFramework({ viewer }) {
         position: hPos,
         orientation: hOri,
         model: {
-          uri: `/models/pfl-palm-drive-house.glb?v=${viewer._pflHouseRev || 12}`,
+          uri: `/models/pfl-palm-drive-house.glb?v=${viewer._pflHouseRev || 13}`,
           scale: houseScale,
           color: Cesium.Color.WHITE.withAlpha(houseOpacity),
           heightReference: Cesium.HeightReference.NONE,
@@ -5671,6 +5708,7 @@ export function loadPflWindowFramework({ viewer }) {
       try { window.__pflMovables?.chair?.update?.({}); } catch {}
       try { window.__pflMovables?.house?.update?.({}); } catch {}
       try { window.__pflMovables?.monaco?.update?.({}); } catch {}
+      try { window.__pflMovables?.dock?.update?.({}); } catch {}
       try { if (typeof sync360SphereEntities === 'function') sync360SphereEntities(); } catch {}
       try { syncActiveMovableGizmo(); } catch {}
     }, delayMs);
