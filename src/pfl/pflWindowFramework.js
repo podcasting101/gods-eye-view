@@ -331,6 +331,7 @@ export function loadPflWindowFramework({ viewer }) {
       <button type="button" class="pfl-f15-btn" id="pfl-btn-vault-inline" style="border-color:#a855f7;color:#d8b4fe;font-weight:700">🏛️ Local Palace &amp; Wyze Vault</button>
       <a href="/memory-palace.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-palace" style="text-decoration:none;display:inline-flex;align-items:center">↗ Full Memory Palace</a>
       <a href="http://127.0.0.1:8093/" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-livewire" style="border-color:#f43f5e;color:#fda4af;text-decoration:none;display:inline-flex;align-items:center">🎥 LiveWire (:8093) ↗</a>
+      <a href="http://127.0.0.1:8093/concierge" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-concierge" style="border-color:#d4af37;color:#fde047;font-weight:700;text-decoration:none;display:inline-flex;align-items:center">🥂 PFL Concierge ↗</a>
       <a href="https://elitespyworlds.com/birdpond/adventure.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-birdpond-ext" style="text-decoration:none;display:inline-flex;align-items:center">🌿 EliteSpyWorlds Bird Pond ↗</a>
     `;
     cmdWin.body.appendChild(extraRow);

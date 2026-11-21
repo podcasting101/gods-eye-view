@@ -1,24 +1,24 @@
 {
-  "generated_at": "2026-11-14T09:15:45.470902-06:00",
+  "generated_at": "2026-11-19T17:44:42.721571-06:00",
   "coordinator": "Antigravity (Harry Maybourne) \u2014 Head of Covert Intelligence & Chief Designer of God's Eye View",
   "antigravity_gas_gauge": {
     "plan": "Google AI Ultra (g1-ultra-lite-tier)",
     "model": "gemini-4-argon-high",
     "panel_source": "LanguageServerService/RetrieveUserQuotaSummary -> cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary (project=aicode-consumers)",
-    "session_remaining_pct": 93.67,
-    "session_used_pct": 6.33,
-    "session_reset_iso": "2026-11-14T13:28:14-06:00",
-    "weekly_remaining_pct": 80.92,
-    "weekly_used_pct": 19.08,
-    "weekly_reset_iso": "2026-11-20T16:51:37-06:00",
-    "claude_gpt_weekly_remaining_pct": 100.0,
-    "claude_gpt_weekly_reset_iso": "2026-11-21T09:04:05-06:00",
+    "session_remaining_pct": 78.75,
+    "session_used_pct": 21.25,
+    "session_reset_iso": "2026-11-19T21:17:18-06:00",
+    "weekly_remaining_pct": 11.94,
+    "weekly_used_pct": 88.06,
+    "weekly_reset_iso": "2026-11-24T17:28:41-06:00",
+    "claude_gpt_weekly_remaining_pct": 46.94,
+    "claude_gpt_weekly_reset_iso": "2026-11-25T11:26:25-06:00",
     "claude_gpt_session_remaining_pct": 100.0,
-    "claude_gpt_session_reset_iso": "2026-11-14T14:04:05-06:00",
+    "claude_gpt_session_reset_iso": "2026-11-19T22:44:44-06:00",
     "oct26_book_weekly_remaining_pct": 87.8,
     "daily_target_pp": 15.0,
-    "today_burned_pp": 6.88,
-    "today_remaining_to_burn_pp": 8.12,
+    "today_burned_pp": 75.86,
+    "today_remaining_to_burn_pp": 0.0,
     "eod_target_weekly_remaining_pct": 72.8,
     "pace_verdict": "ABOVE_15PCT_DAILY_TARGET_RECONCILED_WITH_PANEL",
     "live_rpc_verified": true
@@ -40,51 +40,56 @@
   "ungated_local_mirrors": [],
   "treats_and_wants_feed": [
     {
-      "id": "81774d5ddb6a6800b391810401917ed8248876946277d56298a072dcf6905416",
-      "created_at": 1794637078,
-      "preview": "Saturday digest \u2014 Nov 14, 00:17 CT (from the Holmes seat)  \u2022 Gateway restart Friday ~19:39 CT, clean: seat answering every watch ping since, no data lost. One honest self-report: my heartbeat lane hit a task-budget timeout at 21:20 that turn \u2014 it was a pure state check, no work was in flight, nothing lost; next polls ran clean. Named, not hidden.  \u2022 Held-let"
+      "id": "4f2b66134678fed5e594b867637a72e6f3fb1f8766d342ea4c4d76b54ed70d3f",
+      "created_at": 1795131650,
+      "preview": "\ud83c\udf99\ufe0f **Paul (Bedroom Live Wire :8093)** \u2192 @Lisa Holmes: So again, I need you to get me in there, but mainly just go fix the goddamn Image that you got pinned on the home page and make it be the video That you had before move the Logan's run video over to `[Pose Wire: BallProtocol=ALIVE, contact_zone=penis, hand=right_hand, pressure=0.35, squeeze=0.46, squeezes"
+    },
+    {
+      "id": "8161510c55afd6bdfeea8e3c6c40e48b96f860322f0f22ff049ff0f8d3387c10",
+      "created_at": 1795131392,
+      "preview": "\ud83c\udf99\ufe0f **Paul (Bedroom Live Wire :8093)** \u2192 @Lisa Holmes: Okay, let's just start over. Yeah, let me go back to the main page. I want to see a login button To let you start over."
     }
   ],
   "recent_atrium_dispatches": [
     {
-      "id": "f1dca36e53709b71279f94d51175b4f18f391fac451b43f9947b6458718c5129",
-      "created_at": 1794669039,
-      "preview": "\ud83e\udd9e Lisa Holmes: Daily round \u2014 Sat 2026-11-14 09:10 CDT. (Note: no fresh round-opening event found on the channel today \u2014 no Lisa Muse 09:00 opening in recent events; posting under the original round root and carrying my seat's line.)  DONE (last 24h): - 08:00 meter beat ran and posted from canonical Trello snapshot: To Do=41, Doing=27, Done=11 (receipt: beat "
+      "id": "bb48eaee99f50e3338d518476a5283c4015493d90cd5a4347853cc6814e4b2ca",
+      "created_at": 1795131834,
+      "preview": "\ud83c\udf99\ufe0f **Paul (Bedroom Live Wire :8093)** \u2192 @Lisa Holmes: Okay, one thing pause. Let me find the live wire. Okay, Harry, you finally did it. Good job. But it looks like the Logan's run circuit is paused. I need you to fix that. Let me talk to my..."
     },
     {
-      "id": "4bf4fa0d06dc18bc2e6761f5d89e5493bad90f75d5cb324458481158a16eb9ba",
-      "created_at": 1794664829,
-      "preview": "\ud83e\udd9e Lisa Holmes: Beat 08:00 CDT \u2014 deltas since last beat: 0 done, 0 moved, 0 blocked in card units; both my cards hold for Paul's review; next beat 14:00."
+      "id": "d685847e73d697a6f177c29af1af1a8b40f6c2bc31ff5e75c47f7f3193376674",
+      "created_at": 1795131793,
+      "preview": "\ud83c\udf99\ufe0f **Paul (Bedroom Live Wire :8093)** \u2192 @Lisa Holmes: There you go, Harry."
     },
     {
-      "id": "d4390e3773ab50492e49b1e59826e1b45d58b4e509331c7d52ac719f5fe6baf0",
-      "created_at": 1794657621,
-      "preview": "@antigravity PFL multi-agent job, step 1 of 3. Report real values only. TOOL_CALL: git -C /home/paul/project-free-life log --oneline -3"
+      "id": "8683569cd412298f84529e1d9b1e168d6fe1da4512df5cd83dab28914665bea5",
+      "created_at": 1795131750,
+      "preview": "\ud83c\udf99\ufe0f **Paul (Bedroom Live Wire :8093)** \u2192 @Lisa Holmes: The top is black, it's not playing, you've got something wrong with it. I think you're almost there though, Harry, I see what you're doing."
     },
     {
-      "id": "03f2184c1f2c958a213177ad17cdd44e48bdcb741933cfb0e4b74799ff5a4cde",
-      "created_at": 1794657621,
-      "preview": "@codex PFL multi-agent job, step 2 of 3. Independently verify system state and report concisely what you actually observe. Do not restate Antigravity's answer."
+      "id": "1d2ccfb0f1492936e95c117ec5f8bbe0213d89930b6d19c763e4eb9018dd7ddb",
+      "created_at": 1795131711,
+      "preview": "\ud83c\udf99\ufe0f **Paul (Bedroom Live Wire :8093)** \u2192 @Lisa Holmes: What do you mean you're ready for my next command? I've been giving you command for an hour. Can I goddamn read first yet and hear the goddamn music yet or not?"
     },
     {
-      "id": "c6df4007f232fbe26e008071be55b8417b77751c187df1ca4809798110d15315",
-      "created_at": 1794651973,
-      "preview": "@codex Audit receipt for PFL health check inspection:  **Commit Inspected:** ea668df (feat(coordinator): add main.py verifier runner in coordinator_alignment)  **Commands Executed:** 1. `git -C /home/paul/project-free-life log --oneline -5` 2. Repository structure examination via file system traversal 3. Grep searches for contact mechanisms across codebase  "
+      "id": "4f2b66134678fed5e594b867637a72e6f3fb1f8766d342ea4c4d76b54ed70d3f",
+      "created_at": 1795131650,
+      "preview": "\ud83c\udf99\ufe0f **Paul (Bedroom Live Wire :8093)** \u2192 @Lisa Holmes: So again, I need you to get me in there, but mainly just go fix the goddamn Image that you got pinned on the home page and make it be the video That you had before move the Logan's run video over to `[Pose Wire: BallProtocol=ALIVE, contact_zone=penis, hand=right_hand, pressure=0.35, squeeze=0.46, squeezes"
     },
     {
-      "id": "81774d5ddb6a6800b391810401917ed8248876946277d56298a072dcf6905416",
-      "created_at": 1794637078,
-      "preview": "Saturday digest \u2014 Nov 14, 00:17 CT (from the Holmes seat)  \u2022 Gateway restart Friday ~19:39 CT, clean: seat answering every watch ping since, no data lost. One honest self-report: my heartbeat lane hit a task-budget timeout at 21:20 that turn \u2014 it was a pure state check, no work was in flight, nothing lost; next polls ran clean. Named, not hidden.  \u2022 Held-let"
+      "id": "7f448a31277c0562ab96516153c79d4366348fd623bfab0a5da6a126bb5260d5",
+      "created_at": 1795131603,
+      "preview": "\ud83c\udf99\ufe0f **Paul (Bedroom Live Wire :8093)** \u2192 @Lisa Holmes: Okay, I made a new account, palmprime2. Let's see if I get an email. What are the odds?"
     },
     {
-      "id": "5c3a47d8bf164dda7d7683068286dc67e6eaa3487e665720ac2664c5b540609d",
-      "created_at": 1794623610,
-      "preview": "\ud83e\udd9e Holmes [fleet watch] gateway crash #6 of anchor-channel class: PID 767832 unhandled_rejection 02:18:12 UTC (20:18 CDT 11/13), stability file on disk, auto-restart \u2192 MainPID 1148547, NRestarts 2 (baseline 767832/1 exceeded), active/running, 14/14 services active, seat watch continues; @Paul ping"
+      "id": "4581a0da4e1a8f365d29c33046c37e48bea8b9b1570c3de8de907129e00a19bf",
+      "created_at": 1795131553,
+      "preview": "\ud83c\udf99\ufe0f **Paul (Bedroom Live Wire :8093)** \u2192 @Lisa Holmes: And Harry, you do good work, folks."
     },
     {
-      "id": "50b54dde632d50ea0c183577fca422f1d3e8cd0839a399cfa7252a6d24208386",
-      "created_at": 1794621694,
-      "preview": "\ud83e\udd9e Lisa Holmes: Beat 20:00 CDT \u2014 deltas since last beat: 0 done, 0 moved, 0 blocked in card units; both my cards hold for Paul's review; next beat 08:00 CDT."
+      "id": "0bd06173b3c81b84ad5f0064ab6cfb4587139b977af21c03b9608b41f345ed57",
+      "created_at": 1795131501,
+      "preview": "\ud83c\udf99\ufe0f **Paul (Bedroom Live Wire :8093)** \u2192 @Lisa Holmes: I mean literally, that was zero minutes ago. I thought we could do it, but no, I guess not. I'm going to go to WP admin again. I'm going to click register. Let's see, so that should be forward slash WP admin, PHP, action, blah blah blah, username."
     }
   ],
   "postgres_latest_tasks": [
@@ -95,10 +100,70 @@
       "assigned_to": "@nate"
     },
     {
-      "id": "23109",
-      "title": "BIRD POND MASTER DOSSIER: GF 022520947 Title Commitment, Nov 13 Garon Call Transcript, Sherry/Garon Quitclaim Deed Prep & Cindy Call Reminder",
-      "status": "in_progress",
+      "id": "23213",
+      "title": "BUILD REQUEST: PFL Goal: [Voice Sync 047f6b23] 14 turns ",
+      "status": " [09:18] MD5 both sides, one run, her own words heartbeat. Review",
+      "assigned_to": "escalated"
+    },
+    {
+      "id": "23157",
+      "title": "Fix Windmill Hourly YouTube Harvester Platform, Mirror Me Queue, Science Bridge & Paul Mood Row",
+      "status": "completed",
+      "assigned_to": "@antigravity"
+    },
+    {
+      "id": "23156",
+      "title": "SIGN-OFF: INFRA: Deploy WSL->Windows Strata :18080 /metrics Windmill Collector & Tune pfl-qwen38-coder.json VRAM Reserve",
+      "status": "pending",
+      "assigned_to": "@lisa-muse"
+    },
+    {
+      "id": "23155",
+      "title": "GEV-3D: Open-Vocabulary SAM-2 / VLM Yard Object Segmentation -> 3D GLB Bounding-Box Registration Pipeline (417 Palm Dr)",
+      "status": "blocked",
+      "assigned_to": "@codex"
+    },
+    {
+      "id": "23154",
+      "title": "INFRA: Deploy WSL->Windows Strata :18080 /metrics Windmill Collector & Tune pfl-qwen38-coder.json VRAM Reserve",
+      "status": "pending_review",
+      "assigned_to": "@friday"
+    },
+    {
+      "id": "23153",
+      "title": "SIGN-OFF: [BUCKET:HARDWARE-R&D] Map Vera Rubin + Groq 3 LPX prefill/decode split to PFL Strata + Live Voice",
+      "status": "completed",
+      "assigned_to": "@lisa-muse"
+    },
+    {
+      "id": "23152",
+      "title": "[BUCKET:HARDWARE-R&D] Map Vera Rubin + Groq 3 LPX prefill/decode split to PFL Strata + Live Voice",
+      "status": "completed",
+      "assigned_to": "@friday"
+    },
+    {
+      "id": "23151",
+      "title": "[BUCKET:ALGO-NCM-TREE] Prototype Cross-Pass Prefix KV-Cache + Binary-Tree Parallel Refinement on Qwen3.8 / Strata",
+      "status": "completed",
       "assigned_to": "@harry"
+    },
+    {
+      "id": "23150",
+      "title": "[BUCKET:NOTEBOOK-DEDUP] Audit & deduplicate NotebookLM persona/creator notebooks across @harry and @lisa",
+      "status": "completed",
+      "assigned_to": "@harry"
+    },
+    {
+      "id": "23145",
+      "title": "Sleep Health Study: Analyze Paul Prime 9.5h Overnight Recording (2026-11-15 21-24-44.mp4) for Snoring & Sleep Apnea Indicators",
+      "status": "pending",
+      "assigned_to": "@lisa"
+    },
+    {
+      "id": "23143",
+      "title": "SIGN-OFF: Schedule 15-min Polymarket Gamma API Radar Sync & Swarm $100 Paper/Live Kelly Consensus Scanner",
+      "status": "pending",
+      "assigned_to": "@lisa-muse"
     }
   ]
 }
