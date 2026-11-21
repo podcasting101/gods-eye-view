@@ -2346,6 +2346,45 @@ export function loadPflWindowFramework({ viewer }) {
         return { type: 'movable', mov: wrapBirdpondWallMovable(ent) };
       }
     }
+    // Analytic ray-plane fallback for translucent / Google-3D-overlapped portal & dock targets
+    const ray = viewer?.camera?.getPickRay?.(screenPos);
+    const hitLocalPlaneEnu = (lon, lat, altM) => {
+      if (!ray || !Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+      const originCart = Cesium.Cartesian3.fromDegrees(lon, lat, altM);
+      const enu = Cesium.Transforms.eastNorthUpToFixedFrame(originCart);
+      const invEnu = Cesium.Matrix4.inverseTransformation(enu, new Cesium.Matrix4());
+      const ro = Cesium.Matrix4.multiplyByPoint(invEnu, ray.origin, new Cesium.Cartesian3());
+      const rd = Cesium.Matrix4.multiplyByPointAsVector(invEnu, ray.direction, new Cesium.Cartesian3());
+      if (Math.abs(rd.z) <= 1e-4) return null;
+      const tHit = -ro.z / rd.z;
+      return tHit > 0 && tHit < 220 ? { ex: ro.x + rd.x * tHit, ey: ro.y + rd.y * tHit } : null;
+    };
+    if (ray) {
+      try {
+        const portalEnt = viewer.entities.getById('pfl-holodeck-portal-1s788');
+        const pCart = portalEnt?.position?.getValue?.(Cesium.JulianDate.now());
+        if (pCart) {
+          const pcg = Cesium.Cartographic.fromCartesian(pCart);
+          const pHit = hitLocalPlaneEnu(Cesium.Math.toDegrees(pcg.longitude), Cesium.Math.toDegrees(pcg.latitude), pcg.height - 0.9);
+          if (pHit && Math.hypot(pHit.ex, pHit.ey) <= 1.35) return { type: 'portal' };
+        }
+        const dockMov = window.__pflMovables?.dock;
+        const ds = dockMov?.getState?.();
+        if (ds && Number.isFinite(ds.lat) && Number.isFinite(ds.lon)) {
+          const dSc = Math.max(0.25, Math.min(3.5, Number(ds.scale) || 1));
+          const dG = resolveLocalGroundM(ds.lon, ds.lat) + Number(ds.lift || 0) + 0.35 * dSc;
+          const dHit = hitLocalPlaneEnu(ds.lon, ds.lat, dG);
+          if (dHit) {
+            const rad = Cesium.Math.toRadians(ds.heading || 0);
+            const lx = dHit.ex * Math.cos(rad) - dHit.ey * Math.sin(rad);
+            const ly = dHit.ex * Math.sin(rad) + dHit.ey * Math.cos(rad);
+            if (Math.abs(lx) <= 2.3 * dSc && Math.abs(ly) <= 3.5 * dSc) {
+              return { type: 'movable', mov: dockMov };
+            }
+          }
+        }
+      } catch {}
+    }
     return null;
   }
 
@@ -5181,18 +5220,21 @@ export function loadPflWindowFramework({ viewer }) {
         position: dPos,
         orientation: dOri,
         box: {
-          dimensions: new Cesium.Cartesian3(3.8 * dScale, 6.2 * dScale, 0.35 * dScale),
-          material: Cesium.Color.fromCssColorString('#7c5c3e').withAlpha(0.85 * dOp),
+          dimensions: new Cesium.Cartesian3(3.8 * dScale, 6.2 * dScale, 0.42 * dScale),
+          material: dOp >= 0.99
+            ? Cesium.Color.fromCssColorString('#7c5c3e')
+            : Cesium.Color.fromCssColorString('#7c5c3e').withAlpha(dOp),
           outline: true,
-          outlineColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.75 * dOp),
+          outlineColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(Math.min(1, 0.85 * dOp)),
         },
         billboard: {
           image: makeWorldTagCanvas('⚓ BAYOU DOCK', '#38bdf8', '#7dd3fc'),
           width: 112,
           height: 17,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          pixelOffset: new Cesium.Cartesian2(0, -14),
+          pixelOffset: new Cesium.Cartesian2(0, -34),
           distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 120),
+          disableDepthTestDistance: 40,
         },
       });
       if (!yardLandmarkIds.includes(dockId)) yardLandmarkIds.push(dockId);
@@ -7021,6 +7063,8 @@ export function loadPflWindowFramework({ viewer }) {
     };
     img.onerror = () => {
       if (active360Item?.id !== item.id) return;
+      ctx360.fillStyle = '#090e1a';
+      ctx360.fillRect(0, 0, 480, 270);
       ctx360.fillStyle = '#f87171';
       ctx360.fillText('Failed to decode 360° image', 240, 135);
     };
@@ -7069,7 +7113,11 @@ export function loadPflWindowFramework({ viewer }) {
 
   open360ViewerModal = (item, desiredHeadingDeg = null, autoPlayTime = false) => {
     const pool = allIndexed360Items();
-    const target = item || pool[9] || ALBUM_2018_ITEMS[9];
+    const resolved = typeof item === 'string'
+      ? (pool.find((x) => x.id === item || String(x.id).includes(item) || String(x.file || '').includes(item))
+         || ALBUM_2018_ITEMS.find((x) => x.id === item || String(x.id).includes(item) || String(x.file || '').includes(item)))
+      : (typeof item === 'number' ? (pool[item] || ALBUM_2018_ITEMS[item]) : item);
+    const target = resolved || pool[9] || ALBUM_2018_ITEMS[9];
     if (!target) return;
     viewer360Win.box.style.display = 'flex';
     viewer360Win.box.classList.remove('pfl-minimized');
