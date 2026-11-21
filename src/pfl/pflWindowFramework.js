@@ -7,7 +7,7 @@ import {
 import { activeYardDatumM } from './yardFrames.js';
 import { createSexWorldDemoTour } from './sexWorldDemoTour.js';
 
-const STORAGE_KEY = 'pfl_gev_windows_v3';
+const STORAGE_KEY = 'pfl_gev_windows_v4';
 const IS_LOCAL_NODE = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
 
 function loadSavedLayout() {
@@ -542,7 +542,7 @@ export function loadPflWindowFramework({ viewer }) {
     id: 'pfl-win-3d-compass-inspector',
     title: 'PFL 3D COMPASS, DRONE ORBIT, LENS & PADS',
     defaultLeft: Math.max(20, window.innerWidth - 296),
-    defaultTop: 118,
+    defaultTop: 344,
     defaultWidth: 280,
     defaultMinimized: true,
   });

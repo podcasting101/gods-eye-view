@@ -9,7 +9,8 @@ import {
 export const PHOTOREAL_AT_STARTUP = false;
 export const PHOTOREAL_TIMEOUT_MS = 20000;
 const GOOGLE_STREAM_HOLD_ID = 'google3d-tiles-stream';
-const GOOGLE_STREAM_TIMEOUT_MS = 8000;
+const GOOGLE_STREAM_TIMEOUT_MS = 18000;
+const GOOGLE_STREAM_SETTLE_DEBOUNCE_MS = 450;
 
 /**
  * @module render/cesium/google3d
@@ -108,23 +109,31 @@ function withTimeout(promise, ms, route) {
 /** Configure sibling streaming and bounded render-governor wakeups on a Google 3D tileset. */
 export function configureAndGuardGoogleTileset(tileset) {
   if (!tileset || typeof tileset !== 'object') return tileset;
-  try { tileset.maximumScreenSpaceError = 12; } catch {}
-  try { tileset.loadSiblings = true; } catch {}
-  try { tileset.preferLeaves = true; } catch {}
+  try { tileset.maximumScreenSpaceError = 16; } catch {}
+  try { tileset.loadSiblings = false; } catch {}
+  try { tileset.preferLeaves = false; } catch {}
+  try { tileset.foveatedScreenSpaceError = false; } catch {}
   try { tileset.preloadFlightDestinations = true; } catch {}
-  try { tileset.foveatedTimeDelay = 0.0; } catch {}
 
   if (tileset._pflStreamGuarded) return tileset;
   try { tileset._pflStreamGuarded = true; } catch {}
 
   let safetyTimer = null;
+  let settleTimer = null;
   const clearSafety = () => {
     if (safetyTimer !== null) {
       clearTimeout(safetyTimer);
       safetyTimer = null;
     }
   };
+  const clearSettle = () => {
+    if (settleTimer !== null) {
+      clearTimeout(settleTimer);
+      settleTimer = null;
+    }
+  };
   const armStreamHold = () => {
+    clearSettle();
     holdContinuousRender(GOOGLE_STREAM_HOLD_ID);
     clearSafety();
     safetyTimer = setTimeout(() => {
@@ -133,13 +142,21 @@ export function configureAndGuardGoogleTileset(tileset) {
       governorRequestRender('google3d-stream-timeout');
     }, GOOGLE_STREAM_TIMEOUT_MS);
   };
-  const settleStreamHold = () => {
-    clearSafety();
-    releaseContinuousRender(GOOGLE_STREAM_HOLD_ID);
-    governorRequestRender('google3d-settled');
-    if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
-      try { window.dispatchEvent(new CustomEvent('gev:google3d-settled')); } catch {}
-    }
+  const scheduleSettleHold = () => {
+    clearSettle();
+    settleTimer = setTimeout(() => {
+      settleTimer = null;
+      if (tileset.tilesLoaded === false) {
+        armStreamHold();
+        return;
+      }
+      clearSafety();
+      releaseContinuousRender(GOOGLE_STREAM_HOLD_ID);
+      governorRequestRender('google3d-settled');
+      if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
+        try { window.dispatchEvent(new CustomEvent('gev:google3d-settled')); } catch {}
+      }
+    }, GOOGLE_STREAM_SETTLE_DEBOUNCE_MS);
   };
 
   const offs = [];
@@ -151,13 +168,13 @@ export function configureAndGuardGoogleTileset(tileset) {
 
   sub(tileset.loadProgress, (pendingReq, pendingProc) => {
     if ((pendingReq || 0) + (pendingProc || 0) > 0) armStreamHold();
-    else settleStreamHold();
+    else scheduleSettleHold();
   });
   sub(tileset.tileLoad, () => {
+    if (tileset.tilesLoaded === false) armStreamHold();
     governorRequestRender('google3d-tile');
   });
-  sub(tileset.allTilesLoaded, settleStreamHold);
-  sub(tileset.initialTilesLoaded, settleStreamHold);
+  sub(tileset.allTilesLoaded, scheduleSettleHold);
 
   armStreamHold();
 
@@ -165,6 +182,7 @@ export function configureAndGuardGoogleTileset(tileset) {
     const origDestroy = tileset.destroy.bind(tileset);
     tileset.destroy = (...args) => {
       clearSafety();
+      clearSettle();
       releaseContinuousRender(GOOGLE_STREAM_HOLD_ID);
       for (const off of offs) {
         try { off(); } catch {}
