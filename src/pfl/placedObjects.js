@@ -134,7 +134,14 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
   const token = String(cesiumToken || '').trim();
   signal?.throwIfAborted();
 
-  let chairState = { lat: 29.247434, lon: -95.231426, heading: 192, lift: 0 };
+  let chairState = {
+    lat: 29.247434,
+    lon: -95.231426,
+    heading: 192,
+    lift: 0,
+    scale: 1,
+    opacity: 1,
+  };
   try {
     if (typeof localStorage !== 'undefined') {
       const all = JSON.parse(localStorage.getItem('pfl_custom_objects_v1') || '{}');
@@ -148,12 +155,13 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
     `[PlacedObjects] front-yard ground height: ${groundHeight.toFixed(2)} m`,
   );
 
-  // Chair: ENU frame at the front yard, scaled 2 m -> 1 m, lifted half height
+  // Chair: ENU frame at the front yard, scaled 2 m -> 1 m * user scale, lifted half height
   // so the base rests on the ground.
+  const initChairScale = Math.max(0.25, Math.min(3.5, Number(chairState.scale) > 0 ? Number(chairState.scale) : 1));
   const ground = Cesium.Cartesian3.fromDegrees(lon, lat, groundHeight);
   const enu = Cesium.Transforms.eastNorthUpToFixedFrame(ground);
-  const scale = Cesium.Matrix4.fromUniformScale(0.5);
-  const lift = Cesium.Matrix4.fromTranslation(new Cesium.Cartesian3(0, 0, 0.5));
+  const scale = Cesium.Matrix4.fromUniformScale(0.5 * initChairScale);
+  const lift = Cesium.Matrix4.fromTranslation(new Cesium.Cartesian3(0, 0, 0.5 * initChairScale));
   const modelMatrix = Cesium.Matrix4.multiply(
     enu,
     Cesium.Matrix4.multiply(lift, scale, new Cesium.Matrix4()),
@@ -170,6 +178,10 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
       chair = await Cesium.Cesium3DTileset.fromUrl(resource, { modelMatrix });
       await chair.readyPromise;
       signal?.throwIfAborted();
+      const initOpacity = Math.max(0.05, Math.min(1, Number(chairState.opacity ?? 1)));
+      if (initOpacity < 0.99) {
+        chair.style = new Cesium.Cesium3DTileStyle({ color: `color('white', ${initOpacity.toFixed(2)})` });
+      }
       viewer.scene.primitives.add(chair);
       viewer.creditDisplay.addStaticCredit(CHAIR_CREDIT);
       const bs = chair.boundingSphere;
@@ -293,16 +305,23 @@ export async function loadPlacedObjects({ viewer, cesiumToken, signal }) {
     const gh = bg + PLACEMENT_LIFT_M + (chairState.lift || 0);
     const gCart = Cesium.Cartesian3.fromDegrees(chairState.lon, chairState.lat, gh);
     const cEnu = Cesium.Transforms.eastNorthUpToFixedFrame(gCart);
+    const chairScale = Math.max(0.25, Math.min(3.5, Number(chairState.scale) > 0 ? Number(chairState.scale) : 1));
+    const scaleMat = Cesium.Matrix4.fromUniformScale(0.5 * chairScale);
+    const liftMat = Cesium.Matrix4.fromTranslation(new Cesium.Cartesian3(0, 0, 0.5 * chairScale));
     const rotZ = Cesium.Matrix4.fromRotationTranslation(
       Cesium.Matrix3.fromRotationZ(-Cesium.Math.toRadians(chairState.heading || 0))
     );
     const mLocal = Cesium.Matrix4.multiply(
       rotZ,
-      Cesium.Matrix4.multiply(lift, scale, new Cesium.Matrix4()),
+      Cesium.Matrix4.multiply(liftMat, scaleMat, new Cesium.Matrix4()),
       new Cesium.Matrix4(),
     );
     if (chair && !chair.isDestroyed()) {
       chair.modelMatrix = Cesium.Matrix4.multiply(cEnu, mLocal, new Cesium.Matrix4());
+      const op = Math.max(0.05, Math.min(1, Number(chairState.opacity ?? 1)));
+      chair.style = op < 0.99
+        ? new Cesium.Cesium3DTileStyle({ color: `color('white', ${op.toFixed(2)})` })
+        : undefined;
     }
     if (billboards && !billboards.isDestroyed() && billboards.length >= 2) {
       const sLon = chairState.lon + 1.5 / (111320 * Math.cos(Cesium.Math.toRadians(chairState.lat)));

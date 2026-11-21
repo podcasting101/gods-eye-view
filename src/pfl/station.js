@@ -66,13 +66,17 @@ function addSovereignAnchor(viewer) {
     lon: -95.231445,
     heading: 192,
     lift: 0,
+    scale: 1,
+    opacity: 1,
   });
   const applyEntityPose = (ent) => {
     const gM = resolveTerrainGroundM(viewer, state.lon, state.lat, STORED_GROUND_HEIGHT_M);
+    const scaleK = Math.max(0.25, Math.min(3.5, Number(state.scale) > 0 ? Number(state.scale) : 1));
+    const op = Math.max(0.05, Math.min(1, Number(state.opacity ?? 1)));
     const pos = Cesium.Cartesian3.fromDegrees(
       state.lon,
       state.lat,
-      gM + PLACEMENT_LIFT_M + SOVEREIGN_ANCHOR.modelOriginLiftM + (state.lift || 0),
+      gM + PLACEMENT_LIFT_M + SOVEREIGN_ANCHOR.modelOriginLiftM * scaleK + (state.lift || 0),
     );
     const ori = Cesium.Transforms.headingPitchRollQuaternion(
       pos,
@@ -81,10 +85,14 @@ function addSovereignAnchor(viewer) {
     if (ent) {
       ent.position = pos;
       ent.orientation = ori;
+      if (ent.model) {
+        ent.model.scale = 1.05 * scaleK;
+        ent.model.color = Cesium.Color.WHITE.withAlpha(op);
+      }
     }
-    return { pos, ori };
+    return { pos, ori, scaleK, op };
   };
-  const { pos: position, ori: orientation } = applyEntityPose(null);
+  const { pos: position, ori: orientation, scaleK, op } = applyEntityPose(null);
   const ent = viewer.entities.add({
     id: SOVEREIGN_ANCHOR.id,
     name: `👑 ${SOVEREIGN_ANCHOR.name} (Liverpool)`,
@@ -92,7 +100,8 @@ function addSovereignAnchor(viewer) {
     orientation,
     model: {
       uri: '/models/lisa_muse.glb',
-      scale: 1.05,
+      scale: 1.05 * scaleK,
+      color: Cesium.Color.WHITE.withAlpha(op),
       heightReference: Cesium.HeightReference.NONE,
       minimumPixelSize: 0,
       maximumScale: 50,

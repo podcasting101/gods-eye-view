@@ -779,6 +779,7 @@ export function loadYardFrames({ viewer }) {
             heading: params.headingDeg || 0,
             lift: ctr.heightM || 0,
             scale: typeof params.sizeScale === 'number' && params.sizeScale > 0 ? params.sizeScale : 1,
+            opacity: typeof params.opacity === 'number' ? params.opacity : 1.0,
           };
         },
         update: (patch) => {
@@ -788,7 +789,10 @@ export function loadYardFrames({ viewer }) {
           if (typeof patch.lift === 'number') ctr.heightM = patch.lift;
           if (typeof patch.heading === 'number') params.headingDeg = patch.heading;
           if (typeof patch.scale === 'number' && patch.scale > 0) {
-            params.sizeScale = Math.max(0.4, Math.min(2.5, patch.scale));
+            params.sizeScale = Math.max(0.25, Math.min(3.5, patch.scale));
+          }
+          if (typeof patch.opacity === 'number' && Number.isFinite(patch.opacity)) {
+            params.opacity = Math.max(0.05, Math.min(1.0, patch.opacity));
           }
           pinFrameCenterGeo(params, ctr);
           params.hiddenByStitch = false;

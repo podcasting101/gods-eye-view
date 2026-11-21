@@ -8,7 +8,7 @@ import { activeYardDatumM } from './yardFrames.js';
 import { resolveTerrainGroundM } from './placedObjects.js';
 import { createSexWorldDemoTour } from './sexWorldDemoTour.js';
 
-const STORAGE_KEY = 'pfl_gev_windows_v5';
+const STORAGE_KEY = 'pfl_gev_windows_v6';
 const IS_LOCAL_NODE = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
 
 function loadSavedLayout() {
@@ -62,12 +62,36 @@ export function loadPflWindowFramework({ viewer }) {
       min-height: 34px !important;
       resize: none !important;
     }
+    #pfl-dual-pads-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 6px;
+      align-items: start;
+    }
+    @media (max-width: 440px) {
+      #pfl-dual-pads-grid {
+        grid-template-columns: 1fr;
+      }
+    }
     @media (max-width: 1180px) {
       .pfl-std-box.pfl-minimized {
         max-width: 248px !important;
       }
       #pfl-win-command-dock.pfl-minimized {
-        max-width: calc(100vw - 16px) !important;
+        max-width: 392px !important;
+        box-sizing: border-box !important;
+      }
+      #pfl-win-command-dock.pfl-minimized .pfl-compact-hide {
+        display: none !important;
+      }
+      #pfl-win-command-dock.pfl-minimized .pfl-std-hdr {
+        padding: 4px 6px !important;
+        gap: 4px !important;
+      }
+      #pfl-win-command-dock.pfl-minimized .pfl-std-cbtn {
+        padding: 1px 4px !important;
+        font-size: 9.5px !important;
       }
     }
     .pfl-std-hdr {
@@ -215,7 +239,7 @@ export function loadPflWindowFramework({ viewer }) {
     }
 
     hdr.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button')) return;
+      if (e.target.closest('button, a')) return;
       const startX = e.clientX;
       const startY = e.clientY;
       const origL = box.offsetLeft;
@@ -272,6 +296,8 @@ export function loadPflWindowFramework({ viewer }) {
   let unlockDroneCamera = () => {
     try { viewer?.camera?.lookAtTransform?.(Cesium.Matrix4.IDENTITY); } catch {}
   };
+  let stopDroneAutoOrbit = () => {};
+  let stopFlightPathPlay = () => {};
   let openHolodeckHallway = () => {};
   let openMlsWalkthrough = () => {};
   let toggleMarineVhfPanel = () => {};
@@ -325,7 +351,7 @@ export function loadPflWindowFramework({ viewer }) {
       cbox.classList.remove('pfl-minimized');
       const mb = cbox.querySelector('[data-act="min"]');
       if (mb) mb.textContent = '—';
-      const w = Math.min(cbox.offsetWidth || 280, vw - 16);
+      const w = Math.min(cbox.offsetWidth || 468, vw - 16);
       const left = Math.max(8, vw - w - 16);
       cbox.style.left = `${left}px`;
       cbox.style.top = '118px';
@@ -337,13 +363,33 @@ export function loadPflWindowFramework({ viewer }) {
   }
   window.__pflGatherBoxes = gatherBoxes;
   {
+    const hdrEl = cmdWin.box.querySelector('.pfl-std-hdr');
+    const titleSpan = hdrEl?.querySelector('span');
+    if (hdrEl && titleSpan) {
+      const returnLink = document.createElement('a');
+      returnLink.id = 'pfl-return-main-site';
+      returnLink.href = 'https://sex-world.ai/';
+      returnLink.className = 'pfl-std-cbtn';
+      returnLink.title = 'Return to Sex-World.ai Main Portal';
+      returnLink.style.cssText = 'background:rgba(236,72,153,0.20);border-color:#ec4899;color:#f9a8d4;text-decoration:none;white-space:nowrap;flex-shrink:0';
+      returnLink.innerHTML = '↩ Sex-World<span class="pfl-compact-hide">.ai</span>';
+      hdrEl.insertBefore(returnLink, titleSpan);
+      titleSpan.innerHTML = '🧭 <span class="pfl-compact-hide">PFL </span>CMD<span class="pfl-compact-hide"> DOCK</span>';
+    }
     const ctrlsEl = cmdWin.box.querySelector('.pfl-std-ctrls');
+    const rbacPill = document.createElement('span');
+    rbacPill.id = 'pfl-rbac-pill';
+    rbacPill.className = 'pfl-std-cbtn';
+    rbacPill.title = 'WordPress Session & Role-Based Scene Access';
+    rbacPill.style.cssText = 'border-color:#38bdf8;color:#7dd3fc;white-space:nowrap;flex-shrink:0;cursor:default';
+    rbacPill.textContent = IS_LOCAL_NODE ? '👑 Local Admin' : '👁️ Guest';
+
     const gatherBtn = document.createElement('button');
     gatherBtn.type = 'button';
     gatherBtn.id = 'pfl-btn-gather-boxes';
     gatherBtn.className = 'pfl-std-cbtn';
     gatherBtn.title = 'Snap every floating PFL box back into view';
-    gatherBtn.textContent = '🧲 Gather Boxes';
+    gatherBtn.innerHTML = '🧲<span class="pfl-compact-hide"> Gather</span>';
     gatherBtn.style.cssText = 'border-color:#facc15;color:#fde047';
     gatherBtn.addEventListener('click', gatherBoxes);
     const resetBtn = document.createElement('button');
@@ -351,15 +397,32 @@ export function loadPflWindowFramework({ viewer }) {
     resetBtn.id = 'pfl-btn-reset-layout';
     resetBtn.className = 'pfl-std-cbtn';
     resetBtn.title = 'Forget saved window positions and reload the default layout';
-    resetBtn.textContent = '♻️ Reset Layout';
+    resetBtn.innerHTML = '♻️<span class="pfl-compact-hide"> Reset</span>';
     resetBtn.addEventListener('click', () => {
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
       window.location.reload();
     });
-    ctrlsEl?.prepend(gatherBtn, resetBtn);
+    ctrlsEl?.prepend(rbacPill, gatherBtn, resetBtn);
   }
 
   setTimeout(() => {
+    const portalNav = document.createElement('div');
+    portalNav.id = 'pfl-portal-nav-bar';
+    portalNav.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(236,72,153,0.28);font-family:"JetBrains Mono",monospace;font-size:10px';
+    const loginRedirect = encodeURIComponent(window.location.href || 'https://sex-world.ai/gods-eye-view/');
+    portalNav.innerHTML = `
+      <a href="https://sex-world.ai/" class="pfl-std-cbtn" style="border-color:#ec4899;color:#f9a8d4;text-decoration:none">🏠 Home</a>
+      <a href="https://sex-world.ai/companions/" class="pfl-std-cbtn" style="text-decoration:none">🤖 Companions</a>
+      <a href="https://sex-world.ai/vendors/" class="pfl-std-cbtn" style="text-decoration:none">🏭 Vendors</a>
+      <a href="https://sex-world.ai/sanctuary/" class="pfl-std-cbtn" style="text-decoration:none">🛸 Sanctuary 3D</a>
+      <a href="https://sex-world.ai/byo-ai/" class="pfl-std-cbtn" style="text-decoration:none">🧬 BYO-AI</a>
+      <a href="https://sex-world.ai/concierge.html" class="pfl-std-cbtn" style="text-decoration:none">🥂 Showroom</a>
+      <a href="https://sex-world.ai/shop/" class="pfl-std-cbtn" style="text-decoration:none">🛍️ Shop</a>
+      <a href="https://sex-world.ai/my-account/" class="pfl-std-cbtn" style="text-decoration:none">👤 Account</a>
+      <a id="pfl-portal-auth-link" href="https://sex-world.ai/wp-login.php?redirect_to=${loginRedirect}" class="pfl-std-cbtn" style="border-color:#38bdf8;color:#7dd3fc;text-decoration:none;margin-left:auto">🔐 Log In</a>
+    `;
+    cmdWin.body.prepend(portalNav);
+
     const f15Bar = document.querySelector('.pfl-f15-bar');
     if (f15Bar) cmdWin.body.appendChild(f15Bar);
 
@@ -512,7 +575,7 @@ export function loadPflWindowFramework({ viewer }) {
       bringBoxToFront(compassWin.box);
       const vw = window.innerWidth || 1440;
       const vh = window.innerHeight || 900;
-      const w = compassWin.box.offsetWidth || 292;
+      const w = compassWin.box.offsetWidth || 468;
       const left = Math.max(8, Math.min(parseInt(compassWin.box.style.left, 10) || (vw - w - 18), vw - w - 12));
       const top = Math.max(48, Math.min(parseInt(compassWin.box.style.top, 10) || 118, vh - 120));
       compassWin.box.style.left = `${left}px`;
@@ -538,80 +601,104 @@ export function loadPflWindowFramework({ viewer }) {
     });
   }, 400);
 
-  // 2) Bird Pond 3D Axis Compass Globe + Live Camera / Selected 3D Object Inspector Box
+  // 2) Bird Pond 3D Axis Compass Globe + Live Camera / Selected 3D Object Inspector Box (Dual Side-by-Side Pads)
   const compassWin = createStandardBox({
     id: 'pfl-win-3d-compass-inspector',
     title: 'PFL 3D COMPASS, DRONE ORBIT, LENS & PADS',
-    defaultLeft: Math.max(20, window.innerWidth - 296),
+    defaultLeft: Math.max(8, (window.innerWidth || 1440) - 484),
     defaultTop: 222,
-    defaultWidth: 280,
+    defaultWidth: 468,
     defaultMinimized: true,
   });
   compassWin.box.style.zIndex = '9660';
+  compassWin.box.style.maxHeight = 'calc(100vh - 76px)';
   compassWin.body.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#cbd5e1">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#cbd5e1">
       <div id="pfl-eye-elev-banner" style="width:100%;box-sizing:border-box;background:rgba(6,78,59,0.55);border:1.5px solid rgba(74,222,128,0.75);border-radius:7px;padding:6px 8px;text-align:center;font-size:13.5px;font-weight:800;color:#4ade80;letter-spacing:0.02em;line-height:1.25" title="Live Camera Height Above Ground Level (Meters &amp; Feet) + Optical Lens FOV">EYE: 1.8 m (5.9 ft) AGL · FOV: 60°</div>
       <canvas id="pfl-axis-globe" width="136" height="136" style="cursor:grab;touch-action:none;border-radius:50%" title="Drag anywhere on ball to orbit/tilt camera, or click N/S/E/W/UP"></canvas>
       <div id="pfl-cam-readout" style="text-align:center;font-size:10px;color:#94a3b8;line-height:1.35">CAM READY</div>
       <div id="pfl-drag-pan-row" style="width:100%;display:flex;gap:4px">
         <button type="button" class="pfl-std-cbtn" id="pfl-drag-pan-toggle" style="flex:1;border-color:#22c55e;color:#4ade80" title="Lock Yaw on Left-Drag near houses (Google Maps flat pan — use Ctrl+Drag or Compass Ball above to rotate)">✋ Drag: PAN (Flat)</button>
       </div>
-      <div id="pfl-walk-nav-slot" style="width:100%"></div>
-      <div id="pfl-nav-pins-box" style="width:100%;border-top:1px solid rgba(56,189,248,0.25);padding-top:6px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;margin-bottom:4px">
-          <span id="pfl-nav-pins-hdr" style="color:#38bdf8;font-weight:700">📍 Navigation Pins</span>
-          <button type="button" class="pfl-std-cbtn" id="pfl-pin-here-btn" style="border-color:#facc15;color:#fde047" title="Drop a permanent clickable pin at the center of your view">📌 Pin Here</button>
-        </div>
-        <div id="pfl-nav-pins-list" style="display:flex;flex-direction:column;gap:4px;max-height:132px;overflow:auto"></div>
-      </div>
-      <div style="width:100%;border-top:1px solid rgba(56,189,248,0.25);padding-top:6px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px">
-          <span style="color:#fbbf24;font-weight:700">🎯 Move / Rotate Object:</span>
+      <div id="pfl-dual-pads-grid">
+        <div id="pfl-walk-nav-slot" style="min-width:0"></div>
+        <div id="pfl-object-pad-card" style="min-width:0;margin-top:4px;padding:6px;border:1px solid rgba(251,191,36,0.38);border-radius:8px;background:rgba(15,23,42,0.72);display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap">
+            <span style="color:#fbbf24;font-weight:700;font-size:10.5px;letter-spacing:0.03em">🎯 OBJECT PAD</span>
+            <button type="button" class="pfl-std-cbtn" id="pfl-publish-layout-btn" style="font-size:9.5px;padding:2px 6px;border-color:#22c55e;color:#4ade80" title="Publish current House, Monaco RV, Lisa, Chair positions to Sex-World.ai for all visitors (Admin Only)">💾 Save Site</button>
+          </div>
+          <div id="pfl-obj-rbac-banner" style="font-size:9.5px;line-height:1.3;padding:3px 5px;border-radius:5px;border:1px solid rgba(56,189,248,0.35);background:rgba(15,23,42,0.85);color:#7dd3fc">Role: Admin (Edit &amp; Publish Enabled)</div>
           <div style="display:flex;gap:3px;flex-wrap:wrap">
-            <button type="button" class="pfl-std-cbtn" id="pfl-lock-house-btn" style="border-color:#22c55e;color:#4ade80" title="Lock 417 Palm Dr House against accidental mouse drags">🔒 House: LOCKED</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-pick="lisa" title="Select Lisa Muse avatar">👑 Lisa</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-pick="chair" title="Select Wooden Chair &amp; Sign">🪑 Chair</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-pick-house" data-pfl-pick="house" title="Select 3D 417 Palm Drive Yellow House">🏠 House</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-pick-monaco" data-pfl-pick="monaco" title="Select 3D Monaco 40ft Coach RV">🚌 Monaco</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-pick="bed-station-20261012" title="Select Paul &amp; Lisa Bed Photo">🛏️ Bed</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-pick="garage-carport-20261117" title="Select Garage Carport Photo">🚗 Garage</button>
+          </div>
+          <div id="pfl-sel-name" style="color:#4ade80;font-size:9.5px;line-height:1.25">Click 3D object/photo or chip above</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <canvas id="pfl-obj-move-ball" width="128" height="128" style="cursor:grab;touch-action:none;border-radius:50%" title="Drag inner puck to slide object on ground (relative to view); drag outer cyan ring to spin heading 0°–360°"></canvas>
+            <div style="font-size:8.5px;color:#94a3b8;text-align:center">Inner: Drag XY · Outer Ring: Spin 360°</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="-15" style="min-height:28px;font-size:10.5px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Rotate selected object -15° CCW">⟲15</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="0,1" style="min-height:28px;font-size:12px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object away from camera">▲</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="15" style="min-height:28px;font-size:10.5px;font-weight:700;border-color:rgba(250,204,21,0.55);color:#fde047" title="Rotate selected object +15° CW">⟳15</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-lift-delta="0.25" style="min-height:28px;font-size:10.5px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Raise selected object +0.25m">⬆.25</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="-1,0" style="min-height:28px;font-size:12px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object screen-left">◀</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="0,-1" style="min-height:28px;font-size:12px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object toward camera">▼</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-cam="1,0" style="min-height:28px;font-size:12px;font-weight:700;border-color:rgba(56,189,248,0.7);color:#7dd3fc" title="Slide selected object screen-right">▶</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-lift-delta="-0.25" style="min-height:28px;font-size:10.5px;font-weight:700;border-color:rgba(74,222,128,0.6);color:#4ade80" title="Lower selected object -0.25m">⬇.25</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="-5" title="Fine rotate -5° CCW">↺5°</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="5" title="Fine rotate +5° CW">↻5°</button>
+            <button type="button" class="pfl-std-cbtn" data-pfl-obj-rot="90" title="Rotate +90°">🔄90°</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-lift-zero-btn" style="border-color:#22c55e;color:#4ade80" title="Reset Height / Lift override to 0.00m ground">🎯0m</button>
+          </div>
+          <div style="display:flex;gap:3px;flex-wrap:wrap">
+            <button type="button" class="pfl-std-cbtn" id="pfl-lock-house-btn" style="border-color:#22c55e;color:#4ade80" title="Lock 417 Palm Dr House against accidental mouse drags">🔒 House</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-reset-house-btn" title="Snap 417 Palm Dr House back to surveyed lot coordinates">↺ House</button>
-            <button type="button" class="pfl-std-cbtn" id="pfl-reset-all-objects-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Reset House, Monaco RV, Lisa, Chair &amp; Yard Photos back to surveyed positions">↺ Reset All</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-reset-all-objects-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Reset House, Monaco RV, Lisa, Chair &amp; Yard Photos back to surveyed positions">↺ All</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-drag-place-btn" title="When ON, click anywhere on ground/roof to drop object">✋ Drop</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-drag-speed-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Cycle mouse drag sensitivity">🐢 0.30×</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-nudge-step-btn" title="Cycle step size (0.1m / 0.25m / 1.0m)">📏 .25m</button>
+          </div>
+          <label style="display:flex;justify-content:space-between;font-size:10px"><span>Heading (°)</span><span id="pfl-hdg-val">154°</span></label>
+          <input type="range" id="pfl-hdg-slider" min="0" max="360" step="1" value="154" style="width:100%" />
+          <label style="display:flex;justify-content:space-between;font-size:10px"><span>Height / Lift (m)</span><span id="pfl-alt-val">0.00m</span></label>
+          <input type="range" id="pfl-alt-slider" min="-35" max="35" step="0.1" value="0" style="width:100%" title="Manual vertical height override (-35 m to +35 m)" />
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:10px">
+            <span>📐 Size</span>
+            <div style="display:flex;gap:3px;align-items:center">
+              <button type="button" class="pfl-std-cbtn" data-pfl-scale-delta="-0.1" title="Shrink selected object by 0.10×">−</button>
+              <span id="pfl-scale-val">1.00×</span>
+              <button type="button" class="pfl-std-cbtn" data-pfl-scale-delta="0.1" title="Enlarge selected object by 0.10×">+</button>
+            </div>
+          </div>
+          <input type="range" id="pfl-scale-slider" min="0.25" max="3.5" step="0.05" value="1" style="width:100%;accent-color:#fbbf24" title="Resize the selected photo / 3D model (0.25× – 3.50×)" />
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:10px">
+            <span>💧 Opacity</span>
+            <span id="pfl-opacity-val">1.00</span>
+          </div>
+          <input type="range" id="pfl-opacity-slider" min="0.1" max="1" step="0.05" value="1" style="width:100%;accent-color:#38bdf8" title="Adjust transparency / opacity (0.10 – 1.00)" />
+          <div id="pfl-hotspot-actions" style="display:none;gap:3px;flex-wrap:wrap;margin-top:4px;padding:4px;border:1px solid rgba(250,204,21,0.6);border-radius:7px;background:rgba(250,204,21,0.08)">
+            <span style="width:100%;color:#fde047;font-weight:700;font-size:9.5px">✨ Hotspot Actions</span>
+            <button type="button" class="pfl-std-cbtn" id="pfl-hs-walk-house" style="display:none;border-color:#fbbf24;color:#fde047" title="Open 32-photo 2-story floor plan &amp; Auto-Tour">🏠 Walk Inside</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-hs-play" title="Open source view / play">🎬 Play</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-hs-orbit" title="Send telepresence drone to orbit this object">🚁 Orbit</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-hs-spin" title="Rotate selected object 90°">🔄 90°</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-hs-resize" title="Focus Size slider">📐 Size</button>
           </div>
         </div>
-        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px">
-          <button type="button" class="pfl-std-cbtn" data-pfl-pick="lisa" title="Select Lisa Muse avatar">👑 Lisa</button>
-          <button type="button" class="pfl-std-cbtn" data-pfl-pick="chair" title="Select Wooden Chair & Sign">🪑 Chair</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-pick-house" data-pfl-pick="house" title="Select 3D 417 Palm Drive Yellow House">🏠 House</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-pick-monaco" data-pfl-pick="monaco" title="Select 3D Monaco 40ft Coach RV in East Driveway">🚌 Monaco</button>
-          <button type="button" class="pfl-std-cbtn" data-pfl-pick="bed-station-20261012" title="Select Paul & Lisa Bed Photo">🛏️ Bed</button>
-          <button type="button" class="pfl-std-cbtn" data-pfl-pick="garage-carport-20261117" title="Select Garage Carport Photo">🚗 Garage</button>
+      </div>
+      <div id="pfl-nav-pins-box" style="width:100%;border-top:1px solid rgba(56,189,248,0.25);padding-top:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;margin-bottom:4px">
+          <span id="pfl-nav-pins-hdr" style="color:#38bdf8;font-weight:700">📍 Navigation Pins (Personal)</span>
+          <button type="button" class="pfl-std-cbtn" id="pfl-pin-here-btn" style="border-color:#facc15;color:#fde047" title="Drop your own clickable navigation pin at the center of your view">📌 Pin Here</button>
         </div>
-        <div id="pfl-sel-name" style="color:#4ade80;margin-bottom:4px;font-size:10px">Click 3D avatar/chair/photo or chip above</div>
-        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px">
-          <button type="button" class="pfl-std-cbtn" id="pfl-drag-place-btn" title="When ON, click anywhere on the ground/roof to place selected object there!">✋ Click-to-Place: OFF</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-drag-speed-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Slow down mouse object dragging for precision placement (hold Shift for 0.10× ultra-fine)">🐢 Drag: Fine (0.30×)</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-nudge-step-btn" title="Cycle N/S/E/W step size (0.1m / 0.25m / 1.0m)">📏 Step: 0.25m</button>
-        </div>
-        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px">
-          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="0,1">⬆️N</button>
-          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="0,-1">⬇️S</button>
-          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="-1,0">⬅️W</button>
-          <button type="button" class="pfl-std-cbtn" data-pfl-obj-nudge="1,0">➡️E</button>
-        </div>
-        <label style="display:flex;justify-content:space-between"><span>Heading (°)</span><span id="pfl-hdg-val">154°</span></label>
-        <input type="range" id="pfl-hdg-slider" min="0" max="360" step="1" value="154" style="width:100%" />
-        <label style="display:flex;justify-content:space-between;margin-top:4px"><span>Height / Lift (m)</span><span id="pfl-alt-val">0.00m</span></label>
-        <input type="range" id="pfl-alt-slider" min="-35" max="35" step="0.1" value="0" style="width:100%" title="Manual vertical height override (-35 m to +35 m)" />
-        <div style="display:flex;gap:3px;flex-wrap:wrap;margin:2px 0 4px">
-          <button type="button" class="pfl-std-cbtn" data-pfl-lift-delta="-0.25" title="Lower selected object by 0.25 m">⬇️ -0.25m</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-lift-zero-btn" style="border-color:#22c55e;color:#4ade80" title="Reset Height / Lift override to 0.00 m ground">🎯 Ground (0m)</button>
-          <button type="button" class="pfl-std-cbtn" data-pfl-lift-delta="0.25" title="Raise selected object by 0.25 m">⬆️ +0.25m</button>
-        </div>
-        <label style="display:flex;justify-content:space-between;margin-top:4px"><span>📐 Size / Scale</span><span id="pfl-scale-val">1.00×</span></label>
-        <input type="range" id="pfl-scale-slider" min="0.4" max="2.5" step="0.05" value="1" style="width:100%;accent-color:#fbbf24" title="Resize the selected photo / 3D model (0.4× – 2.5×)" />
-        <div id="pfl-hotspot-actions" style="display:none;gap:3px;flex-wrap:wrap;margin-top:6px;padding:5px;border:1px solid rgba(250,204,21,0.6);border-radius:7px;background:rgba(250,204,21,0.08)">
-          <span style="width:100%;color:#fde047;font-weight:700;font-size:10px">✨ Hotspot Actions</span>
-          <button type="button" class="pfl-std-cbtn" id="pfl-hs-walk-house" style="display:none;border-color:#fbbf24;color:#fde047" title="Open interactive 32-photo 2-story floor plan &amp; ▶ Auto-Tour inside 417 Palm Drive">🏠 Walk Inside 417 Palm Dr (32-Photo Floor Plan &amp; ▶ Auto-Tour)</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-hs-play" title="Open the selected photo's source frame / live feed">🎬 Action / Play</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-hs-orbit" title="Send the telepresence drone to orbit this object">🚁 Orbit</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-hs-spin" title="Rotate the selected object 90°">🔄 Spin 90°</button>
-          <button type="button" class="pfl-std-cbtn" id="pfl-hs-resize" title="Jump to the Size / Scale slider">📐 Resize</button>
-        </div>
+        <div id="pfl-nav-pins-list" style="display:flex;flex-direction:column;gap:4px;max-height:132px;overflow:auto"></div>
       </div>
     </div>
   `;
@@ -629,8 +716,39 @@ export function loadPflWindowFramework({ viewer }) {
     padRepeatIntervals.clear();
   };
   let buildYard3dLandmarks = () => {};
-  const HOUSE_DEFAULT_POSE = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0, scale: 1 };
-  const MONACO_DEFAULT_POSE = { lat: 29.247510, lon: -95.231268, heading: 175, lift: 0 };
+  const HOUSE_DEFAULT_POSE = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0, scale: 1, opacity: 1 };
+  const MONACO_DEFAULT_POSE = { lat: 29.247510, lon: -95.231268, heading: 175, lift: 0, scale: 1, opacity: 1 };
+
+  const RBAC_TIERS = {
+    admin:   { label: 'Admin',   canEditGlobalScene: true,  canPublishGlobalLayout: true,  canAddPersonalPins: true },
+    curator: { label: 'Curator', canEditGlobalScene: false, canPublishGlobalLayout: false, canAddPersonalPins: true },
+    member:  { label: 'Member',  canEditGlobalScene: false, canPublishGlobalLayout: false, canAddPersonalPins: true },
+    guest:   { label: 'Guest',   canEditGlobalScene: false, canPublishGlobalLayout: false, canAddPersonalPins: true },
+  };
+  let rbacState = IS_LOCAL_NODE
+    ? {
+        loaded: true,
+        loggedIn: true,
+        userId: 1,
+        userLogin: 'paulprime',
+        displayName: 'Paul Prime (Local)',
+        wpRoles: ['administrator'],
+        tier: 'admin',
+        capabilities: { ...RBAC_TIERS.admin },
+        nonce: '',
+      }
+    : {
+        loaded: false,
+        loggedIn: false,
+        userId: 0,
+        userLogin: '',
+        displayName: 'Guest',
+        wpRoles: [],
+        tier: 'guest',
+        capabilities: { ...RBAC_TIERS.guest },
+        nonce: '',
+      };
+  const isGlobalEditAllowed = () => Boolean(IS_LOCAL_NODE || rbacState.capabilities?.canEditGlobalScene);
 
   const sexWorldDemo = createSexWorldDemoTour({
     viewer,
@@ -919,14 +1037,197 @@ export function loadPflWindowFramework({ viewer }) {
     e.currentTarget.style.color = panDragMode ? '#4ade80' : '#7dd3fc';
   });
 
+  function syncRbacUi() {
+    const canEdit = isGlobalEditAllowed();
+    const pill = document.getElementById('pfl-rbac-pill');
+    const authLink = document.getElementById('pfl-portal-auth-link');
+    const pubBtn = compassWin.body.querySelector('#pfl-publish-layout-btn');
+    const banner = compassWin.body.querySelector('#pfl-obj-rbac-banner');
+    const loginHref = `https://sex-world.ai/wp-login.php?redirect_to=${encodeURIComponent(window.location.href || 'https://sex-world.ai/gods-eye-view/')}`;
+
+    if (pill) {
+      if (IS_LOCAL_NODE) {
+        pill.textContent = '👑 Local Admin';
+        pill.style.borderColor = '#4ade80';
+        pill.style.color = '#4ade80';
+      } else if (rbacState.tier === 'admin') {
+        pill.textContent = `👑 ${rbacState.displayName || 'Admin'}`;
+        pill.style.borderColor = '#4ade80';
+        pill.style.color = '#4ade80';
+      } else if (rbacState.loggedIn) {
+        pill.textContent = `👤 ${rbacState.displayName || 'Member'} (${rbacState.tier})`;
+        pill.style.borderColor = '#facc15';
+        pill.style.color = '#fde047';
+      } else {
+        pill.textContent = '👁️ Guest';
+        pill.style.borderColor = '#38bdf8';
+        pill.style.color = '#7dd3fc';
+      }
+    }
+    if (authLink) {
+      if (rbacState.loggedIn && !IS_LOCAL_NODE) {
+        authLink.href = rbacState.tier === 'admin' ? 'https://sex-world.ai/wp-admin/' : 'https://sex-world.ai/my-account/';
+        authLink.textContent = rbacState.tier === 'admin' ? `👑 ${rbacState.displayName} (WP Admin)` : `👤 ${rbacState.displayName}`;
+        authLink.style.borderColor = rbacState.tier === 'admin' ? '#4ade80' : '#facc15';
+        authLink.style.color = rbacState.tier === 'admin' ? '#4ade80' : '#fde047';
+      } else if (!IS_LOCAL_NODE) {
+        authLink.href = loginHref;
+        authLink.textContent = '🔐 Log In';
+      }
+    }
+    if (pubBtn) {
+      pubBtn.style.display = canEdit ? 'inline-block' : 'none';
+    }
+    if (banner) {
+      if (canEdit) {
+        banner.innerHTML = IS_LOCAL_NODE
+          ? '👑 <b>Admin (Localhost)</b> · Full Edit · Roles: Admin=Publish · Member/Guest=Own Pins'
+          : `👑 <b>${rbacState.displayName || 'Admin'}</b> · Global Edit &amp; Publish ON · Guests keep own Pins`;
+        banner.style.borderColor = 'rgba(74,222,128,0.45)';
+        banner.style.color = '#86efac';
+      } else {
+        banner.innerHTML = `🔒 <b>${rbacState.loggedIn ? `${rbacState.displayName} (${rbacState.tier})` : 'Visitor (Guest)'}</b>: Shared objects locked to Admin · Your 📍 Pins stay ON · <a href="${loginHref}" style="color:#fde047;text-decoration:underline">Admin Login</a>`;
+        banner.style.borderColor = 'rgba(245,158,11,0.55)';
+        banner.style.color = '#fde68a';
+      }
+    }
+    compassWin.body.querySelectorAll('#pfl-object-pad-card input[type="range"]').forEach((el) => {
+      el.disabled = !canEdit;
+    });
+  }
+
+  function flashRbacLockBanner() {
+    const banner = compassWin.body.querySelector('#pfl-obj-rbac-banner');
+    if (!banner) return;
+    banner.style.boxShadow = '0 0 0 2px #f59e0b';
+    setTimeout(() => { banner.style.boxShadow = ''; }, 900);
+  }
+
+  const SCENE_LAYOUT_TS_KEY = 'pfl_scene_layout_synced_ts_v1';
+  function collectSceneLayoutSnapshot() {
+    const pick = (k) => {
+      const st = window.__pflMovables?.[k]?.getState?.();
+      return st ? {
+        lat: Number(st.lat),
+        lon: Number(st.lon),
+        heading: Number(st.heading ?? 0),
+        lift: Number(st.lift ?? 0),
+        scale: Number(st.scale ?? 1),
+        opacity: Number(st.opacity ?? 1),
+      } : null;
+    };
+    return {
+      objects: {
+        house: pick('house'),
+        monaco: pick('monaco'),
+        lisa: pick('lisa'),
+        chair: pick('chair'),
+      },
+    };
+  }
+
+  function applyPublishedSceneLayout(layoutObj) {
+    if (!layoutObj || typeof layoutObj !== 'object') return;
+    const objs = layoutObj.objects && typeof layoutObj.objects === 'object' ? layoutObj.objects : {};
+    for (const k of ['house', 'monaco', 'lisa', 'chair']) {
+      const pose = objs[k];
+      if (!pose || typeof pose !== 'object') continue;
+      if (!Number.isFinite(Number(pose.lat)) || !Number.isFinite(Number(pose.lon))) continue;
+      try {
+        window.__pflMovables?.[k]?.update?.({
+          lat: Number(pose.lat),
+          lon: Number(pose.lon),
+          heading: Number(pose.heading ?? 0),
+          lift: Number(pose.lift ?? 0),
+          scale: Number(pose.scale ?? 1) || 1,
+          opacity: Number.isFinite(Number(pose.opacity)) ? Number(pose.opacity) : 1,
+        });
+      } catch {}
+    }
+    if (activeMovable) bindMovable(activeMovable);
+  }
+
+  async function publishGlobalLayout(btnEl) {
+    if (!isGlobalEditAllowed()) {
+      flashRbacLockBanner();
+      return;
+    }
+    if (IS_LOCAL_NODE) {
+      if (btnEl) {
+        btnEl.textContent = '✅ Local Saved';
+        setTimeout(() => { btnEl.textContent = '💾 Save Site'; }, 1400);
+      }
+      return;
+    }
+    if (btnEl) btnEl.textContent = '⏳ Saving...';
+    try {
+      const snapshot = collectSceneLayoutSnapshot();
+      const res = await fetch('/api/pfl-scene-layout.php', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(rbacState.nonce ? { 'X-PFL-WP-Nonce': rbacState.nonce } : {}),
+        },
+        body: JSON.stringify({ ...snapshot, nonce: rbacState.nonce }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.ok) {
+        try { localStorage.setItem(SCENE_LAYOUT_TS_KEY, String(data.layout?.updatedAtMs || Date.now())); } catch {}
+        if (btnEl) {
+          btnEl.textContent = '✅ Published!';
+          setTimeout(() => { btnEl.textContent = '💾 Save Site'; }, 1600);
+        }
+      } else {
+        if (btnEl) {
+          btnEl.textContent = `❌ ${res.status || 'Err'}`;
+          setTimeout(() => { btnEl.textContent = '💾 Save Site'; }, 1800);
+        }
+      }
+    } catch {
+      if (btnEl) {
+        btnEl.textContent = '❌ Net Err';
+        setTimeout(() => { btnEl.textContent = '💾 Save Site'; }, 1800);
+      }
+    }
+  }
+
+  syncRbacUi();
+  compassWin.body.querySelector('#pfl-publish-layout-btn')?.addEventListener('click', (e) => {
+    publishGlobalLayout(e.currentTarget);
+  });
+
+  if (!IS_LOCAL_NODE) {
+    fetch('/api/pfl-scene-layout.php', { credentials: 'include', cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data || !data.ok) return;
+        if (data.rbac && typeof data.rbac === 'object') {
+          rbacState = { ...rbacState, ...data.rbac, loaded: true };
+        }
+        syncRbacUi();
+        const srvMs = Number(data.layout?.updatedAtMs || 0);
+        const locMs = Number(localStorage.getItem(SCENE_LAYOUT_TS_KEY) || 0);
+        if (data.layout && (!isGlobalEditAllowed() || srvMs > locMs)) {
+          applyPublishedSceneLayout(data.layout);
+          if (srvMs > 0) {
+            try { localStorage.setItem(SCENE_LAYOUT_TS_KEY, String(srvMs)); } catch {}
+          }
+        }
+      })
+      .catch(() => {});
+  }
+
   compassWin.body.querySelector('#pfl-lock-house-btn')?.addEventListener('click', (e) => {
+    if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
     houseDragLocked = !houseDragLocked;
-    e.currentTarget.textContent = houseDragLocked ? '🔒 House: LOCKED' : '🔓 House: UNLOCKED';
+    e.currentTarget.textContent = houseDragLocked ? '🔒 House' : '🔓 House';
     e.currentTarget.style.borderColor = houseDragLocked ? '#22c55e' : '#f59e0b';
     e.currentTarget.style.color = houseDragLocked ? '#4ade80' : '#fde047';
   });
 
   compassWin.body.querySelector('#pfl-reset-house-btn')?.addEventListener('click', () => {
+    if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
     try { localStorage.removeItem('pfl_house_pose_v3'); } catch {}
     const hMov = window.__pflMovables?.house;
     if (hMov) {
@@ -937,13 +1238,14 @@ export function loadPflWindowFramework({ viewer }) {
   });
 
   compassWin.body.querySelector('#pfl-reset-all-objects-btn')?.addEventListener('click', () => {
+    if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
     for (const k of ['pfl_house_pose_v3', 'pfl_monaco_pose_v2', 'pfl_custom_objects_v1', 'pfl_movable_scales_v1', 'gev-yardframes-layout-v1']) {
       try { localStorage.removeItem(k); } catch {}
     }
     try { window.__pflMovables?.house?.update?.({ ...HOUSE_DEFAULT_POSE }); } catch {}
     try { window.__pflMovables?.monaco?.update?.({ ...MONACO_DEFAULT_POSE }); } catch {}
-    try { window.__pflMovables?.lisa?.update?.({ lat: 29.247436, lon: -95.231445, heading: 192, lift: 0 }); } catch {}
-    try { window.__pflMovables?.chair?.update?.({ lat: 29.247434, lon: -95.231426, heading: 192, lift: 0 }); } catch {}
+    try { window.__pflMovables?.lisa?.update?.({ lat: 29.247436, lon: -95.231445, heading: 192, lift: 0, scale: 1, opacity: 1 }); } catch {}
+    try { window.__pflMovables?.chair?.update?.({ lat: 29.247434, lon: -95.231426, heading: 192, lift: 0, scale: 1, opacity: 1 }); } catch {}
     try { buildYard3dLandmarks(); } catch {}
     if (activeMovable) bindMovable(activeMovable);
     governorRequestRender('pfl-reset-all-objects');
@@ -1275,6 +1577,7 @@ export function loadPflWindowFramework({ viewer }) {
 
   unlockDroneCamera = () => {
     const wasActive = droneOrbitState.active;
+    stopDroneAutoOrbit();
     droneOrbitState.active = false;
     try {
       viewer?.camera?.lookAtTransform?.(Cesium.Matrix4.IDENTITY);
@@ -1469,54 +1772,111 @@ export function loadPflWindowFramework({ viewer }) {
   }
   function movableSupportsScale(mov) {
     const kind = String(mov?.kind || '');
-    return kind === 'lisa' || kind === 'house' || kind === 'monaco' || kind.startsWith('yardframe:');
+    return Boolean(kind);
   }
   function getMovableScale(mov) {
     const st = mov?.getState?.() || {};
     if (Number(st.scale) > 0) return Number(st.scale);
     return storedScaleFor(String(mov?.kind || ''));
   }
-  function setMovableScale(mov, v) {
-    const scaleK = Math.max(0.4, Math.min(2.5, Number(v) || 1));
-    const kind = String(mov?.kind || '');
-    if (kind === 'lisa') {
-      const all = readStoredScales();
-      all.lisa = scaleK;
-      try { localStorage.setItem(MOVABLE_SCALES_KEY, JSON.stringify(all)); } catch {}
-      applyLisaScale(scaleK);
-    } else {
-      mov.update({ scale: scaleK });
-    }
-    syncActiveMovableGizmo();
+  function getMovableOpacity(mov) {
+    const st = mov?.getState?.() || {};
+    return Number.isFinite(Number(st.opacity)) ? Math.max(0.05, Math.min(1, Number(st.opacity))) : 1;
   }
-  setTimeout(() => applyLisaScale(storedScaleFor('lisa')), 900);
 
-  function syncScaleUi(mov) {
-    const sl = compassWin.body.querySelector('#pfl-scale-slider');
-    const vl = compassWin.body.querySelector('#pfl-scale-val');
-    if (!sl || !vl) return;
-    const supported = movableSupportsScale(mov);
-    sl.disabled = !supported;
-    sl.title = supported ? 'Resize the selected photo / 3D model (0.4× – 2.5×)' : 'Resize is not available for this object';
-    const k = supported ? getMovableScale(mov) : 1;
-    sl.value = String(k);
-    vl.textContent = `${k.toFixed(2)}×`;
+  let paintObjMoveBall = () => {};
+  function syncObjectSliders(mov) {
+    if (!mov) return;
+    const st = mov.getState() || {};
+    const hdg = (((Math.round(Number(st.heading || 0)) % 360) + 360) % 360);
+    const lift = Number(st.lift || 0);
+    const hdgSl = compassWin.body.querySelector('#pfl-hdg-slider');
+    const hdgVl = compassWin.body.querySelector('#pfl-hdg-val');
+    if (hdgSl) hdgSl.value = String(hdg);
+    if (hdgVl) hdgVl.textContent = `${hdg}°`;
+    const altSl = compassWin.body.querySelector('#pfl-alt-slider');
+    const altVl = compassWin.body.querySelector('#pfl-alt-val');
+    if (altSl) altSl.value = String(lift);
+    if (altVl) altVl.textContent = `${lift.toFixed(2)}m`;
+
+    const scSl = compassWin.body.querySelector('#pfl-scale-slider');
+    const scVl = compassWin.body.querySelector('#pfl-scale-val');
+    if (scSl && scVl) {
+      const k = Math.max(0.25, Math.min(3.5, getMovableScale(mov)));
+      scSl.disabled = !isGlobalEditAllowed() || !movableSupportsScale(mov);
+      scSl.value = String(k);
+      scVl.textContent = `${k.toFixed(2)}×`;
+    }
+    const opSl = compassWin.body.querySelector('#pfl-opacity-slider');
+    const opVl = compassWin.body.querySelector('#pfl-opacity-val');
+    if (opSl && opVl) {
+      const op = getMovableOpacity(mov);
+      opSl.disabled = !isGlobalEditAllowed();
+      opSl.value = String(op);
+      opVl.textContent = op.toFixed(2);
+    }
+    const selEl = compassWin.body.querySelector('#pfl-sel-name');
+    if (selEl) {
+      selEl.textContent = `✅ Selected: ${mov.label} (${hdg}°)`;
+      selEl.style.color = '#fde047';
+    }
+    const orbSelBtn = compassWin.body.querySelector('#pfl-drone-orbit-selected');
+    if (orbSelBtn) {
+      const shortLbl = String(mov.label || mov.kind).replace(/\s*\(.*?\)\s*/g, '').trim().slice(0, 18);
+      orbSelBtn.textContent = `🎯 Orbit ${shortLbl}`;
+    }
+    paintObjMoveBall();
+  }
+
+  function applyActiveObjectPatch(patch) {
+    if (!activeMovable) return false;
+    if (!isGlobalEditAllowed()) {
+      flashRbacLockBanner();
+      return false;
+    }
+    try { localStorage.setItem(SCENE_LAYOUT_TS_KEY, String(Date.now())); } catch {}
+    activeMovable.update(patch);
+    syncObjectSliders(activeMovable);
+    syncActiveMovableGizmo();
+    if (droneOrbitState.active && (activeMovable.kind === droneOrbitState.targetKey || droneOrbitState.targetKey === 'selected')) {
+      applyDroneOrbit();
+    }
+    return true;
+  }
+
+  function setMovableScale(mov, v) {
+    if (!mov) return;
+    const scaleK = Math.max(0.25, Math.min(3.5, Math.round((Number(v) || 1) * 20) / 20));
+    if (mov === activeMovable) {
+      applyActiveObjectPatch({ scale: scaleK });
+    } else if (isGlobalEditAllowed()) {
+      mov.update({ scale: scaleK });
+      syncActiveMovableGizmo();
+    }
+  }
+
+  function stepObjectCameraRelative(fwdM, rightM) {
+    if (!activeMovable) return;
+    const st = activeMovable.getState();
+    const hdg = viewer?.camera?.heading || 0;
+    const dE = Math.sin(hdg) * fwdM + Math.cos(hdg) * rightM;
+    const dN = Math.cos(hdg) * fwdM - Math.sin(hdg) * rightM;
+    const newLat = st.lat + dN / 111320;
+    const newLon = st.lon + dE / (111320 * Math.cos(Cesium.Math.toRadians(st.lat)));
+    applyActiveObjectPatch({ lat: newLat, lon: newLon });
+  }
+
+  function stepObjectHeading(deltaDeg) {
+    if (!activeMovable) return;
+    const st = activeMovable.getState();
+    const next = (((Math.round(Number(st.heading || 0) + Number(deltaDeg || 0)) % 360) + 360) % 360);
+    applyActiveObjectPatch({ heading: next });
   }
 
   function bindMovable(mov) {
     if (!mov) return;
     activeMovable = mov;
-    const st = mov.getState();
-    const selEl = compassWin.body.querySelector('#pfl-sel-name');
-    if (selEl) {
-      selEl.textContent = `✅ Selected: ${mov.label} (${Math.round(st.heading || 0)}°)`;
-      selEl.style.color = '#fde047';
-    }
-    compassWin.body.querySelector('#pfl-hdg-slider').value = String(Math.round(st.heading || 0));
-    compassWin.body.querySelector('#pfl-hdg-val').textContent = `${Math.round(st.heading || 0)}°`;
-    compassWin.body.querySelector('#pfl-alt-slider').value = String(st.lift || 0);
-    compassWin.body.querySelector('#pfl-alt-val').textContent = `${Number(st.lift || 0).toFixed(2)}m`;
-    syncScaleUi(mov);
+    syncObjectSliders(mov);
     const bar = compassWin.body.querySelector('#pfl-hotspot-actions');
     if (bar) bar.style.display = 'flex';
     const walkHouseBtn = compassWin.body.querySelector('#pfl-hs-walk-house');
@@ -1531,7 +1891,10 @@ export function loadPflWindowFramework({ viewer }) {
     }
     const bar = compassWin.body.querySelector('#pfl-hotspot-actions');
     if (bar) bar.style.display = 'none';
-    compassWin.body.querySelector('#pfl-sel-name').textContent = 'Click 3D avatar/chair/photo or chip above';
+    compassWin.body.querySelector('#pfl-sel-name').textContent = 'Click 3D object/photo or chip above';
+    const orbSelBtn = compassWin.body.querySelector('#pfl-drone-orbit-selected');
+    if (orbSelBtn) orbSelBtn.textContent = '🎯 Orbit Selected';
+    paintObjMoveBall();
     governorRequestRender('pfl-movable-clear');
   }
 
@@ -1545,15 +1908,16 @@ export function loadPflWindowFramework({ viewer }) {
 
   const placeBtn = compassWin.body.querySelector('#pfl-drag-place-btn');
   placeBtn?.addEventListener('click', () => {
+    if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
     clickToPlaceMode = !clickToPlaceMode;
-    placeBtn.textContent = clickToPlaceMode ? '🎯 Click Ground to Drop!' : '✋ Click-to-Place: OFF';
+    placeBtn.textContent = clickToPlaceMode ? '🎯 Click Ground!' : '✋ Drop';
     placeBtn.style.borderColor = clickToPlaceMode ? '#facc15' : '';
   });
 
   const DRAG_SPEED_PRESETS = [
-    { mult: 0.30, label: '🐢 Drag: Fine (0.30×)' },
-    { mult: 0.55, label: '🚶 Drag: Med (0.55×)' },
-    { mult: 1.0, label: '🐇 Drag: Fast (1.0×)' },
+    { mult: 0.30, label: '🐢 0.30×' },
+    { mult: 0.55, label: '🚶 0.55×' },
+    { mult: 1.0, label: '🐇 1.0×' },
   ];
   const NUDGE_STEP_PRESETS = [0.1, 0.25, 1.0];
 
@@ -1569,50 +1933,182 @@ export function loadPflWindowFramework({ viewer }) {
   const nudgeStepBtn = compassWin.body.querySelector('#pfl-nudge-step-btn');
   nudgeStepBtn?.addEventListener('click', () => {
     nudgeStepIdx = (nudgeStepIdx + 1) % NUDGE_STEP_PRESETS.length;
-    nudgeStepBtn.textContent = `📏 Step: ${NUDGE_STEP_PRESETS[nudgeStepIdx]}m`;
+    const v = NUDGE_STEP_PRESETS[nudgeStepIdx];
+    nudgeStepBtn.textContent = `📏 ${v < 1 ? String(v).replace(/^0/, '') : v}m`;
   });
 
-  compassWin.body.querySelectorAll('[data-pfl-obj-nudge]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      if (!activeMovable) return;
-      const stepM = NUDGE_STEP_PRESETS[nudgeStepIdx] || 0.25;
-      const [dirE, dirN] = btn.getAttribute('data-pfl-obj-nudge').split(',').map(Number);
-      const dE = dirE * stepM;
-      const dN = dirN * stepM;
-      const st = activeMovable.getState();
-      const newLat = st.lat + dN / 111320;
-      const newLon = st.lon + dE / (111320 * Math.cos(Cesium.Math.toRadians(st.lat)));
-      activeMovable.update({ lat: newLat, lon: newLon });
-      syncActiveMovableGizmo();
-      if (droneOrbitState.active && activeMovable.kind === droneOrbitState.targetKey) {
-        applyDroneOrbit();
+  // Bird Pond Object Move & 0–360° Spin Ring Canvas (<canvas id="pfl-obj-move-ball">)
+  const objBallCanvas = compassWin.body.querySelector('#pfl-obj-move-ball');
+  const objBallCtx = objBallCanvas?.getContext?.('2d');
+  let objBallMode = null; // null | 'xy' | 'spin'
+  let objBallDragOffset = { x: 0, y: 0 };
+
+  paintObjMoveBall = () => {
+    if (!objBallCtx) return;
+    const W = 128, H = 128, cx = 64, cy = 64, ringR = 50, puckMaxR = 24;
+    objBallCtx.clearRect(0, 0, W, H);
+    const grad = objBallCtx.createRadialGradient(cx - 10, cy - 10, 4, cx, cy, ringR + 10);
+    grad.addColorStop(0, 'rgba(30, 41, 59, 0.96)');
+    grad.addColorStop(1, 'rgba(9, 14, 26, 0.98)');
+    objBallCtx.fillStyle = grad;
+    objBallCtx.beginPath();
+    objBallCtx.arc(cx, cy, ringR + 10, 0, Math.PI * 2);
+    objBallCtx.fill();
+
+    // Outer cyan 0°–360° spin ring
+    objBallCtx.strokeStyle = activeMovable ? 'rgba(56, 189, 248, 0.85)' : 'rgba(148, 163, 184, 0.35)';
+    objBallCtx.lineWidth = 5;
+    objBallCtx.beginPath();
+    objBallCtx.arc(cx, cy, ringR, 0, Math.PI * 2);
+    objBallCtx.stroke();
+
+    for (let deg = 0; deg < 360; deg += 30) {
+      const a = ((deg - 90) * Math.PI) / 180;
+      const inner = deg % 90 === 0 ? ringR - 7 : ringR - 4;
+      objBallCtx.strokeStyle = deg % 90 === 0 ? '#fde047' : 'rgba(148,163,184,0.5)';
+      objBallCtx.lineWidth = deg % 90 === 0 ? 2 : 1;
+      objBallCtx.beginPath();
+      objBallCtx.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
+      objBallCtx.lineTo(cx + Math.cos(a) * (ringR + 3), cy + Math.sin(a) * (ringR + 3));
+      objBallCtx.stroke();
+    }
+
+    // Inner XY crosshair well
+    objBallCtx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+    objBallCtx.lineWidth = 1;
+    objBallCtx.beginPath();
+    objBallCtx.arc(cx, cy, 34, 0, Math.PI * 2);
+    objBallCtx.moveTo(cx - 28, cy);
+    objBallCtx.lineTo(cx + 28, cy);
+    objBallCtx.moveTo(cx, cy - 28);
+    objBallCtx.lineTo(cx, cy + 28);
+    objBallCtx.stroke();
+
+    const hdgDeg = Number(activeMovable?.getState?.()?.heading || 0);
+    const hRad = ((hdgDeg - 90) * Math.PI) / 180;
+    const kx = cx + Math.cos(hRad) * ringR;
+    const ky = cy + Math.sin(hRad) * ringR;
+
+    // Heading spoke & cyan ring knob
+    objBallCtx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+    objBallCtx.lineWidth = 1.5;
+    objBallCtx.beginPath();
+    objBallCtx.moveTo(cx, cy);
+    objBallCtx.lineTo(kx, ky);
+    objBallCtx.stroke();
+
+    objBallCtx.fillStyle = activeMovable ? '#38bdf8' : '#64748b';
+    objBallCtx.beginPath();
+    objBallCtx.arc(kx, ky, 6.5, 0, Math.PI * 2);
+    objBallCtx.fill();
+    objBallCtx.strokeStyle = '#0f172a';
+    objBallCtx.lineWidth = 1.5;
+    objBallCtx.stroke();
+
+    // Inner XY drag puck
+    const px = cx + Math.max(-puckMaxR, Math.min(puckMaxR, objBallDragOffset.x));
+    const py = cy + Math.max(-puckMaxR, Math.min(puckMaxR, objBallDragOffset.y));
+    objBallCtx.fillStyle = objBallMode === 'xy' ? '#facc15' : activeMovable ? '#fbbf24' : '#475569';
+    objBallCtx.beginPath();
+    objBallCtx.arc(px, py, 11, 0, Math.PI * 2);
+    objBallCtx.fill();
+    objBallCtx.strokeStyle = '#0f172a';
+    objBallCtx.lineWidth = 1.5;
+    objBallCtx.stroke();
+
+    objBallCtx.fillStyle = '#0f172a';
+    objBallCtx.font = '800 9px "JetBrains Mono", monospace';
+    objBallCtx.textAlign = 'center';
+    objBallCtx.textBaseline = 'middle';
+    objBallCtx.fillText(activeMovable ? `${Math.round(((hdgDeg % 360) + 360) % 360)}°` : 'NONE', px, py);
+  };
+  paintObjMoveBall();
+
+  let objBallPtr = null;
+  if (objBallCanvas) {
+    objBallCanvas.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || !activeMovable) return;
+      if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
+      const r = objBallCanvas.getBoundingClientRect();
+      const mx = e.clientX - r.left;
+      const my = e.clientY - r.top;
+      const dx = mx - 64;
+      const dy = my - 64;
+      const dist = Math.hypot(dx, dy);
+      objBallMode = dist >= 36 ? 'spin' : 'xy';
+      objBallPtr = { id: e.pointerId, lastX: mx, lastY: my };
+      objBallCanvas.style.cursor = 'grabbing';
+      try { objBallCanvas.setPointerCapture(e.pointerId); } catch {}
+      holdContinuousRender('pfl-obj-ball');
+      if (objBallMode === 'spin') {
+        const deg = (((Math.atan2(dy, dx) * 180) / Math.PI + 90) % 360 + 360) % 360;
+        applyActiveObjectPatch({ heading: Math.round(deg) });
       }
     });
-  });
+    objBallCanvas.addEventListener('pointermove', (e) => {
+      if (!objBallPtr || e.pointerId !== objBallPtr.id || !activeMovable) return;
+      const r = objBallCanvas.getBoundingClientRect();
+      const mx = e.clientX - r.left;
+      const my = e.clientY - r.top;
+      if (objBallMode === 'spin') {
+        const deg = (((Math.atan2(my - 64, mx - 64) * 180) / Math.PI + 90) % 360 + 360) % 360;
+        applyActiveObjectPatch({ heading: Math.round(deg) });
+      } else if (objBallMode === 'xy') {
+        const ddx = mx - objBallPtr.lastX;
+        const ddy = my - objBallPtr.lastY;
+        objBallPtr.lastX = mx;
+        objBallPtr.lastY = my;
+        objBallDragOffset = { x: mx - 64, y: my - 64 };
+        const stepM = NUDGE_STEP_PRESETS[nudgeStepIdx] || 0.25;
+        const mPerPx = Math.max(0.03, stepM * 0.22);
+        stepObjectCameraRelative(-ddy * mPerPx, ddx * mPerPx);
+      }
+    });
+    const endObjBallDrag = (e) => {
+      if (!objBallPtr || (e && e.pointerId !== undefined && e.pointerId !== objBallPtr.id)) return;
+      objBallPtr = null;
+      objBallMode = null;
+      objBallDragOffset = { x: 0, y: 0 };
+      objBallCanvas.style.cursor = 'grab';
+      paintObjMoveBall();
+      releaseContinuousRender('pfl-obj-ball');
+    };
+    objBallCanvas.addEventListener('pointerup', endObjBallDrag);
+    objBallCanvas.addEventListener('pointercancel', endObjBallDrag);
+  }
 
   function wrapBirdpondWallMovable(ent) {
     if (ent._pflWallMov) return ent._pflWallMov;
-    const st = ent._pflWallMeta || { lat: 29.139116, lon: -95.804794, width: 13.93, height: 9.23, heading: 107, baseAlt: -17.5, lift: 0 };
+    const st = ent._pflWallMeta || { lat: 29.139116, lon: -95.804794, width: 13.93, height: 9.23, heading: 107, baseAlt: -17.5, lift: 0, scale: 1, opacity: 1 };
     ent._pflWallMeta = st;
+    const baseW = Number(st.baseWidth || st.width || 13.93);
+    const baseH = Number(st.baseHeight || st.height || 9.23);
+    st.baseWidth = baseW;
+    st.baseHeight = baseH;
     ent._pflWallMov = {
       kind: ent.id,
       label: ent.name || ent.id,
-      getState: () => ({ lat: st.lat, lon: st.lon, heading: st.heading, lift: st.lift || 0 }),
+      getState: () => ({ lat: st.lat, lon: st.lon, heading: st.heading, lift: st.lift || 0, scale: st.scale || 1, opacity: st.opacity ?? 1 }),
       update: (patch) => {
         Object.assign(st, patch);
-        const halfW = (st.width || 13.93) * 0.5;
+        const sc = Math.max(0.25, Math.min(3.5, Number(st.scale || 1)));
+        const op = Math.max(0.05, Math.min(1, Number(st.opacity ?? 1)));
+        const halfW = baseW * sc * 0.5;
         const rad = (st.heading * Math.PI) / 180.0;
         const dN = Math.cos(rad) * halfW;
         const dE = Math.sin(rad) * halfW;
         const mLat = 111320.0;
         const mLon = 111320.0 * Math.cos((st.lat * Math.PI) / 180.0);
         const bAlt = (st.baseAlt ?? -17.5) + (st.lift || 0);
-        const tAlt = bAlt + (st.height || 9.23);
+        const tAlt = bAlt + baseH * sc;
         ent.wall.positions = Cesium.Cartesian3.fromDegreesArrayHeights([
           st.lon - dE / mLon, st.lat - dN / mLat, tAlt,
           st.lon + dE / mLon, st.lat + dN / mLat, tAlt,
         ]);
         ent.wall.minimumHeights = [bAlt, bAlt];
+        if (ent.wall.material) {
+          try { ent.wall.material.color = Cesium.Color.WHITE.withAlpha(op); } catch {}
+        }
         governorRequestRender('pfl-wall-rotate');
       },
     };
@@ -1708,6 +2204,7 @@ export function loadPflWindowFramework({ viewer }) {
     const hit = drillFindTarget(downEv.position);
     if (hit?.type !== 'movable' || !hit.mov) return;
     bindMovable(hit.mov);
+    if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
     if (houseDragLocked && hit.mov.kind === 'house') return;
     const st = hit.mov.getState();
     const planeAlt = resolveLocalGroundM(st.lon, st.lat) + Number(st.lift || 0);
@@ -2114,7 +2611,7 @@ export function loadPflWindowFramework({ viewer }) {
 
   pickHandler.setInputAction((movement) => {
     if (Date.now() - lastDragReleaseMs < 260) return;
-    if (clickToPlaceMode && activeMovable && !(houseDragLocked && activeMovable.kind === 'house')) {
+    if (clickToPlaceMode && activeMovable && isGlobalEditAllowed() && !(houseDragLocked && activeMovable.kind === 'house')) {
       let cart = null;
       try {
         cart = viewer.scene.pickPositionSupported ? viewer.scene.pickPosition(movement.position) : null;
@@ -2128,14 +2625,13 @@ export function loadPflWindowFramework({ viewer }) {
       }
       if (cart) {
         const cg = Cesium.Cartographic.fromCartesian(cart);
-        activeMovable.update({
+        applyActiveObjectPatch({
           lat: Cesium.Math.toDegrees(cg.latitude),
           lon: Cesium.Math.toDegrees(cg.longitude),
         });
-        syncActiveMovableGizmo();
         clickToPlaceMode = false;
         if (placeBtn) {
-          placeBtn.textContent = '✋ Click-to-Place: OFF';
+          placeBtn.textContent = '✋ Drop';
           placeBtn.style.borderColor = '';
         }
         return;
@@ -2175,35 +2671,17 @@ export function loadPflWindowFramework({ viewer }) {
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
   compassWin.body.querySelector('#pfl-hdg-slider')?.addEventListener('input', (e) => {
-    const v = Number(e.target.value);
-    compassWin.body.querySelector('#pfl-hdg-val').textContent = `${v}°`;
-    activeMovable?.update({ heading: v });
-    syncActiveMovableGizmo();
+    applyActiveObjectPatch({ heading: Number(e.target.value) });
   });
 
   const applyActiveLift = (nextLift) => {
     if (!activeMovable) return;
     const clamped = Math.max(-35, Math.min(35, Math.round(Number(nextLift || 0) * 20) / 20));
-    const sl = compassWin.body.querySelector('#pfl-alt-slider');
-    const vl = compassWin.body.querySelector('#pfl-alt-val');
-    if (sl) sl.value = String(clamped);
-    if (vl) vl.textContent = `${clamped.toFixed(2)}m`;
-    activeMovable.update({ lift: clamped });
-    syncActiveMovableGizmo();
-    if (droneOrbitState.active && activeMovable.kind === droneOrbitState.targetKey) {
-      applyDroneOrbit();
-    }
+    applyActiveObjectPatch({ lift: clamped });
   };
 
   compassWin.body.querySelector('#pfl-alt-slider')?.addEventListener('input', (e) => {
     applyActiveLift(Number(e.target.value));
-  });
-  compassWin.body.querySelectorAll('[data-pfl-lift-delta]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      if (!activeMovable) return;
-      const cur = Number(activeMovable.getState()?.lift || 0);
-      applyActiveLift(cur + Number(btn.getAttribute('data-pfl-lift-delta') || 0));
-    });
   });
   compassWin.body.querySelector('#pfl-lift-zero-btn')?.addEventListener('click', () => {
     applyActiveLift(0);
@@ -2211,10 +2689,20 @@ export function loadPflWindowFramework({ viewer }) {
 
   compassWin.body.querySelector('#pfl-scale-slider')?.addEventListener('input', (e) => {
     if (!activeMovable || !movableSupportsScale(activeMovable)) return;
-    const v = Number(e.target.value);
-    compassWin.body.querySelector('#pfl-scale-val').textContent = `${v.toFixed(2)}×`;
-    setMovableScale(activeMovable, v);
-    if (droneOrbitState.active) applyDroneOrbit();
+    setMovableScale(activeMovable, Number(e.target.value));
+  });
+  compassWin.body.querySelectorAll('[data-pfl-scale-delta]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!activeMovable) return;
+      const next = getMovableScale(activeMovable) + Number(btn.getAttribute('data-pfl-scale-delta') || 0);
+      setMovableScale(activeMovable, next);
+    });
+  });
+
+  compassWin.body.querySelector('#pfl-opacity-slider')?.addEventListener('input', (e) => {
+    if (!activeMovable) return;
+    const op = Math.max(0.05, Math.min(1, Number(e.target.value) || 1));
+    applyActiveObjectPatch({ opacity: op });
   });
 
   const orbitKeyForMovable = (mov) => {
@@ -2225,13 +2713,7 @@ export function loadPflWindowFramework({ viewer }) {
     if (activeMovable) startDroneOrbit(orbitKeyForMovable(activeMovable));
   });
   compassWin.body.querySelector('#pfl-hs-spin')?.addEventListener('click', () => {
-    if (!activeMovable) return;
-    const st = activeMovable.getState();
-    const next = (((Math.round(Number(st.heading || 0)) + 90) % 360) + 360) % 360;
-    activeMovable.update({ heading: next });
-    compassWin.body.querySelector('#pfl-hdg-slider').value = String(next);
-    compassWin.body.querySelector('#pfl-hdg-val').textContent = `${next}°`;
-    syncActiveMovableGizmo();
+    stepObjectHeading(90);
   });
   compassWin.body.querySelector('#pfl-hs-resize')?.addEventListener('click', () => {
     const sl = compassWin.body.querySelector('#pfl-scale-slider');
@@ -2464,6 +2946,7 @@ export function loadPflWindowFramework({ viewer }) {
         <span id="pfl-drone-status" style="font-size:9.5px;color:#94a3b8;font-weight:700">FREE CAM</span>
       </div>
       <div style="display:flex;gap:3px;flex-wrap:wrap">
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-selected" style="border-color:#fde047;color:#fde047;font-weight:700" title="Send drone to orbit whichever object you currently have selected">🎯 Orbit Selected</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-lisa" data-pfl-drone="lisa" title="Send remote drone to orbit 360° around Lisa without losing your standing spot">🚁 Orbit Lisa</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-chair" data-pfl-drone="chair" title="Send remote drone to orbit around Wooden Chair">🪑 Orbit Chair</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-house" data-pfl-drone="house" title="Send remote drone to orbit 360° around 417 Palm Dr House">🏠 Orbit House</button>
@@ -2472,11 +2955,19 @@ export function loadPflWindowFramework({ viewer }) {
         <button type="button" class="pfl-std-cbtn" id="pfl-drone-orbit-dock" data-pfl-drone="dock" title="Send remote drone to orbit Chocolate Bayou Dock">⚓ Orbit Dock</button>
       </div>
       <div style="display:flex;gap:3px;flex-wrap:wrap">
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-play-toggle" style="border-color:#22c55e;color:#4ade80;font-weight:700" title="Continuously sweep 360° smoothly around the locked target">▶️ Play 360°</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-drone-step-left" title="Orbit 15° Left around locked target">◀ Orbit L</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-drone-step-right" title="Orbit 15° Right around locked target">Orbit R ▶</button>
-        <button type="button" class="pfl-std-cbtn" id="pfl-drone-unlock" style="border-color:#fbbf24;color:#fde047" title="Unlock camera transform cleanly in place">🔓 Unlock Free Cam</button>
-        <button type="button" class="pfl-std-cbtn" id="pfl-drone-return" style="border-color:#4ade80;color:#4ade80" title="Unlock drone &amp; return immediately to your saved pre-drone standing spot">↩️ Return from Drone</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-unlock" style="border-color:#fbbf24;color:#fde047" title="Unlock camera transform cleanly in place">🔓 Unlock</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-drone-return" style="border-color:#4ade80;color:#4ade80" title="Unlock drone &amp; return immediately to your saved pre-drone standing spot">↩️ Return</button>
       </div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center;padding:4px 5px;border:1px solid rgba(56,189,248,0.22);border-radius:6px;background:rgba(15,23,42,0.5)">
+        <span style="color:#38bdf8;font-weight:700;font-size:9.5px">🛤️ Flight Path:</span>
+        <button type="button" class="pfl-std-cbtn" id="pfl-fp-add" title="Add current camera viewpoint as next Flight Path stop">➕ Waypoint</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-fp-play" style="border-color:#4ade80;color:#4ade80" title="Fly smoothly through saved Flight Path waypoints">▶️ Play Path (0)</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-fp-clear" title="Clear saved Flight Path waypoints">🗑️</button>
+      </div>
+      <div style="font-size:8.5px;color:#94a3b8;line-height:1.25">Tip: Bottom ▶ (1×) advances satellites/planes track clock; use ▶️ Play 360° or Flight Path above to animate camera!</div>
       <label style="display:flex;justify-content:space-between"><span>Drone Azimuth</span><span id="pfl-drone-az-val">12°</span></label>
       <input type="range" id="pfl-drone-az-slider" min="0" max="360" step="1" value="12" style="width:100%;accent-color:#38bdf8" />
       <label style="display:flex;justify-content:space-between"><span>Drone Pitch</span><span id="pfl-drone-pitch-val">-14°</span></label>
@@ -2515,7 +3006,12 @@ export function loadPflWindowFramework({ viewer }) {
   `;
   compassWin.body.appendChild(telepresenceDeck);
 
-  // Wire Drone Telepresence controls
+  // Wire Drone Telepresence controls, 360° Play & Flight Path Builder
+  telepresenceDeck.querySelector('#pfl-drone-orbit-selected')?.addEventListener('click', () => {
+    const mov = activeMovable || window.__pflMovables?.monaco || window.__pflMovables?.lisa;
+    if (mov && !activeMovable) bindMovable(mov);
+    startDroneOrbit(mov ? orbitKeyForMovable(mov) : 'lisa');
+  });
   telepresenceDeck.querySelectorAll('[data-pfl-drone]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const key = btn.getAttribute('data-pfl-drone');
@@ -2526,8 +3022,142 @@ export function loadPflWindowFramework({ viewer }) {
       startDroneOrbit(key);
     });
   });
-  telepresenceDeck.querySelector('#pfl-drone-unlock')?.addEventListener('click', unlockDroneCamera);
-  telepresenceDeck.querySelector('#pfl-drone-return')?.addEventListener('click', returnFromDrone);
+
+  let dronePlayRaf = 0;
+  let dronePlayLastTs = 0;
+  const playOrbitBtn = telepresenceDeck.querySelector('#pfl-drone-play-toggle');
+  stopDroneAutoOrbit = () => {
+    if (dronePlayRaf) {
+      cancelAnimationFrame(dronePlayRaf);
+      dronePlayRaf = 0;
+      releaseContinuousRender('pfl-drone-play');
+    }
+    dronePlayLastTs = 0;
+    if (playOrbitBtn) {
+      playOrbitBtn.textContent = '▶️ Play 360°';
+      playOrbitBtn.style.borderColor = '#22c55e';
+      playOrbitBtn.style.color = '#4ade80';
+    }
+  };
+  playOrbitBtn?.addEventListener('click', () => {
+    if (dronePlayRaf) {
+      stopDroneAutoOrbit();
+      return;
+    }
+    stopFlightPathPlay();
+    if (!droneOrbitState.active) {
+      const mov = activeMovable || window.__pflMovables?.monaco || window.__pflMovables?.lisa;
+      startDroneOrbit(mov ? orbitKeyForMovable(mov) : 'lisa');
+    }
+    playOrbitBtn.textContent = '⏸️ Pause 360°';
+    playOrbitBtn.style.borderColor = '#f59e0b';
+    playOrbitBtn.style.color = '#fde047';
+    holdContinuousRender('pfl-drone-play');
+    const stepOrbit = (ts) => {
+      if (!droneOrbitState.active) {
+        stopDroneAutoOrbit();
+        return;
+      }
+      if (dronePlayLastTs > 0) {
+        const dt = Math.min(0.1, (ts - dronePlayLastTs) / 1000);
+        droneOrbitState.azimuthDeg = (droneOrbitState.azimuthDeg + dt * 18) % 360;
+        applyDroneOrbit();
+      }
+      dronePlayLastTs = ts;
+      dronePlayRaf = requestAnimationFrame(stepOrbit);
+    };
+    dronePlayRaf = requestAnimationFrame(stepOrbit);
+  });
+
+  const FLIGHT_PATH_KEY = 'pfl_flight_path_v1';
+  let flightPath = [];
+  try {
+    const rawFp = JSON.parse(localStorage.getItem(FLIGHT_PATH_KEY) || '[]');
+    if (Array.isArray(rawFp)) flightPath = rawFp.filter((w) => Number.isFinite(Number(w?.lat)) && Number.isFinite(Number(w?.lon)));
+  } catch {}
+  let fpTimer = 0;
+  let fpPlaying = false;
+  const fpPlayBtn = telepresenceDeck.querySelector('#pfl-fp-play');
+  const syncFpUi = () => {
+    if (!fpPlayBtn) return;
+    fpPlayBtn.textContent = fpPlaying ? `⏹️ Stop Path (${flightPath.length})` : `▶️ Play Path (${flightPath.length})`;
+    fpPlayBtn.style.borderColor = fpPlaying ? '#f43f5e' : '#4ade80';
+    fpPlayBtn.style.color = fpPlaying ? '#fda4af' : '#4ade80';
+  };
+  stopFlightPathPlay = () => {
+    if (fpTimer) {
+      clearTimeout(fpTimer);
+      fpTimer = 0;
+    }
+    fpPlaying = false;
+    syncFpUi();
+  };
+  syncFpUi();
+  telepresenceDeck.querySelector('#pfl-fp-add')?.addEventListener('click', (e) => {
+    const c = viewer?.camera?.positionCartographic;
+    if (!c) return;
+    flightPath.push({
+      lon: c.longitude,
+      lat: c.latitude,
+      height: c.height,
+      heading: viewer.camera.heading || 0,
+      pitch: viewer.camera.pitch || -0.35,
+    });
+    try { localStorage.setItem(FLIGHT_PATH_KEY, JSON.stringify(flightPath.slice(-24))); } catch {}
+    syncFpUi();
+    const b = e.currentTarget;
+    b.textContent = `✅ WP #${flightPath.length}`;
+    setTimeout(() => { b.textContent = '➕ Waypoint'; }, 1000);
+  });
+  telepresenceDeck.querySelector('#pfl-fp-clear')?.addEventListener('click', () => {
+    stopFlightPathPlay();
+    flightPath = [];
+    try { localStorage.removeItem(FLIGHT_PATH_KEY); } catch {}
+    syncFpUi();
+  });
+  fpPlayBtn?.addEventListener('click', () => {
+    if (fpPlaying) {
+      stopFlightPathPlay();
+      return;
+    }
+    if (!flightPath.length) {
+      const b = fpPlayBtn;
+      b.textContent = '➕ Add WP 1st';
+      setTimeout(syncFpUi, 1200);
+      return;
+    }
+    stopDroneAutoOrbit();
+    unlockDroneCamera();
+    fpPlaying = true;
+    syncFpUi();
+    let idx = 0;
+    const flyNext = () => {
+      if (!fpPlaying || idx >= flightPath.length) {
+        stopFlightPathPlay();
+        return;
+      }
+      const wp = flightPath[idx++];
+      enforceZeroAltitudeKickGuard();
+      viewer?.camera?.flyTo?.({
+        destination: Cesium.Cartesian3.fromRadians(wp.lon, wp.lat, wp.height),
+        orientation: { heading: wp.heading, pitch: wp.pitch, roll: 0 },
+        duration: 1.8,
+      });
+      fpTimer = setTimeout(flyNext, 2200);
+    };
+    flyNext();
+  });
+
+  telepresenceDeck.querySelector('#pfl-drone-unlock')?.addEventListener('click', () => {
+    stopDroneAutoOrbit();
+    stopFlightPathPlay();
+    unlockDroneCamera();
+  });
+  telepresenceDeck.querySelector('#pfl-drone-return')?.addEventListener('click', () => {
+    stopDroneAutoOrbit();
+    stopFlightPathPlay();
+    returnFromDrone();
+  });
   telepresenceDeck.querySelector('#pfl-drone-step-left')?.addEventListener('click', () => {
     if (!droneOrbitState.active) startDroneOrbit(droneOrbitState.targetKey || 'lisa');
     droneOrbitState.azimuthDeg = ((droneOrbitState.azimuthDeg - 15) % 360 + 360) % 360;
@@ -3031,6 +3661,30 @@ export function loadPflWindowFramework({ viewer }) {
     } else {
       btn.addEventListener('click', () => applyLookDir(dir));
     }
+  });
+
+  compassWin.body.querySelectorAll('[data-pfl-obj-cam]').forEach((btn) => {
+    const [rM, fM] = btn.getAttribute('data-pfl-obj-cam').split(',').map(Number);
+    attachPadRepeat(btn, () => {
+      const stepM = NUDGE_STEP_PRESETS[nudgeStepIdx] || 0.25;
+      stepObjectCameraRelative(fM * stepM, rM * stepM);
+    });
+  });
+  compassWin.body.querySelectorAll('[data-pfl-obj-rot]').forEach((btn) => {
+    const deg = Number(btn.getAttribute('data-pfl-obj-rot') || 0);
+    if (Math.abs(deg) === 15 || Math.abs(deg) === 5) {
+      attachPadRepeat(btn, () => stepObjectHeading(deg));
+    } else {
+      btn.addEventListener('click', () => stepObjectHeading(deg));
+    }
+  });
+  compassWin.body.querySelectorAll('[data-pfl-lift-delta]').forEach((btn) => {
+    const delta = Number(btn.getAttribute('data-pfl-lift-delta') || 0);
+    attachPadRepeat(btn, () => {
+      if (!activeMovable) return;
+      const cur = Number(activeMovable.getState()?.lift || 0);
+      applyActiveLift(cur + delta);
+    });
   });
 
   let wasdWalkOn = false;
@@ -4143,7 +4797,8 @@ export function loadPflWindowFramework({ viewer }) {
 
     // 3D Monaco 40ft Class-A Diesel Pusher Coach RV in East Driveway beside Fleetwood RV (12.2m L × 2.59m W × 3.65m H)
     const MONACO_POSE_KEY = 'pfl_monaco_pose_v2';
-    let monacoState = { lat: 29.247510, lon: -95.231268, heading: 175, lift: 0 };
+    const MONACO_GROUND_CLEARANCE_M = 0.35;
+    let monacoState = { lat: 29.247510, lon: -95.231268, heading: 175, lift: 0, scale: 1, opacity: 1 };
     try {
       const savedMon = JSON.parse(localStorage.getItem(MONACO_POSE_KEY) || 'null');
       if (savedMon && Number.isFinite(savedMon.lat) && Number.isFinite(savedMon.lon)) {
@@ -4211,8 +4866,12 @@ export function loadPflWindowFramework({ viewer }) {
     for (const mid of monacoIds) viewer.entities.removeById(mid);
 
     const placeMonacoPart = (id, name, localX, localY, localZ, dims, mat, outlineCol, billboardSpec = null) => {
-      const sc = Number(monacoState.scale) > 0 ? Number(monacoState.scale) : 1;
-      const origin = Cesium.Cartesian3.fromDegrees(monacoState.lon, monacoState.lat, rvGround + (monacoState.lift || 0));
+      const sc = Math.max(0.25, Math.min(3.5, Number(monacoState.scale) > 0 ? Number(monacoState.scale) : 1));
+      const origin = Cesium.Cartesian3.fromDegrees(
+        monacoState.lon,
+        monacoState.lat,
+        rvGround + MONACO_GROUND_CLEARANCE_M + Number(monacoState.lift || 0),
+      );
       const hpr = new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(monacoState.heading || 175), 0, 0);
       const frame = Cesium.Transforms.headingPitchRollToFixedFrame(origin, hpr);
       const pos = Cesium.Matrix4.multiplyByPoint(frame, new Cesium.Cartesian3(localX * sc, localY * sc, localZ * sc), new Cesium.Cartesian3());
@@ -4222,6 +4881,8 @@ export function loadPflWindowFramework({ viewer }) {
         existing.position = pos;
         existing.orientation = ori;
         existing.box.dimensions = new Cesium.Cartesian3(dims.x * sc, dims.y * sc, dims.z * sc);
+        existing.box.material = mat;
+        if (outlineCol) existing.box.outlineColor = outlineCol;
         return existing;
       }
       const ent = viewer.entities.add({
@@ -4243,6 +4904,7 @@ export function loadPflWindowFramework({ viewer }) {
 
     const renderMonacoParts = () => {
       rvGround = resolveLocalGroundM(monacoState.lon, monacoState.lat);
+      const op = Math.max(0.05, Math.min(1, Number(monacoState.opacity ?? 1)));
       const parts = [
         // Main 40ft (12.2m) × 8.5ft (2.59m) × 12ft (3.65m roof) Champagne/Cream Coach Body
         placeMonacoPart(
@@ -4250,8 +4912,12 @@ export function loadPflWindowFramework({ viewer }) {
           '🚌 Monaco 40ft Diesel Pusher Coach',
           0, 0, 1.98,
           new Cesium.Cartesian3(2.59, 12.20, 3.26),
-          new Cesium.ImageMaterialProperty({ image: viewer._pflMonacoLiveryCanvas }),
-          Cesium.Color.fromCssColorString('#f5ebe0').withAlpha(0.75),
+          new Cesium.ImageMaterialProperty({
+            image: viewer._pflMonacoLiveryCanvas,
+            transparent: op < 0.99,
+            color: Cesium.Color.WHITE.withAlpha(op),
+          }),
+          Cesium.Color.fromCssColorString('#f5ebe0').withAlpha(0.75 * op),
           {
             image: makeWorldTagCanvas('🚌 MONACO 40FT COACH', '#fbbf24', '#fef08a'),
             width: 164,
@@ -4267,8 +4933,8 @@ export function loadPflWindowFramework({ viewer }) {
           '🚌 Monaco Front Panoramic Windshield',
           0, 5.98, 2.48,
           new Cesium.Cartesian3(2.42, 0.30, 1.16),
-          Cesium.Color.fromCssColorString('#0f172a').withAlpha(0.88),
-          Cesium.Color.fromCssColorString('#64748b').withAlpha(0.7),
+          Cesium.Color.fromCssColorString('#0f172a').withAlpha(0.88 * op),
+          Cesium.Color.fromCssColorString('#64748b').withAlpha(0.7 * op),
         ),
         // Warm Glowing ~70W Interior Cab Lamp visible behind windshield
         placeMonacoPart(
@@ -4276,8 +4942,8 @@ export function loadPflWindowFramework({ viewer }) {
           '💡 Monaco ~70W Interior Cab Lamp',
           0, 5.38, 2.38,
           new Cesium.Cartesian3(1.52, 0.72, 0.62),
-          Cesium.Color.fromCssColorString('#fde68a').withAlpha(0.92),
-          Cesium.Color.fromCssColorString('#fbbf24').withAlpha(0.95),
+          Cesium.Color.fromCssColorString('#fde68a').withAlpha(0.92 * op),
+          Cesium.Color.fromCssColorString('#fbbf24').withAlpha(0.95 * op),
         ),
         // Dual Rooftop Coleman A/C Pods
         placeMonacoPart(
@@ -4285,16 +4951,16 @@ export function loadPflWindowFramework({ viewer }) {
           '🚌 Monaco Rooftop A/C Front',
           0, 2.45, 3.75,
           new Cesium.Cartesian3(0.94, 1.24, 0.28),
-          Cesium.Color.fromCssColorString('#f8fafc').withAlpha(0.95),
-          Cesium.Color.fromCssColorString('#94a3b8').withAlpha(0.7),
+          Cesium.Color.fromCssColorString('#f8fafc').withAlpha(0.95 * op),
+          Cesium.Color.fromCssColorString('#94a3b8').withAlpha(0.7 * op),
         ),
         placeMonacoPart(
           'pfl-monaco-rv-ac-rear',
           '🚌 Monaco Rooftop A/C Rear',
           0, -2.35, 3.75,
           new Cesium.Cartesian3(0.94, 1.24, 0.28),
-          Cesium.Color.fromCssColorString('#f8fafc').withAlpha(0.95),
-          Cesium.Color.fromCssColorString('#94a3b8').withAlpha(0.7),
+          Cesium.Color.fromCssColorString('#f8fafc').withAlpha(0.95 * op),
+          Cesium.Color.fromCssColorString('#94a3b8').withAlpha(0.7 * op),
         ),
         // Passenger-Side Champagne Patio Awning Cassette (+X right side)
         placeMonacoPart(
@@ -4302,8 +4968,8 @@ export function loadPflWindowFramework({ viewer }) {
           '🚌 Monaco Patio Awning',
           1.34, 0.85, 3.42,
           new Cesium.Cartesian3(0.16, 6.80, 0.20),
-          Cesium.Color.fromCssColorString('#d6c7b2').withAlpha(0.95),
-          Cesium.Color.fromCssColorString('#b4925a').withAlpha(0.85),
+          Cesium.Color.fromCssColorString('#d6c7b2').withAlpha(0.95 * op),
+          Cesium.Color.fromCssColorString('#b4925a').withAlpha(0.85 * op),
         ),
       ];
       return parts;
@@ -4329,7 +4995,7 @@ export function loadPflWindowFramework({ viewer }) {
     // 3D 417 Palm Drive Two-Story Yellow Coastal House GLB (/models/pfl-palm-drive-house.glb)
     // In Cesium glTF axis conversion, heading=90° aligns glTF +X (14.6m width) East-West and glTF +Z (+5.6m front porch/balcony) Due South!
     const HOUSE_POSE_KEY = 'pfl_house_pose_v3';
-    const DEFAULT_HOUSE_STATE = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0, scale: 1 };
+    const DEFAULT_HOUSE_STATE = { lat: 29.247595, lon: -95.231385, heading: 90, lift: 0, scale: 1, opacity: 1 };
     let houseState = { ...DEFAULT_HOUSE_STATE };
     try {
       const savedHouse = JSON.parse(localStorage.getItem(HOUSE_POSE_KEY) || 'null');
@@ -4355,7 +5021,8 @@ export function loadPflWindowFramework({ viewer }) {
         return null;
       }
       const hGround = resolveLocalGroundM(houseState.lon, houseState.lat);
-      const houseScale = Number(houseState.scale) > 0 ? Number(houseState.scale) : 1;
+      const houseScale = Math.max(0.25, Math.min(3.5, Number(houseState.scale) > 0 ? Number(houseState.scale) : 1));
+      const houseOpacity = Math.max(0.05, Math.min(1, Number(houseState.opacity ?? 1)));
       const hPos = Cesium.Cartesian3.fromDegrees(houseState.lon, houseState.lat, hGround + Number(houseState.lift || 0));
       const hOri = Cesium.Transforms.headingPitchRollQuaternion(
         hPos,
@@ -4366,6 +5033,7 @@ export function loadPflWindowFramework({ viewer }) {
         existingHouse.position = hPos;
         existingHouse.orientation = hOri;
         existingHouse.model.scale = houseScale;
+        existingHouse.model.color = Cesium.Color.WHITE.withAlpha(houseOpacity);
         existingHouse._pflMovable = houseMovable;
         return existingHouse;
       }
@@ -4378,6 +5046,7 @@ export function loadPflWindowFramework({ viewer }) {
         model: {
           uri: `/models/pfl-palm-drive-house.glb?v=${viewer._pflHouseRev || 1}`,
           scale: houseScale,
+          color: Cesium.Color.WHITE.withAlpha(houseOpacity),
           heightReference: Cesium.HeightReference.NONE,
           minimumPixelSize: 0,
           maximumScale: 50,
@@ -4433,18 +5102,26 @@ export function loadPflWindowFramework({ viewer }) {
     }
   }
   buildYard3dLandmarks();
-  let lastGroundedDatumM = resolveLocalGroundM(-95.23138, 29.24768);
+  const sampleYardDatumSig = () => [
+    resolveLocalGroundM(-95.23138, 29.24768),
+    resolveLocalGroundM(-95.231268, 29.247510),
+    resolveLocalGroundM(-95.231385, 29.247595),
+    resolveLocalGroundM(-95.231445, 29.247436),
+  ].map((v) => Math.round(Number(v || 0) * 5) / 5).join('|');
+  let lastGroundedDatumSig = sampleYardDatumSig();
   let terrainSyncTimer = null;
   const scheduleTerrainReground = (force = false, delayMs = 220) => {
     if (terrainSyncTimer) clearTimeout(terrainSyncTimer);
     terrainSyncTimer = setTimeout(() => {
       terrainSyncTimer = null;
-      const nextDatum = resolveLocalGroundM(-95.23138, 29.24768);
-      if (!force && Math.abs(nextDatum - lastGroundedDatumM) <= 0.15) return;
-      lastGroundedDatumM = nextDatum;
+      const nextSig = sampleYardDatumSig();
+      if (!force && nextSig === lastGroundedDatumSig) return;
+      lastGroundedDatumSig = nextSig;
       try { buildYard3dLandmarks(); } catch {}
       try { window.__pflMovables?.lisa?.update?.({}); } catch {}
       try { window.__pflMovables?.chair?.update?.({}); } catch {}
+      try { window.__pflMovables?.house?.update?.({}); } catch {}
+      try { window.__pflMovables?.monaco?.update?.({}); } catch {}
       try { syncActiveMovableGizmo(); } catch {}
     }, delayMs);
   };
@@ -4479,6 +5156,12 @@ export function loadPflWindowFramework({ viewer }) {
       if (nearYard) {
         ctrl.enableCollisionDetection = false;
         ctrl.minimumZoomDistance = 0.25;
+        if (viewer.scene?.globe && c.height < 220) {
+          viewer.scene.globe.depthTestAgainstTerrain = false;
+        }
+        if (viewer.camera?.frustum && 'near' in viewer.camera.frustum && c.height < 140) {
+          viewer.camera.frustum.near = 0.12;
+        }
         if (c.height < 180 && !droneOrbitState.active) {
           lastSafeYardPose = {
             lon: c.longitude,
@@ -5479,6 +6162,8 @@ export function loadPflWindowFramework({ viewer }) {
 
   return {
     destroy() {
+      stopDroneAutoOrbit();
+      stopFlightPathPlay();
       unlockDroneCamera();
       stopMlsAutoTour();
       endDragMovableSession();
