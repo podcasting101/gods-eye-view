@@ -784,8 +784,8 @@ export function loadPflWindowFramework({ viewer }) {
   let open360ViewerModal = () => {};
   let sync360SphereEntities = () => {};
   let walkCollisionsOn = true;
-  const HOUSE_DEFAULT_POSE = { lat: 29.247585, lon: -95.231378, heading: 104, lift: 0, scale: 1, opacity: 1 };
-  const MONACO_DEFAULT_POSE = { lat: 29.247505, lon: -95.231242, heading: 14, lift: 0, scale: 1, opacity: 1 };
+  const HOUSE_DEFAULT_POSE = { lat: 29.2475785, lon: -95.231348, heading: 99, lift: -0.5, scale: 1, opacity: 1 };
+  const MONACO_DEFAULT_POSE = { lat: 29.2474517, lon: -95.2312069, heading: 194, lift: 0, scale: 1, opacity: 1 };
   const DOCK_DEFAULT_POSE = { lat: 29.247786, lon: -95.231388, heading: 14, lift: 0, scale: 1, opacity: 1 };
 
   function houseLocalToGeo(localEastM, localNorthM, hState = null) {
@@ -1187,13 +1187,17 @@ export function loadPflWindowFramework({ viewer }) {
         banner.style.borderColor = 'rgba(74,222,128,0.45)';
         banner.style.color = '#86efac';
       } else {
-        banner.innerHTML = `🔒 <b>${rbacState.loggedIn ? `${rbacState.displayName} (${rbacState.tier})` : 'Visitor (Guest)'}</b>: Shared objects locked to Admin · Your 📍 Pins stay ON · <a href="${loginHref}" style="color:#fde047;text-decoration:underline">Admin Login</a>`;
+        banner.innerHTML = `👁️ <b>Guest Sandbox</b> · Move objects locally · Changes do NOT save globally (Admin only) · <a href="${loginHref}" style="color:#fde047;text-decoration:underline">Admin Login</a>`;
         banner.style.borderColor = 'rgba(245,158,11,0.55)';
         banner.style.color = '#fde68a';
       }
     }
     compassWin.body.querySelectorAll('#pfl-object-pad-card input[type="range"]').forEach((el) => {
-      el.disabled = !canEdit;
+      if (el.id === 'pfl-scale-slider') {
+        el.disabled = !movableSupportsScale(activeMovable);
+      } else {
+        el.disabled = false;
+      }
     });
   }
 
@@ -1241,35 +1245,51 @@ export function loadPflWindowFramework({ viewer }) {
     return { objects };
   }
 
+  let isApplyingPublishedLayout = false;
+  let adminAutoPublishTimer = null;
+  function scheduleAdminAutoPublish() {
+    if (IS_LOCAL_NODE || !isGlobalEditAllowed() || isApplyingPublishedLayout) return;
+    if (adminAutoPublishTimer) clearTimeout(adminAutoPublishTimer);
+    adminAutoPublishTimer = setTimeout(() => {
+      adminAutoPublishTimer = null;
+      publishGlobalLayout(compassWin.body.querySelector('#pfl-publish-layout-btn'));
+    }, 1200);
+  }
+
   function applyPublishedSceneLayout(layoutObj, retryMissing = true) {
     if (!layoutObj || typeof layoutObj !== 'object') return;
     const objs = layoutObj.objects && typeof layoutObj.objects === 'object' ? layoutObj.objects : {};
     const missing = [];
-    for (const k of SCENE_LAYOUT_KEYS) {
-      const pose = objs[k];
-      if (!pose || typeof pose !== 'object') continue;
-      if (!Number.isFinite(Number(pose.lat)) || !Number.isFinite(Number(pose.lon))) continue;
-      const mov = window.__pflMovables?.[k];
-      if (!mov?.update) {
-        missing.push(k);
-        continue;
+    isApplyingPublishedLayout = true;
+    try {
+      for (const k of SCENE_LAYOUT_KEYS) {
+        const pose = objs[k];
+        if (!pose || typeof pose !== 'object') continue;
+        if (!Number.isFinite(Number(pose.lat)) || !Number.isFinite(Number(pose.lon))) continue;
+        const mov = window.__pflMovables?.[k];
+        if (!mov?.update) {
+          missing.push(k);
+          continue;
+        }
+        try {
+          mov.update({
+            lat: Number(pose.lat),
+            lon: Number(pose.lon),
+            heading: Number(pose.heading ?? 0),
+            lift: Number(pose.lift ?? 0),
+            scale: Number(pose.scale ?? 1) || 1,
+            opacity: Number.isFinite(Number(pose.opacity)) ? Number(pose.opacity) : 1,
+          });
+        } catch {}
       }
-      try {
-        mov.update({
-          lat: Number(pose.lat),
-          lon: Number(pose.lon),
-          heading: Number(pose.heading ?? 0),
-          lift: Number(pose.lift ?? 0),
-          scale: Number(pose.scale ?? 1) || 1,
-          opacity: Number.isFinite(Number(pose.opacity)) ? Number(pose.opacity) : 1,
-        });
-      } catch {}
+      if (activeMovable) bindMovable(activeMovable);
+    } finally {
+      isApplyingPublishedLayout = false;
     }
     if (retryMissing && missing.length > 0) {
       const partial = { objects: Object.fromEntries(missing.map((k) => [k, objs[k]])) };
       setTimeout(() => applyPublishedSceneLayout(partial, false), 1200);
     }
-    if (activeMovable) bindMovable(activeMovable);
   }
 
   async function publishGlobalLayout(btnEl) {
@@ -1344,7 +1364,6 @@ export function loadPflWindowFramework({ viewer }) {
   }
 
   compassWin.body.querySelector('#pfl-lock-house-btn')?.addEventListener('click', (e) => {
-    if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
     houseDragLocked = !houseDragLocked;
     e.currentTarget.textContent = houseDragLocked ? '🔒 House' : '🔓 House';
     e.currentTarget.style.borderColor = houseDragLocked ? '#22c55e' : '#f59e0b';
@@ -1991,7 +2010,7 @@ export function loadPflWindowFramework({ viewer }) {
     const scVl = compassWin.body.querySelector('#pfl-scale-val');
     if (scSl && scVl) {
       const k = Math.max(0.25, Math.min(3.5, getMovableScale(mov)));
-      scSl.disabled = !isGlobalEditAllowed() || !movableSupportsScale(mov);
+      scSl.disabled = !movableSupportsScale(mov);
       scSl.value = String(k);
       scVl.textContent = `${k.toFixed(2)}×`;
     }
@@ -1999,7 +2018,7 @@ export function loadPflWindowFramework({ viewer }) {
     const opVl = compassWin.body.querySelector('#pfl-opacity-val');
     if (opSl && opVl) {
       const op = getMovableOpacity(mov);
-      opSl.disabled = !isGlobalEditAllowed();
+      opSl.disabled = false;
       opSl.value = String(op);
       opVl.textContent = op.toFixed(2);
     }
@@ -2018,17 +2037,16 @@ export function loadPflWindowFramework({ viewer }) {
 
   function applyActiveObjectPatch(patch) {
     if (!activeMovable) return false;
-    if (!isGlobalEditAllowed()) {
-      flashRbacLockBanner();
-      return false;
+    if (isGlobalEditAllowed()) {
+      try { localStorage.setItem(SCENE_LAYOUT_TS_KEY, String(Date.now())); } catch {}
     }
-    try { localStorage.setItem(SCENE_LAYOUT_TS_KEY, String(Date.now())); } catch {}
     activeMovable.update(patch);
     syncObjectSliders(activeMovable);
     syncActiveMovableGizmo();
     if (droneOrbitState.active && (activeMovable.kind === droneOrbitState.targetKey || droneOrbitState.targetKey === 'selected')) {
       applyDroneOrbit();
     }
+    if (isGlobalEditAllowed()) scheduleAdminAutoPublish();
     return true;
   }
 
@@ -2037,9 +2055,13 @@ export function loadPflWindowFramework({ viewer }) {
     const scaleK = Math.max(0.25, Math.min(3.5, Math.round((Number(v) || 1) * 20) / 20));
     if (mov === activeMovable) {
       applyActiveObjectPatch({ scale: scaleK });
-    } else if (isGlobalEditAllowed()) {
+    } else {
+      if (isGlobalEditAllowed()) {
+        try { localStorage.setItem(SCENE_LAYOUT_TS_KEY, String(Date.now())); } catch {}
+      }
       mov.update({ scale: scaleK });
       syncActiveMovableGizmo();
+      if (isGlobalEditAllowed()) scheduleAdminAutoPublish();
     }
   }
 
@@ -2102,7 +2124,6 @@ export function loadPflWindowFramework({ viewer }) {
 
   compassWin.body.querySelector('#pfl-reset-selected-btn')?.addEventListener('click', () => {
     if (!activeMovable) return;
-    if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
     const k = String(activeMovable.kind || '');
     const SURVEY_DEFAULTS = {
       house: { ...HOUSE_DEFAULT_POSE },
@@ -2134,7 +2155,6 @@ export function loadPflWindowFramework({ viewer }) {
 
   const placeBtn = compassWin.body.querySelector('#pfl-drag-place-btn');
   placeBtn?.addEventListener('click', () => {
-    if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
     clickToPlaceMode = !clickToPlaceMode;
     placeBtn.textContent = clickToPlaceMode ? '🎯 Click Ground!' : '✋ Drop';
     placeBtn.style.borderColor = clickToPlaceMode ? '#facc15' : '';
@@ -2261,7 +2281,6 @@ export function loadPflWindowFramework({ viewer }) {
     };
     objBallCanvas.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || !activeMovable) return;
-      if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
       const { mx, my } = toObjBallCoords(e);
       const dx = mx - 64;
       const dy = my - 64;
@@ -2460,7 +2479,13 @@ export function loadPflWindowFramework({ viewer }) {
     const wasMoved = dragMovableSession.moved;
     dragMovableSession = null;
     releaseContinuousRender('pfl-drag-movable');
-    if (wasMoved) lastDragReleaseMs = Date.now();
+    if (wasMoved) {
+      lastDragReleaseMs = Date.now();
+      if (isGlobalEditAllowed()) {
+        try { localStorage.setItem(SCENE_LAYOUT_TS_KEY, String(Date.now())); } catch {}
+        scheduleAdminAutoPublish();
+      }
+    }
     const ctrl = viewer?.scene?.screenSpaceCameraController;
     if (ctrl) {
       ctrl.enableRotate = true;
@@ -2476,7 +2501,6 @@ export function loadPflWindowFramework({ viewer }) {
     const hit = drillFindTarget(downEv.position);
     if (hit?.type !== 'movable' || !hit.mov) return;
     bindMovable(hit.mov);
-    if (!isGlobalEditAllowed()) { flashRbacLockBanner(); return; }
     if (houseDragLocked && hit.mov.kind === 'house') return;
     const st = hit.mov.getState();
     const planeAlt = resolveLocalGroundM(st.lon, st.lat) + Number(st.lift || 0);
@@ -2902,7 +2926,7 @@ export function loadPflWindowFramework({ viewer }) {
 
   pickHandler.setInputAction((movement) => {
     if (Date.now() - lastDragReleaseMs < 260) return;
-    if (clickToPlaceMode && activeMovable && isGlobalEditAllowed() && !(houseDragLocked && activeMovable.kind === 'house')) {
+    if (clickToPlaceMode && activeMovable && !(houseDragLocked && activeMovable.kind === 'house')) {
       let cart = null;
       try {
         cart = viewer.scene.pickPositionSupported ? viewer.scene.pickPosition(movement.position) : null;
