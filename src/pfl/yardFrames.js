@@ -146,14 +146,14 @@ const CALIBRATED_HOUSE_SURVEY = {
     hiddenByStitch: true,
   },
   'yard-overview-20261012': {
-    // Stretched across the East Driveway + Solar Carport so the White Tesla & solar panels align over their driveway footprint
-    camLat: 29.247452,
-    camLon: -95.231350,
-    camHeightM: 0.22,
+    // Anchored to House West side (-95.231501) and pulled right/West so East edge (-95.231267) places the dark van cleanly BESIDE Monaco RV (-95.231255 West wall) without overlap
+    camLat: 29.247456,
+    camLon: -95.231384,
+    camHeightM: 0.20,
     headingDeg: 194,
     pitchDeg: -18,
-    distanceM: 6.4,
-    widthScale: 1.48,
+    distanceM: 6.2,
+    widthScale: 1.08,
     rollDeg: 2,
     flat: true,
     texRot: 0,
@@ -210,9 +210,9 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'garage-carport-20261117': {
     hiddenByStitch: false,
-    camLat: 29.247555,
-    camLon: -95.231285,
-    camHeightM: 1.48,
+    camLat: 29.247568,
+    camLon: -95.231238,
+    camHeightM: 2.1,
     headingDeg: 194,
     pitchDeg: -5,
     distanceM: 2.45,
@@ -385,6 +385,17 @@ function loadSavedLayout() {
         };
       }
       parsed.fixedLot23AlignedV24 = true;
+      parsed.frames = frames;
+      window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
+    }
+    if (parsed && !parsed.restoredYardTeslaV25) {
+      for (const id of ['yard-overview-20261012']) {
+        frames[id] = {
+          ...(frames[id] || {}),
+          ...CALIBRATED_HOUSE_SURVEY[id],
+        };
+      }
+      parsed.restoredYardTeslaV25 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }

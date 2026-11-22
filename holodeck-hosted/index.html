@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PFL Cloud Holodeck — 3D Gaussian Splats</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #020617;
+            overflow: hidden;
+            height: 100vh;
+            color: #e2e8f0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            user-select: none;
+        }
+
+        /* ── Top Cloud Holodeck Navigation Bar ── */
+        #holodeck-topbar {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 40;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-width: calc(100vw - 24px);
+            padding: 6px 10px;
+            border-radius: 10px;
+            background: rgba(5, 11, 24, 0.86);
+            border: 1px solid rgba(34, 211, 238, 0.42);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+        }
+        .hd-btn, .hd-link {
+            appearance: none;
+            text-decoration: none;
+            background: rgba(15, 23, 42, 0.88);
+            border: 1px solid rgba(100, 116, 139, 0.45);
+            color: #cbd5e1;
+            padding: 4px 9px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.12s, border-color 0.12s, color 0.12s;
+        }
+        .hd-btn:hover, .hd-link:hover {
+            background: rgba(34, 211, 238, 0.18);
+            border-color: #22d3ee;
+            color: #ecfeff;
+        }
+        .hd-link-home {
+            border-color: rgba(250, 204, 21, 0.7);
+            color: #fde047;
+            background: rgba(66, 32, 6, 0.5);
+        }
+        .hd-link-home:hover {
+            background: rgba(234, 179, 8, 0.25);
+            border-color: #facc15;
+            color: #fef9c3;
+        }
+        .hd-btn.active {
+            background: rgba(34, 211, 238, 0.24);
+            border-color: #22d3ee;
+            color: #67e8f9;
+        }
+        .hd-badge {
+            font-size: 10px;
+            color: #94a3b8;
+            border: 1px solid rgba(71, 85, 105, 0.45);
+            border-radius: 999px;
+            padding: 2px 8px;
+            white-space: nowrap;
+        }
+
+        /* ── Launch / Settings Overlay ── */
+        #overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+            color: #e2e8f0;
+            padding-top: 48px;
+        }
+        #overlay h1 {
+            font-size: 28px;
+            font-weight: 300;
+            letter-spacing: 9px;
+            margin-bottom: 4px;
+            color: #67e8f9;
+        }
+        .subtitle {
+            font-size: 11px;
+            color: #64748b;
+            letter-spacing: 4px;
+            margin-bottom: 18px;
+        }
+        .ctrl-grid {
+            display: grid;
+            grid-template-columns: auto auto;
+            gap: 4px 18px;
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 18px;
+        }
+        .ctrl-grid .k { color: #e2e8f0; font-weight: 600; }
+        #scene-select {
+            background: #091224;
+            border: 1px solid rgba(34, 211, 238, 0.45);
+            color: #a5f3fc;
+            padding: 9px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-bottom: 12px;
+            min-width: 290px;
+        }
+        .ov-row {
+            margin-bottom: 10px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 290px;
+            justify-content: space-between;
+            color: #cbd5e1;
+        }
+        .ov-input {
+            background: #091224;
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #67e8f9;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        #enter-btn {
+            background: rgba(8, 145, 178, 0.35);
+            border: 1px solid #22d3ee;
+            color: #ecfeff;
+            padding: 10px 42px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 7px;
+            cursor: pointer;
+            letter-spacing: 2px;
+        }
+        #enter-btn:hover:not(:disabled) { background: rgba(6, 182, 212, 0.5); }
+        #enter-btn:disabled { opacity: 0.45; cursor: wait; }
+        #load-msg { font-size: 12px; color: #7dd3fc; min-height: 18px; margin-top: 12px; }
+        #load-bar-wrap {
+            width: 290px;
+            height: 6px;
+            margin-top: 6px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            overflow: hidden;
+        }
+        #load-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #06b6d4, #22d3ee, #67e8f9);
+            transition: width 0.15s ease-out;
+        }
+
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 14px;
+            height: 14px;
+            pointer-events: none;
+            z-index: 8;
+            display: none;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.55);
+        }
+        #crosshair::before { width: 2px; height: 100%; left: 50%; transform: translateX(-50%); }
+        #crosshair::after  { height: 2px; width: 100%; top: 50%; transform: translateY(-50%); }
+
+        #hud {
+            position: fixed;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(2, 6, 23, 0.72);
+            border: 1px solid rgba(56, 189, 248, 0.32);
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            color: #94a3b8;
+            display: none;
+            pointer-events: none;
+            z-index: 12;
+            white-space: nowrap;
+        }
+        #status {
+            position: fixed;
+            top: 56px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 13px;
+            color: #7dd3fc;
+            pointer-events: none;
+            z-index: 20;
+        }
+        #hud-coords {
+            position: fixed;
+            top: 58px;
+            left: 14px;
+            background: rgba(2, 6, 23, 0.84);
+            border: 1px solid rgba(34, 211, 238, 0.4);
+            padding: 10px 14px;
+            border-radius: 7px;
+            font-family: monospace;
+            font-size: 11px;
+            color: #7dd3fc;
+            z-index: 14;
+            display: none;
+            line-height: 1.55;
+            width: 224px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+        }
+
+        /* ── D-PAD ── */
+        #dpad {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: none;
+            z-index: 16;
+            user-select: none;
+        }
+        .dp-row { display: flex; justify-content: center; gap: 4px; margin: 2px 0; }
+        .dp-btn {
+            width: 44px;
+            height: 44px;
+            background: rgba(8, 47, 73, 0.45);
+            border: 1px solid rgba(34, 211, 238, 0.38);
+            border-radius: 7px;
+            color: #7dd3fc;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: none;
+        }
+        .dp-btn:active, .dp-btn.held { background: rgba(34, 211, 238, 0.32); }
+        .dp-label { font-size: 10px; color: #64748b; text-align: center; margin-top: 2px; }
+
+        /* ── 3D Hotspot Portals ── */
+        .hotspot-indicator {
+            position: fixed;
+            pointer-events: auto;
+            transform: translate(-50%, -50%);
+            z-index: 15;
+            display: none;
+            cursor: pointer;
+        }
+        .hotspot-ring {
+            width: 50px;
+            height: 50px;
+            border: 2px solid #22d3ee;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: hs-pulse 1.6s ease-in-out infinite;
+            background: rgba(8, 47, 73, 0.72);
+            box-shadow: 0 0 14px rgba(34, 211, 238, 0.55);
+        }
+        .hotspot-icon { font-size: 22px; line-height: 1; }
+        .hotspot-lbl {
+            position: absolute;
+            top: 54px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-size: 11px;
+            font-weight: 600;
+            color: #ecfeff;
+            background: rgba(2, 6, 23, 0.85);
+            border: 1px solid rgba(34, 211, 238, 0.45);
+            padding: 2px 8px;
+            border-radius: 5px;
+        }
+        @keyframes hs-pulse {
+            0%, 100% { box-shadow: 0 0 12px rgba(34, 211, 238, 0.45); }
+            50% { box-shadow: 0 0 26px rgba(34, 211, 238, 0.85); }
+        }
+
+        /* ── Interact menu & Toast ── */
+        #interact-menu {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(2, 6, 23, 0.96);
+            border: 1px solid #22d3ee;
+            border-radius: 10px;
+            padding: 18px 22px 14px;
+            z-index: 35;
+            display: none;
+            min-width: 280px;
+        }
+        #interact-title {
+            color: #67e8f9;
+            font-size: 13px;
+            letter-spacing: 1.5px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #1e293b;
+            padding-bottom: 8px;
+            text-align: center;
+        }
+        .interact-btn {
+            display: block;
+            width: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid #334155;
+            color: #e2e8f0;
+            padding: 9px 12px;
+            margin-bottom: 7px;
+            border-radius: 6px;
+            font-size: 12.5px;
+            cursor: pointer;
+            text-align: left;
+        }
+        .interact-btn:hover { background: rgba(34, 211, 238, 0.18); border-color: #22d3ee; }
+        #interact-close {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        #interact-response {
+            position: fixed;
+            bottom: 54px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(2, 6, 23, 0.92);
+            border: 1px solid #22d3ee;
+            color: #a5f3fc;
+            padding: 7px 14px;
+            border-radius: 7px;
+            font-size: 12px;
+            z-index: 35;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="holodeck-topbar">
+    <a class="hd-link hd-link-home" href="/gods-eye-view/">🌐 ← 417 Palm Dr (God's Eye View)</a>
+    <button type="button" class="hd-btn" data-hd-file="splats/take1-room-capture.spz">🚪 Entry Hallway</button>
+    <button type="button" class="hd-btn" data-hd-file="splats/take3-main-hall.spz">🏛️ Main Hall</button>
+    <button type="button" class="hd-btn" data-hd-file="splats/lisa-command-center.spz">👑 Lisa Command</button>
+    <button type="button" class="hd-btn" data-hd-file="splats/arcade_spaceship.spz">🕹️ Arcade</button>
+    <button type="button" class="hd-btn" data-hd-file="splats/bedroom-10view.spz">🛏️ Bedroom</button>
+    <button type="button" class="hd-btn" data-hd-file="splats/01-command-deck.splat">🛸 Command Deck</button>
+    <button type="button" class="hd-btn" id="hd-toggle-overlay">🎛 Controls</button>
+    <span class="hd-badge">Cloud Splat Holodeck · Local Metabase/Matrix/AI-Town deferred</span>
+</div>
+
+<div id="overlay">
+    <h1>HOLODECK</h1>
+    <div class="subtitle">PROJECT FREE LIFE · CLOUD SPLAT SERVER</div>
+
+    <select id="scene-select">
+        <option>Loading splat catalog...</option>
+    </select>
+
+    <div class="ov-row">
+        <span>Floor Level (Y):</span>
+        <input type="number" id="floor-y-input" class="ov-input" value="-3.0" step="0.5" style="width:92px;text-align:center;">
+    </div>
+    <div class="ov-row">
+        <span>Scene Rotation:</span>
+        <select id="rot-select" class="ov-input" style="width:148px;">
+            <option value="none">None (0°)</option>
+            <option value="cw180z" selected>180° CW Z</option>
+            <option value="cw90z">90° CW Z</option>
+            <option value="yup">180° CW X (Y-Up Flip)</option>
+        </select>
+    </div>
+    <div class="ov-row" style="justify-content:flex-start;">
+        <input type="checkbox" id="use-bounds" style="width:15px;height:15px;cursor:pointer;">
+        <label for="use-bounds" style="cursor:pointer;">Enforce boundaries (collision)</label>
+    </div>
+
+    <div style="margin:8px 0 14px;border-top:1px dashed rgba(56,189,248,0.35);padding-top:10px;width:290px;">
+        <div style="color:#67e8f9;font-size:11px;font-weight:600;letter-spacing:1px;text-align:center;margin-bottom:8px;">LIVE ROTATION SLIDERS</div>
+        <div class="ov-row" style="margin-bottom:5px;font-family:monospace;font-size:11px;">
+            <span>Pitch (X):</span>
+            <input type="range" id="tune-rot-x" min="-180" max="180" value="0" style="width:130px;">
+            <span id="tune-val-x" style="width:36px;text-align:right;color:#7dd3fc;">0°</span>
+        </div>
+        <div class="ov-row" style="margin-bottom:5px;font-family:monospace;font-size:11px;">
+            <span>Yaw (Y):</span>
+            <input type="range" id="tune-rot-y" min="-180" max="180" value="0" style="width:130px;">
+            <span id="tune-val-y" style="width:36px;text-align:right;color:#7dd3fc;">0°</span>
+        </div>
+        <div class="ov-row" style="margin-bottom:2px;font-family:monospace;font-size:11px;">
+            <span>Roll (Z):</span>
+            <input type="range" id="tune-rot-z" min="-180" max="180" value="0" style="width:130px;">
+            <span id="tune-val-z" style="width:36px;text-align:right;color:#7dd3fc;">0°</span>
+        </div>
+    </div>
+
+    <div class="ctrl-grid">
+        <div>Move</div><div class="k">W A S D</div>
+        <div>Float up/down</div><div class="k">Q / E</div>
+        <div>Sprint / Jump</div><div class="k">Shift / Space</div>
+        <div>Look</div><div class="k">Mouse drag</div>
+        <div>Menu / Exit</div><div class="k">Esc</div>
+    </div>
+
+    <button id="enter-btn" disabled>Loading…</button>
+    <div id="load-msg">Fetching Gaussian Splat…</div>
+    <div id="load-bar-wrap"><div id="load-bar"></div></div>
+</div>
+
+<div id="crosshair"></div>
+<div id="hud-coords">
+    <div style="font-weight:bold;border-bottom:1px solid rgba(56,189,248,0.35);margin-bottom:6px;padding-bottom:3px;color:#67e8f9;letter-spacing:1.2px;">TELEMETRY</div>
+    <div>POS X: <span id="tele-x" style="color:#fff">0.00</span></div>
+    <div>POS Y: <span id="tele-y" style="color:#fff">0.00</span> (Floor: <span id="tele-floor">0.00</span>)</div>
+    <div>POS Z: <span id="tele-z" style="color:#fff">0.00</span></div>
+    <div style="margin-top:4px;border-top:1px dashed rgba(56,189,248,0.25);padding-top:4px;">PITCH: <span id="tele-pitch" style="color:#fde047">0°</span> · YAW: <span id="tele-yaw" style="color:#fde047">0°</span></div>
+</div>
+<div id="hud">Drag — look · WASD — move · Q/E — float · Shift — sprint · Esc — controls</div>
+<div id="status"></div>
+
+<div id="dpad">
+    <div class="dp-row"><div class="dp-btn" id="dp-fwd">▲</div></div>
+    <div class="dp-row">
+        <div class="dp-btn" id="dp-lft">◀</div>
+        <div class="dp-btn" id="dp-bk">▼</div>
+        <div class="dp-btn" id="dp-rgt">▶</div>
+    </div>
+    <div class="dp-row" style="margin-top:6px;gap:18px">
+        <div><div class="dp-btn" id="dp-up" style="font-size:14px">↑</div><div class="dp-label">up</div></div>
+        <div><div class="dp-btn" id="dp-dn" style="font-size:14px">↓</div><div class="dp-label">dn</div></div>
+    </div>
+</div>
+
+<div id="interact-menu">
+    <button id="interact-close">✕</button>
+    <div id="interact-title">📍 HOTSPOT</div>
+    <button class="interact-btn" data-action="pick">🔓 Pick the lock</button>
+    <button class="interact-btn" data-action="examine">🔍 Examine</button>
+    <button class="interact-btn" data-action="knock">✊ Knock</button>
+    <button class="interact-btn" data-action="leave">🚶 Step back</button>
+</div>
+<div id="interact-response"></div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "./three/three.module.js"
+    }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import {
+    applyFpsCameraRotation,
+    createFallbackScene,
+    hasFineTunedRotation,
+} from './scene-config.mjs';
+
+const EYE_H = 2.25;
+const SPEED = 4.0;
+const SPRINT_MUL = 2.5;
+const JUMP_VEL = 5.5;
+const GRAVITY = -14;
+const MOUSE_SENS = 0.0022;
+
+const ROTS = {
+    cw90z: [0, 0, -0.7071067811865476, 0.7071067811865476],
+    cw180z: [0, 0, -1, 0],
+    yup: [1, 0, 0, 0],
+    zup2yup: [-0.7071067811865476, 0, 0, 0.7071067811865476],
+    arcade70: [0.819152, 0, 0, 0.573576],
+    none: [0, 0, 0, 1],
+};
+
+const statusEl = document.getElementById('status');
+const overlay = document.getElementById('overlay');
+const crosshair = document.getElementById('crosshair');
+const hud = document.getElementById('hud');
+const enterBtn = document.getElementById('enter-btn');
+const sceneSel = document.getElementById('scene-select');
+const loadMsg = document.getElementById('load-msg');
+const dpad = document.getElementById('dpad');
+const floorYInput = document.getElementById('floor-y-input');
+const rotSelect = document.getElementById('rot-select');
+const useBoundsCheckbox = document.getElementById('use-bounds');
+const tuneRotX = document.getElementById('tune-rot-x');
+const tuneRotY = document.getElementById('tune-rot-y');
+const tuneRotZ = document.getElementById('tune-rot-z');
+const tuneValX = document.getElementById('tune-val-x');
+const tuneValY = document.getElementById('tune-val-y');
+const tuneValZ = document.getElementById('tune-val-z');
+
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.01, 500);
+camera.rotation.order = 'YXZ';
+camera.position.set(0, EYE_H, 0);
+
+const runtimeErrors = [];
+window.addEventListener('error', (e) => runtimeErrors.push(e.message || String(e)));
+window.addEventListener('unhandledrejection', (e) => runtimeErrors.push(String(e.reason)));
+
+let catalogData = { scenes: [], hotspots: {}, objects: {}, defaultScene: 'splats/take1-room-capture.spz' };
+let currentScene = null;
+let currentViewer = null;
+let splatLoaded = false;
+let splatCount = 0;
+let HOTSPOTS = [];
+let active = false;
+let dragging = false;
+let lastX = 0, lastY = 0, yaw = 0, pitch = 0;
+let floorY = -3.0, velY = 0, onGround = true;
+const keys = {};
+
+window.__holodeckState = () => ({
+    file: currentScene?.file || null,
+    label: currentScene?.label || null,
+    loaded: Boolean(splatLoaded),
+    splatCount,
+    camPos: [camera.position.x, camera.position.y, camera.position.z],
+    hotspotsCount: HOTSPOTS.length,
+    hotspotsTargets: HOTSPOTS.map((h) => h.action_target).filter(Boolean),
+    errors: runtimeErrors.slice(),
+});
+
+// ── 3D Overlay Renderer (Entry Hallway table + glowing holographic orb) ──
+const overlayCanvas = document.createElement('canvas');
+overlayCanvas.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:6;';
+document.body.appendChild(overlayCanvas);
+const overlayRenderer = new THREE.WebGLRenderer({ canvas: overlayCanvas, alpha: true, antialias: true });
+overlayRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+overlayRenderer.setSize(innerWidth, innerHeight);
+const overlayScene = new THREE.Scene();
+overlayScene.add(new THREE.AmbientLight(0xffffff, 1.2));
+[[4, 3, 2], [-4, 3, -2], [2, 3, -4], [-2, 3, 4]].forEach(([x, y, z]) => {
+    const l = new THREE.PointLight(0xffffff, 0.5, 20);
+    l.position.set(x, y, z);
+    overlayScene.add(l);
+});
+
+let orbMesh = null;
+let tableGroup = null;
+function buildTableObject() {
+    if (tableGroup) {
+        overlayScene.remove(tableGroup);
+        orbMesh = null;
+    }
+    tableGroup = new THREE.Group();
+    const wood = new THREE.MeshPhongMaterial({ color: 0x8a5520, emissive: 0x2a1408, emissiveIntensity: 0.4, shininess: 35, side: THREE.DoubleSide });
+    const dark = new THREE.MeshPhongMaterial({ color: 0x4d2a0a, emissive: 0x150800, emissiveIntensity: 0.3, shininess: 8, side: THREE.DoubleSide });
+    const top = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.058, 0.52), wood);
+    top.position.y = 0.695;
+    top.frustumCulled = false;
+    tableGroup.add(top);
+    const legGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.68, 8);
+    [[-0.37, 0.34, 0.21], [0.37, 0.34, 0.21], [-0.37, 0.34, -0.21], [0.37, 0.34, -0.21]].forEach(([lx, ly, lz]) => {
+        const leg = new THREE.Mesh(legGeo, dark);
+        leg.position.set(lx, ly, lz);
+        leg.frustumCulled = false;
+        tableGroup.add(leg);
+    });
+    tableGroup.position.set(0, floorY, 0.4);
+    overlayScene.add(tableGroup);
+
+    orbMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.1, 24, 24),
+        new THREE.MeshPhongMaterial({ color: 0x22d3ee, emissive: 0x06b6d4, emissiveIntensity: 0.9, transparent: true, opacity: 0.9, shininess: 130 }),
+    );
+    orbMesh.position.set(0, floorY + 0.835, 0.4);
+    orbMesh.frustumCulled = false;
+    const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.145, 0.011, 8, 48),
+        new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.55 }),
+    );
+    ring.rotation.x = Math.PI / 2;
+    orbMesh.add(ring);
+    overlayScene.add(orbMesh);
+}
+buildTableObject();
+
+// ── Mouse Look & Keyboard ──
+window.addEventListener('mousedown', (e) => {
+    if (
+        e.target.closest('#holodeck-topbar') ||
+        e.target.closest('#overlay') ||
+        e.target.closest('#dpad') ||
+        e.target.closest('#hud-coords') ||
+        e.target.closest('#interact-menu') ||
+        e.target.closest('.hotspot-indicator')
+    ) return;
+    if (!active || e.button !== 0) return;
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    e.preventDefault();
+}, true);
+window.addEventListener('mouseup', () => { dragging = false; }, true);
+window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    yaw -= (e.clientX - lastX) * MOUSE_SENS;
+    pitch -= (e.clientY - lastY) * MOUSE_SENS;
+    pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+    lastX = e.clientX;
+    lastY = e.clientY;
+    applyFpsCameraRotation(camera, pitch, yaw);
+}, true);
+
+window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    keys[e.code] = true;
+    if (e.code === 'Space') e.preventDefault();
+    if (e.code === 'Escape') {
+        const im = document.getElementById('interact-menu');
+        if (im && im.style.display === 'block') { im.style.display = 'none'; return; }
+        if (active) exitScene();
+        else if (splatLoaded) enterScene();
+    }
+}, true);
+window.addEventListener('keyup', (e) => { keys[e.code] = false; }, true);
+
+const DPAD_MAP = {
+    'dp-fwd': 'KeyW',
+    'dp-bk': 'KeyS',
+    'dp-lft': 'KeyA',
+    'dp-rgt': 'KeyD',
+    'dp-up': 'KeyQ',
+    'dp-dn': 'KeyE',
+};
+for (const [id, code] of Object.entries(DPAD_MAP)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const on = () => { keys[code] = true; el.classList.add('held'); };
+    const off = () => { keys[code] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', on);
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); on(); }, { passive: false });
+    el.addEventListener('mouseup', off);
+    el.addEventListener('mouseleave', off);
+    el.addEventListener('touchend', off);
+    el.addEventListener('click', () => { keys[code] = true; setTimeout(() => { keys[code] = false; }, 150); });
+}
+
+// ── Interact Menu ──
+const interactMenu = document.getElementById('interact-menu');
+const interactResp = document.getElementById('interact-response');
+let toastTimer = null;
+function showToast(msg) {
+    interactResp.textContent = msg;
+    interactResp.style.display = 'block';
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { interactResp.style.display = 'none'; }, 3500);
+}
+document.getElementById('interact-close')?.addEventListener('click', () => {
+    interactMenu.style.display = 'none';
+});
+document.querySelectorAll('.interact-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+        interactMenu.style.display = 'none';
+        showToast('Interacted: ' + btn.textContent.trim());
+    });
+});
+
+// ── Hotspots Projection ──
+const _hsv = new THREE.Vector3();
+function loadHotspotsFromCatalog(sceneFile) {
+    HOTSPOTS.forEach((h) => h.el?.remove());
+    HOTSPOTS = [];
+    const list = catalogData.hotspots?.[sceneFile] || [];
+    for (const h of list) {
+        const el = document.createElement('div');
+        el.className = 'hotspot-indicator';
+        el.id = 'hotspot-' + h.id;
+        el.innerHTML = `<div class="hotspot-ring"><div class="hotspot-icon">${h.icon || '📍'}</div></div><div class="hotspot-lbl">${h.label}</div>`;
+        document.body.appendChild(el);
+        const hs = {
+            id: h.id,
+            scene: sceneFile,
+            worldPos: new THREE.Vector3(h.x, h.y, h.z),
+            label: h.label,
+            icon: h.icon || '📍',
+            maxDist: Number(h.maxDist || 12.0),
+            action_type: h.action_type || 'interact',
+            action_target: h.action_target || '',
+            el,
+        };
+        el.addEventListener('click', () => {
+            if (hs.action_type === 'door' && hs.action_target) {
+                if (/^(\/|https?:\/\/)/i.test(hs.action_target)) {
+                    location.href = hs.action_target;
+                } else {
+                    const url = new URL(location.href);
+                    url.searchParams.delete('floorY');
+                    url.searchParams.delete('rot');
+                    url.searchParams.delete('bounds');
+                    url.searchParams.set('file', hs.action_target);
+                    location.href = url.toString();
+                }
+            } else {
+                document.getElementById('interact-title').textContent = `${hs.icon} ${hs.label.toUpperCase()}`;
+                interactMenu.style.display = 'block';
+            }
+        });
+        HOTSPOTS.push(hs);
+    }
+}
+
+function loadSceneObjectsFromCatalog(sceneFile) {
+    const list = catalogData.objects?.[sceneFile] || [];
+    for (const obj of list) {
+        if (obj.type === 'pedestal') {
+            const g = new THREE.Group();
+            const col = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.45, 0.45, 1.2, 24),
+                new THREE.MeshPhongMaterial({ color: obj.color || '#22d3ee', transparent: true, opacity: 0.78, shininess: 90 }),
+            );
+            col.position.y = 0.6;
+            g.add(col);
+            const orb = new THREE.Mesh(
+                new THREE.SphereGeometry(0.16, 20, 20),
+                new THREE.MeshBasicMaterial({ color: obj.color || '#22d3ee' }),
+            );
+            orb.position.y = 1.55;
+            g.add(orb);
+            g.position.set(obj.x, obj.y, obj.z);
+            g.scale.set(obj.scale_x || 1, obj.scale_y || 1, obj.scale_z || 1);
+            overlayScene.add(g);
+        } else if (obj.type === 'whiteboard') {
+            const c = document.createElement('canvas');
+            c.width = 512; c.height = 384;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = 'rgba(8, 16, 32, 0.92)';
+            ctx.fillRect(0, 0, 512, 384);
+            ctx.strokeStyle = '#22d3ee';
+            ctx.lineWidth = 10;
+            ctx.strokeRect(0, 0, 512, 384);
+            ctx.fillStyle = '#67e8f9';
+            ctx.font = 'bold 26px sans-serif';
+            ctx.fillText('PFL CLOUD HOLODECK', 36, 62);
+            ctx.fillStyle = '#e2e8f0';
+            ctx.font = '20px monospace';
+            ctx.fillText('STATUS: ONLINE (STATIC)', 36, 120);
+            ctx.fillText('NODE: 1S788 CARPORT', 36, 160);
+            ctx.fillText('ANCHOR: 417 PALM DR', 36, 200);
+            const m = new THREE.Mesh(
+                new THREE.PlaneGeometry(2.0, 1.5),
+                new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), side: THREE.DoubleSide, transparent: true, opacity: 0.94 }),
+            );
+            m.position.set(obj.x, obj.y, obj.z);
+            m.scale.set(obj.scale_x || 1, obj.scale_y || 1, obj.scale_z || 1);
+            overlayScene.add(m);
+        }
+    }
+}
+
+function updateHotspots() {
+    for (const h of HOTSPOTS) {
+        if (!active || !currentScene) { h.el.style.display = 'none'; continue; }
+        const dist = camera.position.distanceTo(h.worldPos);
+        if (dist > h.maxDist) { h.el.style.display = 'none'; continue; }
+        _hsv.copy(h.worldPos).project(camera);
+        if (_hsv.z > 1) { h.el.style.display = 'none'; continue; }
+        h.el.style.left = `${((_hsv.x + 1) / 2) * window.innerWidth}px`;
+        h.el.style.top = `${((-_hsv.y + 1) / 2) * window.innerHeight}px`;
+        h.el.style.display = 'block';
+        h.el.style.opacity = String(Math.max(0.4, 1 - (dist / h.maxDist) * 0.55));
+    }
+}
+
+// ── Movement & Render Tick ──
+const moveDir = new THREE.Vector3(), fwd = new THREE.Vector3(), right = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+const clock = new THREE.Clock();
+
+function tick() {
+    requestAnimationFrame(tick);
+    const hc = document.getElementById('hud-coords');
+    if (!active) {
+        if (hc) hc.style.display = 'none';
+        return;
+    }
+    if (hc) {
+        hc.style.display = 'block';
+        document.getElementById('tele-x').textContent = camera.position.x.toFixed(2);
+        document.getElementById('tele-y').textContent = camera.position.y.toFixed(2);
+        document.getElementById('tele-floor').textContent = floorY.toFixed(2);
+        document.getElementById('tele-z').textContent = camera.position.z.toFixed(2);
+        const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+        document.getElementById('tele-pitch').textContent = Math.round(euler.x * 180 / Math.PI) + '°';
+        document.getElementById('tele-yaw').textContent = Math.round(euler.y * 180 / Math.PI) + '°';
+    }
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const speed = SPEED * ((keys['ShiftLeft'] || keys['ShiftRight']) ? SPRINT_MUL : 1);
+    camera.getWorldDirection(fwd);
+    fwd.y = 0;
+    fwd.normalize();
+    right.crossVectors(fwd, UP).normalize();
+    moveDir.set(0, 0, 0);
+    if (keys['KeyW'] || keys['ArrowUp']) moveDir.addScaledVector(fwd, 1);
+    if (keys['KeyS'] || keys['ArrowDown']) moveDir.addScaledVector(fwd, -1);
+    if (keys['KeyA'] || keys['ArrowLeft']) moveDir.addScaledVector(right, -1);
+    if (keys['KeyD'] || keys['ArrowRight']) moveDir.addScaledVector(right, 1);
+    if (keys['KeyQ']) moveDir.addScaledVector(UP, 1);
+    if (keys['KeyE']) moveDir.addScaledVector(UP, -1);
+    if (moveDir.lengthSq() > 0) camera.position.addScaledVector(moveDir.normalize(), speed * dt);
+
+    const enforceBounds = Boolean(useBoundsCheckbox?.checked);
+    if (currentScene && enforceBounds) {
+        if (currentScene.minX !== undefined) camera.position.x = Math.max(currentScene.minX, camera.position.x);
+        if (currentScene.maxX !== undefined) camera.position.x = Math.min(currentScene.maxX, camera.position.x);
+        if (currentScene.minZ !== undefined) camera.position.z = Math.max(currentScene.minZ, camera.position.z);
+        if (currentScene.maxZ !== undefined) camera.position.z = Math.min(currentScene.maxZ, camera.position.z);
+    }
+    if (keys['KeyQ'] || keys['KeyE'] || !enforceBounds) {
+        velY = 0;
+        onGround = false;
+    } else {
+        if (keys['Space'] && onGround) { velY = JUMP_VEL; onGround = false; }
+        velY += GRAVITY * dt;
+        camera.position.y += velY * dt;
+    }
+    if (enforceBounds && camera.position.y < floorY + EYE_H) {
+        camera.position.y = floorY + EYE_H;
+        velY = 0;
+        onGround = true;
+    }
+    updateHotspots();
+    if (currentScene?.file === 'splats/take1-room-capture.spz' && orbMesh) {
+        const t = Date.now() * 0.001;
+        orbMesh.rotation.y = t * 0.9;
+        orbMesh.position.y = floorY + 0.835 + Math.sin(t * 1.6) * 0.032;
+        if (orbMesh.children[0]) orbMesh.children[0].rotation.z = t * 0.55;
+        overlayRenderer.render(overlayScene, camera);
+    } else if (catalogData.objects?.[currentScene?.file]?.length) {
+        overlayRenderer.render(overlayScene, camera);
+    }
+}
+tick();
+
+window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    overlayRenderer.setSize(innerWidth, innerHeight);
+});
+
+function enterScene() {
+    overlay.style.display = 'none';
+    crosshair.style.display = 'block';
+    hud.style.display = 'block';
+    dpad.style.display = 'block';
+    const fv = parseFloat(floorYInput.value);
+    floorY = Number.isFinite(fv) ? fv : -3.0;
+    buildTableObject();
+    const startX = currentScene?.startX ?? 0;
+    const startY = currentScene?.startY ?? (floorY + EYE_H);
+    const startZ = currentScene?.startZ ?? 3;
+    camera.position.set(startX, startY, startZ);
+    yaw = currentScene?.yaw ?? 0;
+    pitch = currentScene?.pitch ?? 0;
+    camera.rotation.set(pitch, yaw, 0);
+    clock.getDelta();
+    active = true;
+}
+
+function exitScene() {
+    active = false;
+    overlay.style.display = 'flex';
+    crosshair.style.display = 'none';
+    hud.style.display = 'none';
+    dpad.style.display = 'none';
+}
+
+document.getElementById('hd-toggle-overlay')?.addEventListener('click', () => {
+    if (active) exitScene();
+    else if (splatLoaded) enterScene();
+});
+
+function applyLiveRotation() {
+    const rx = parseFloat(tuneRotX.value);
+    const ry = parseFloat(tuneRotY.value);
+    const rz = parseFloat(tuneRotZ.value);
+    tuneValX.textContent = rx + '°';
+    tuneValY.textContent = ry + '°';
+    tuneValZ.textContent = rz + '°';
+    const sceneObj = currentViewer?.getSplatScene?.(0);
+    if (sceneObj) {
+        sceneObj.quaternion.setFromEuler(new THREE.Euler(rx * Math.PI / 180, ry * Math.PI / 180, rz * Math.PI / 180, 'YXZ'));
+    }
+}
+tuneRotX.addEventListener('input', applyLiveRotation);
+tuneRotY.addEventListener('input', applyLiveRotation);
+tuneRotZ.addEventListener('input', applyLiveRotation);
+
+function syncSlidersFromSceneRotation() {
+    const sceneObj = currentViewer?.getSplatScene?.(0);
+    if (!sceneObj) return;
+    const euler = new THREE.Euler().setFromQuaternion(sceneObj.quaternion, 'YXZ');
+    const dx = Math.round(euler.x * 180 / Math.PI);
+    const dy = Math.round(euler.y * 180 / Math.PI);
+    const dz = Math.round(euler.z * 180 / Math.PI);
+    tuneRotX.value = dx;
+    tuneRotY.value = dy;
+    tuneRotZ.value = dz;
+    tuneValX.textContent = dx + '°';
+    tuneValY.textContent = dy + '°';
+    tuneValZ.textContent = dz + '°';
+}
+
+async function loadScene(scene) {
+    currentScene = scene;
+    splatLoaded = false;
+    loadMsg.textContent = `Loading ${scene.label}…`;
+    statusEl.textContent = `Loading ${scene.label}…`;
+    enterBtn.disabled = true;
+    enterBtn.textContent = 'Loading…';
+
+    try {
+        const { Viewer, SceneFormat } = await import('./gs3d.module.js');
+        if (currentViewer) {
+            try { await currentViewer.dispose?.(); } catch {}
+            currentViewer = null;
+        }
+        currentViewer = new Viewer({
+            rootElement: document.body,
+            selfDrivenMode: true,
+            sharedMemoryForWorkers: false,
+            dynamicScene: false,
+            camera,
+            webXRMode: 0,
+            useBuiltInControls: false,
+        });
+        currentViewer.start();
+
+        const loadBarEl = document.getElementById('load-bar');
+        if (loadBarEl) loadBarEl.style.width = '4%';
+        const lower = scene.file.toLowerCase();
+        const format = lower.endsWith('.spz') ? SceneFormat.Spz : (lower.endsWith('.ply') ? SceneFormat.Ply : SceneFormat.Splat);
+        await currentViewer.addSplatScene(scene.file, {
+            splatAlphaRemovalThreshold: 5,
+            showLoadingUI: false,
+            format,
+            rotation: ROTS[scene.rot || 'none'] || ROTS.none,
+            onProgress: (percent, percentLabel, loaderStatus) => {
+                const pct = Math.max(0, Math.min(100, Number(percent) || 0));
+                const isProcessing = loaderStatus === 1 || String(loaderStatus || '').toLowerCase().includes('process');
+                const msg = isProcessing
+                    ? `Decoding 3D Gaussian splats (${scene.label})…`
+                    : `Downloading ${scene.label} (${percentLabel || Math.round(pct) + '%'})…`;
+                loadMsg.textContent = msg;
+                statusEl.textContent = msg;
+                if (loadBarEl) loadBarEl.style.width = (isProcessing ? 92 : Math.max(6, Math.round(pct * 0.9))) + '%';
+            },
+        });
+        if (loadBarEl) loadBarEl.style.width = '100%';
+
+        const sceneObj = currentViewer.getSplatScene(0);
+        if (sceneObj && hasFineTunedRotation(scene)) {
+            sceneObj.quaternion.setFromEuler(
+                new THREE.Euler(
+                    (scene.rotX || 0) * Math.PI / 180,
+                    (scene.rotY || 0) * Math.PI / 180,
+                    (scene.rotZ || 0) * Math.PI / 180,
+                    'YXZ',
+                ),
+            );
+        }
+        try {
+            splatCount = Number(currentViewer?.splatMesh?.getSplatCount?.() || sceneObj?.splatBuffer?.getSplatCount?.() || 0);
+        } catch {
+            splatCount = 0;
+        }
+        splatLoaded = true;
+        loadMsg.textContent = '';
+        statusEl.textContent = '';
+        enterBtn.disabled = false;
+        enterBtn.textContent = 'ENTER HOLODECK';
+        enterBtn.onclick = () => enterScene();
+        syncSlidersFromSceneRotation();
+        setTimeout(() => enterScene(), 80);
+    } catch (err) {
+        runtimeErrors.push(err?.message || String(err));
+        loadMsg.textContent = 'Error: ' + (err?.message || err);
+        statusEl.textContent = '⚠ ' + (err?.message || err);
+        console.error(err);
+    }
+}
+
+async function main() {
+    try {
+        const res = await fetch('./data/holodeck-catalog.json', { cache: 'no-store' });
+        catalogData = await res.json();
+    } catch (e) {
+        runtimeErrors.push('Failed to load holodeck-catalog.json: ' + e);
+    }
+
+    const scenes = catalogData.scenes || [];
+    sceneSel.innerHTML = scenes.map((s) => `<option value="${s.file}">${s.label} (${s.file.split('/').pop()})</option>`).join('');
+
+    const urlParams = new URLSearchParams(location.search);
+    const urlFile = urlParams.get('file') || catalogData.defaultScene || scenes[0]?.file || 'splats/take1-room-capture.spz';
+    let scene = scenes.find((s) => s.file === urlFile) || createFallbackScene(urlFile);
+    sceneSel.value = scene.file;
+
+    document.querySelectorAll('[data-hd-file]').forEach((btn) => {
+        const target = btn.getAttribute('data-hd-file');
+        btn.classList.toggle('active', target === scene.file);
+        btn.addEventListener('click', () => {
+            const url = new URL(location.href);
+            url.searchParams.delete('floorY');
+            url.searchParams.delete('rot');
+            url.searchParams.delete('bounds');
+            url.searchParams.set('file', target);
+            location.href = url.toString();
+        });
+    });
+
+    sceneSel.addEventListener('change', () => {
+        const url = new URL(location.href);
+        url.searchParams.set('file', sceneSel.value);
+        location.href = url.toString();
+    });
+
+    const urlFloorY = urlParams.get('floorY');
+    const urlRot = urlParams.get('rot');
+    const urlBounds = urlParams.get('bounds');
+    floorYInput.value = urlFloorY !== null ? urlFloorY : (scene.floorY ?? -3.0);
+    rotSelect.value = urlRot !== null ? urlRot : (scene.rot || 'none');
+    useBoundsCheckbox.checked = urlBounds !== null ? (urlBounds === 'true') : Boolean(scene.bounds);
+    scene = { ...scene, floorY: parseFloat(floorYInput.value), rot: rotSelect.value, bounds: useBoundsCheckbox.checked };
+
+    const reloadPresets = () => {
+        const url = new URL(location.href);
+        url.searchParams.set('file', scene.file);
+        url.searchParams.set('floorY', floorYInput.value);
+        url.searchParams.set('rot', rotSelect.value);
+        url.searchParams.set('bounds', useBoundsCheckbox.checked ? 'true' : 'false');
+        location.href = url.toString();
+    };
+    floorYInput.addEventListener('change', reloadPresets);
+    rotSelect.addEventListener('change', reloadPresets);
+    useBoundsCheckbox.addEventListener('change', reloadPresets);
+
+    loadHotspotsFromCatalog(scene.file);
+    loadSceneObjectsFromCatalog(scene.file);
+    await loadScene(scene);
+}
+
+main();
+</script>
+</body>
+</html>

@@ -2713,7 +2713,8 @@ export function loadStarshipEventTheater({ viewer, neo4jLayer = null } = {}) {
       }
     });
     hudRoot.querySelector('[data-pfl-open-holodeck]')?.addEventListener('click', () => {
-      window.open('http://127.0.0.1:8766', '_blank', 'noopener');
+      const isLocalHost = /^(localhost|127\.0\.0\.1|10\.|192\.168\.)/i.test(window.location.hostname || '');
+      window.open(isLocalHost ? 'http://127.0.0.1:8766/' : '/holodeck/', '_blank', 'noopener');
     });
     hudRoot.querySelector('[data-pfl-edit-photos]')?.addEventListener('click', () => {
       if (typeof window.__pflToggleArrangeYard === 'function') {

@@ -785,7 +785,7 @@ export function loadPflWindowFramework({ viewer }) {
   let sync360SphereEntities = () => {};
   let walkCollisionsOn = true;
   const HOUSE_DEFAULT_POSE = { lat: 29.247585, lon: -95.231378, heading: 104, lift: 0, scale: 1, opacity: 1 };
-  const MONACO_DEFAULT_POSE = { lat: 29.247515, lon: -95.231255, heading: 194, lift: 0, scale: 1, opacity: 1 };
+  const MONACO_DEFAULT_POSE = { lat: 29.247505, lon: -95.231242, heading: 14, lift: 0, scale: 1, opacity: 1 };
   const DOCK_DEFAULT_POSE = { lat: 29.247786, lon: -95.231388, heading: 14, lift: 0, scale: 1, opacity: 1 };
 
   function houseLocalToGeo(localEastM, localNorthM, hState = null) {
@@ -1208,6 +1208,19 @@ export function loadPflWindowFramework({ viewer }) {
   }
 
   const SCENE_LAYOUT_TS_KEY = 'pfl_scene_layout_synced_ts_v1';
+  const SCENE_LAYOUT_KEYS = [
+    'house',
+    'monaco',
+    'dock',
+    'lisa',
+    'chair',
+    'garage-carport-20261117',
+    'yard-overview-20261012',
+    'bed-station-20261012',
+    'back-yard-cam2-water',
+    'house-side-20261012',
+    'back-yard-cam1-plan',
+  ];
   function collectSceneLayoutSnapshot() {
     const pick = (k) => {
       const st = window.__pflMovables?.[k]?.getState?.();
@@ -1220,25 +1233,29 @@ export function loadPflWindowFramework({ viewer }) {
         opacity: Number(st.opacity ?? 1),
       } : null;
     };
-    return {
-      objects: {
-        house: pick('house'),
-        monaco: pick('monaco'),
-        lisa: pick('lisa'),
-        chair: pick('chair'),
-      },
-    };
+    const objects = {};
+    for (const k of SCENE_LAYOUT_KEYS) {
+      const val = pick(k);
+      if (val) objects[k] = val;
+    }
+    return { objects };
   }
 
-  function applyPublishedSceneLayout(layoutObj) {
+  function applyPublishedSceneLayout(layoutObj, retryMissing = true) {
     if (!layoutObj || typeof layoutObj !== 'object') return;
     const objs = layoutObj.objects && typeof layoutObj.objects === 'object' ? layoutObj.objects : {};
-    for (const k of ['house', 'monaco', 'lisa', 'chair']) {
+    const missing = [];
+    for (const k of SCENE_LAYOUT_KEYS) {
       const pose = objs[k];
       if (!pose || typeof pose !== 'object') continue;
       if (!Number.isFinite(Number(pose.lat)) || !Number.isFinite(Number(pose.lon))) continue;
+      const mov = window.__pflMovables?.[k];
+      if (!mov?.update) {
+        missing.push(k);
+        continue;
+      }
       try {
-        window.__pflMovables?.[k]?.update?.({
+        mov.update({
           lat: Number(pose.lat),
           lon: Number(pose.lon),
           heading: Number(pose.heading ?? 0),
@@ -1247,6 +1264,10 @@ export function loadPflWindowFramework({ viewer }) {
           opacity: Number.isFinite(Number(pose.opacity)) ? Number(pose.opacity) : 1,
         });
       } catch {}
+    }
+    if (retryMissing && missing.length > 0) {
+      const partial = { objects: Object.fromEntries(missing.map((k) => [k, objs[k]])) };
+      setTimeout(() => applyPublishedSceneLayout(partial, false), 1200);
     }
     if (activeMovable) bindMovable(activeMovable);
   }
@@ -1383,12 +1404,13 @@ export function loadPflWindowFramework({ viewer }) {
     return Math.max(...samples);
   }
 
-  // 1S788 Holodeck Hallway Portal Window (:8766 Stargate Room Map & Launchpad — 100% CSP-Clean Native DOM)
-  const HOLODECK_HALLWAY_URL = 'http://127.0.0.1:8766/?file=splats/take1-room-capture.spz';
+  // 1S788 Holodeck Hallway Portal Window (Cloud /holodeck/ when public, :8766 when local node — 100% CSP-Clean Native DOM)
+  const HOLODECK_BASE_URL = IS_LOCAL_NODE ? 'http://127.0.0.1:8766/' : '/holodeck/';
+  const HOLODECK_HALLWAY_URL = `${HOLODECK_BASE_URL}?file=splats/take1-room-capture.spz`;
   let activeHolodeckUrl = HOLODECK_HALLWAY_URL;
   const holodeckWin = createStandardBox({
     id: 'pfl-win-holodeck-portal',
-    title: '🚪 1S788 HOLODECK HALLWAY PORTAL (:8766)',
+    title: IS_LOCAL_NODE ? '🚪 1S788 HOLODECK HALLWAY PORTAL (:8766)' : '🚪 1S788 CLOUD HOLODECK PORTAL (/holodeck/)',
     defaultLeft: Math.max(40, Math.round((window.innerWidth - 620) * 0.5)),
     defaultTop: 84,
     defaultWidth: 620,
@@ -1397,52 +1419,68 @@ export function loadPflWindowFramework({ viewer }) {
   holodeckWin.body.innerHTML = `
     <div id="pfl-holodeck-stargate-map" data-holodeck-target="${HOLODECK_HALLWAY_URL}" style="font-family:'Inter',system-ui,sans-serif;font-size:11.5px;color:#e2e8f0">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-        <span style="color:#67e8f9;font-weight:700">🌀 1S788 Carport Breezeway → 3D Gaussian Splat Holodeck (:8766)</span>
+        <span style="color:#67e8f9;font-weight:700">🌀 1S788 Carport Breezeway → 3D Gaussian Splat Holodeck</span>
         <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-          <button type="button" class="pfl-std-cbtn" id="pfl-holodeck-step-in" style="background:rgba(34,211,238,0.18);border-color:#22d3ee;color:#67e8f9;padding:3px 8px">🚪 Walk Into Hallway Now (:8766)</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-holodeck-step-in" style="background:rgba(34,211,238,0.18);border-color:#22d3ee;color:#67e8f9;padding:3px 8px">🚪 Walk Into Hallway Now</button>
           <a href="${HOLODECK_HALLWAY_URL}" target="_blank" rel="noopener" class="pfl-std-cbtn" id="pfl-holodeck-fulltab" style="border-color:#a855f7;color:#e9d5ff;text-decoration:none;padding:3px 8px">↗ Open in New Tab</a>
           <button type="button" class="pfl-std-cbtn" id="pfl-holodeck-close" style="border-color:#f43f5e;color:#fda4af">✕ Close</button>
         </div>
       </div>
       <div style="padding:12px;border:1.5px solid rgba(34,211,238,0.45);border-radius:10px;background:radial-gradient(circle at 50% 35%, rgba(34,211,238,0.14), rgba(88,28,135,0.20) 52%, rgba(3,7,18,0.96) 100%)">
         <div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#a5f3fc;margin-bottom:8px;line-height:1.4">
-          🌀 <b>STARGATE TRANSPORT RING</b> · Step into the glowing cyan ring or click below to beam from outdoor 417 Palm Dr into your indoor 3D Gaussian Splats (<code>127.0.0.1:8766</code>), or toggle the self-hosted Yard 3D Splat right here!
+          🌀 <b>STARGATE TRANSPORT RING</b> · Step into the glowing cyan ring or click below to beam from outdoor 417 Palm Dr into your indoor 3D Gaussian Splats (<code>${IS_LOCAL_NODE ? '127.0.0.1:8766' : '/holodeck/'}</code>), or toggle the self-hosted Yard 3D Splat right here!
         </div>
         <div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-bottom:9px">
           <button type="button" class="pfl-std-cbtn" id="pfl-holodeck-splat-btn" style="border-color:#22d3ee;color:#67e8f9;padding:4px 9px">✨ Yard 3D Point Splat: OFF</button>
-          <span id="pfl-holodeck-server-badge" style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 8px;border:1px solid #334155;border-radius:5px;color:#94a3b8">Local Splat Server (:8766) Ready</span>
+          <span id="pfl-holodeck-server-badge" style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 8px;border:1px solid #334155;border-radius:5px;color:#94a3b8">${IS_LOCAL_NODE ? 'Local Splat Server (:8766) Ready' : 'Cloud Splat Holodeck (/holodeck/) Ready'}</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px">
           <div style="padding:8px 10px;border:1px solid rgba(34,211,238,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
             <strong style="color:#67e8f9">🚪 1. Entry Hallway (<code>take1-room-capture.spz</code>)</strong>
             <span style="font-size:10.5px;color:#94a3b8">1S788 carport threshold · Doors to Main Hall, Command Center &amp; 417 Palm Dr Yard</span>
             <div style="display:flex;gap:5px;margin-top:2px">
-              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="http://127.0.0.1:8766/?file=splats/take1-room-capture.spz" style="border-color:#22d3ee;color:#67e8f9">Step In →</button>
-              <a href="http://127.0.0.1:8766/?file=splats/take1-room-capture.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/take1-room-capture.spz" style="border-color:#22d3ee;color:#67e8f9">Step In →</button>
+              <a href="${HOLODECK_BASE_URL}?file=splats/take1-room-capture.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
             </div>
           </div>
           <div style="padding:8px 10px;border:1px solid rgba(168,85,247,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
             <strong style="color:#e9d5ff">🏛️ 2. Main Hall (<code>take3-main-hall.spz</code>)</strong>
             <span style="font-size:10.5px;color:#94a3b8">Central interior corridor · Connects Entry Hallway, Alt Angle &amp; Lisa Command Center</span>
             <div style="display:flex;gap:5px;margin-top:2px">
-              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="http://127.0.0.1:8766/?file=splats/take3-main-hall.spz" style="border-color:#a855f7;color:#e9d5ff">Step In →</button>
-              <a href="http://127.0.0.1:8766/?file=splats/take3-main-hall.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/take3-main-hall.spz" style="border-color:#a855f7;color:#e9d5ff">Step In →</button>
+              <a href="${HOLODECK_BASE_URL}?file=splats/take3-main-hall.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
             </div>
           </div>
           <div style="padding:8px 10px;border:1px solid rgba(74,222,128,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
             <strong style="color:#86efac">👑 3. Lisa Command Center (<code>lisa-command-center.spz</code>)</strong>
             <span style="font-size:10.5px;color:#94a3b8">Sovereign bridge · Doors to Main Hall, Arcade Spaceship &amp; 417 Palm Dr Yard</span>
             <div style="display:flex;gap:5px;margin-top:2px">
-              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="http://127.0.0.1:8766/?file=splats/lisa-command-center.spz" style="border-color:#4ade80;color:#86efac">Step In →</button>
-              <a href="http://127.0.0.1:8766/?file=splats/lisa-command-center.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/lisa-command-center.spz" style="border-color:#4ade80;color:#86efac">Step In →</button>
+              <a href="${HOLODECK_BASE_URL}?file=splats/lisa-command-center.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
             </div>
           </div>
           <div style="padding:8px 10px;border:1px solid rgba(251,191,36,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
             <strong style="color:#fde047">🕹️ 4. Arcade Spaceship (<code>arcade_spaceship.spz</code>)</strong>
             <span style="font-size:10.5px;color:#94a3b8">Starship deck · Return portal wired back to Lisa Command Center</span>
             <div style="display:flex;gap:5px;margin-top:2px">
-              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="http://127.0.0.1:8766/?file=splats/arcade_spaceship.spz" style="border-color:#fbbf24;color:#fde047">Step In →</button>
-              <a href="http://127.0.0.1:8766/?file=splats/arcade_spaceship.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/arcade_spaceship.spz" style="border-color:#fbbf24;color:#fde047">Step In →</button>
+              <a href="${HOLODECK_BASE_URL}?file=splats/arcade_spaceship.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+            </div>
+          </div>
+          <div style="padding:8px 10px;border:1px solid rgba(56,189,248,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
+            <strong style="color:#7dd3fc">🛏️ 5. Paul's Bedroom (<code>bedroom-10view.spz</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">10-view interior 3D Gaussian Splat room capture</span>
+            <div style="display:flex;gap:5px;margin-top:2px">
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/bedroom-10view.spz" style="border-color:#38bdf8;color:#7dd3fc">Step In →</button>
+              <a href="${HOLODECK_BASE_URL}?file=splats/bedroom-10view.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+            </div>
+          </div>
+          <div style="padding:8px 10px;border:1px solid rgba(192,132,252,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
+            <strong style="color:#d8b4fe">🛸 6. 01 Command Deck (<code>01-command-deck.splat</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">Fast-loading HunyuanWorld bridge splat deck</span>
+            <div style="display:flex;gap:5px;margin-top:2px">
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/01-command-deck.splat" style="border-color:#c084fc;color:#d8b4fe">Step In →</button>
+              <a href="${HOLODECK_BASE_URL}?file=splats/01-command-deck.splat" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
             </div>
           </div>
         </div>
@@ -3457,7 +3495,7 @@ export function loadPflWindowFramework({ viewer }) {
       <div id="pfl-teleport-pads-list" style="display:flex;gap:3px;flex-wrap:wrap"></div>
       <div style="display:flex;gap:3px;flex-wrap:wrap">
         <button type="button" class="pfl-std-cbtn" id="pfl-drop-pad-btn" style="border-color:#4ade80;color:#4ade80" title="Drop a persistent Second-Life teleport pad at your exact current camera position, angle &amp; lens FOV">➕ Drop Pad Here</button>
-        <button type="button" class="pfl-std-cbtn" id="pfl-enter-holodeck-btn" style="border-color:#a855f7;color:#e9d5ff" title="Step through the 1S788 Carport Portal into the 3D Gaussian Splat Holodeck Hallway (:8766)">🚪 Enter Holodeck Hallway (:8766)</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-enter-holodeck-btn" style="border-color:#a855f7;color:#e9d5ff" title="${IS_LOCAL_NODE ? 'Step through the 1S788 Carport Portal into the 3D Gaussian Splat Holodeck Hallway (:8766)' : 'Step through the 1S788 Cloud Holodeck Portal into your hosted 3D Gaussian Splats (/holodeck/)'}">${IS_LOCAL_NODE ? '🚪 Enter Holodeck Hallway (:8766)' : '🚪 Enter Cloud Holodeck (/holodeck/)'}</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-house-3d-toggle" style="border-color:#fbbf24;color:#fde047" title="Toggle 3D 417 Palm Dr Yellow Coastal House GLB model &amp; auto-elevate Bed photo onto upstairs west-bedroom roof">🏠 3D House: ON</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-yard-splat-toggle" style="border-color:rgba(148,163,184,0.35);color:#94a3b8" title="Toggle self-hosted 417 Palm Dr Front Yard 3D Gaussian Point Splat tileset">✨ Yard 3D Splat: OFF</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-walk-collisions-toggle" style="border-color:#4ade80;color:#86efac" title="Toggle solid 3D wall colliders with Front, Carport &amp; Bayou Doorways">🧱 Collisions: ON</button>
@@ -5288,7 +5326,7 @@ export function loadPflWindowFramework({ viewer }) {
     const portalId = 'pfl-holodeck-portal-1s788';
     viewer.entities.add({
       id: portalId,
-      name: '🚪 Stargate Transport Ring → 1S788 Holodeck Hallway (:8766)',
+      name: '🚪 Stargate Transport Ring → 1S788 Holodeck Hallway',
       position: Cesium.Cartesian3.fromDegrees(portalGeo.lon, portalGeo.lat, portalGround + 1.15),
       ellipse: {
         semiMajorAxis: 1.15,
@@ -5488,7 +5526,8 @@ export function loadPflWindowFramework({ viewer }) {
         monacoState.lat,
         rvGround + MONACO_GROUND_CLEARANCE_M + Number(monacoState.lift || 0),
       );
-      const hpr = new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(monacoState.heading || 175), 0, 0);
+      const monHdg = Number.isFinite(Number(monacoState.heading)) ? Number(monacoState.heading) : 14;
+      const hpr = new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(monHdg), 0, 0);
       const frame = Cesium.Transforms.headingPitchRollToFixedFrame(origin, hpr);
       const pos = Cesium.Matrix4.multiplyByPoint(frame, new Cesium.Cartesian3(localX * sc, localY * sc, localZ * sc), new Cesium.Cartesian3());
       const ori = Cesium.Transforms.headingPitchRollQuaternion(pos, hpr);
