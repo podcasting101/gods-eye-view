@@ -199,6 +199,21 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
 
   try {
     try {
+      const ctrl = viewer?.scene?.screenSpaceCameraController;
+      if (ctrl) {
+        const hashStr = typeof window !== 'undefined' ? String(window.location?.hash || '') : '';
+        const cam = viewer?.camera?.positionCartographic;
+        const nearLiverpoolCam =
+          cam &&
+          Math.abs(Cesium.Math.toDegrees(cam.latitude) - 29.2475) < 0.02 &&
+          Math.abs(Cesium.Math.toDegrees(cam.longitude) - -95.2314) < 0.02;
+        if (/alt=-/i.test(hashStr) || /lat=29\.247/i.test(hashStr) || nearLiverpoolCam) {
+          ctrl.enableCollisionDetection = false;
+          if ('minimumZoomDistance' in ctrl) ctrl.minimumZoomDistance = 0.25;
+        }
+      }
+    } catch {}
+    try {
       anchor = addSovereignAnchor(viewer);
       if (anchor) {
         const anchorSt = anchor._pflMovable?.getState?.() || {};

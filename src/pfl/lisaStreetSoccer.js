@@ -2,6 +2,7 @@ import * as Cesium from 'cesium';
 import { governorRequestRender } from '../renderGovernor.js';
 import { STORED_GROUND_HEIGHT_M } from './placedObjects.js';
 import { activeYardDatumM } from './yardFrames.js';
+import { cameraFlightActive } from '../render/cesium/internals.js';
 
 export const SOCCER_TIMELINE_DURATION_S = 24.0;
 export const RUN_STRIDE_CYCLE_S = 0.6667;
@@ -20,11 +21,13 @@ const MODELS = Object.freeze({
   michaelGold: `${BASE_MODEL_URL}michael-soccer.glb`,
 });
 
-// Across Palm Drive open grass field vs Palm Drive painted center stripe (~95 deg road heading)
+// Across Palm Drive open grass field vs Palm Drive painted center stripe (~105 deg ESE Palm Drive alignment)
 const TRACK_ORIGINS = Object.freeze({
-  field: Object.freeze({ lat: 29.247222, lon: -95.231385, yawDeg: -5.0, label: 'Across-St. Stadium + 3v3' }),
-  stripe: Object.freeze({ lat: 29.247355, lon: -95.231385, yawDeg: -5.0, label: 'Palm Dr Center Stripe' }),
+  field: Object.freeze({ lat: 29.247202, lon: -95.231385, yawDeg: -15.0, label: 'Across-St. Stadium + 3v3' }),
+  stripe: Object.freeze({ lat: 29.247355, lon: -95.231385, yawDeg: -15.0, label: 'Palm Dr Center Stripe' }),
 });
+
+const SCOREBOARD_STORAGE_KEY = 'pfl_stadium_scoreboard_v1';
 
 function enuTrackToLatLonAlt(xAlongM, yAcrossM, altM, trackMode = 'field') {
   const orig = TRACK_ORIGINS[trackMode] || TRACK_ORIGINS.field;
@@ -34,6 +37,162 @@ function enuTrackToLatLonAlt(xAlongM, yAcrossM, altM, trackMode = 'field') {
   const lat = orig.lat + dNorthM / 111320;
   const lon = orig.lon + dEastM / (111320 * Math.cos(Cesium.Math.toRadians(orig.lat)));
   return { lat, lon, altM, cart: Cesium.Cartesian3.fromDegrees(lon, lat, altM) };
+}
+
+function defaultScoreboardState() {
+  const ctr = enuTrackToLatLonAlt(0, -11.4, 0, 'field');
+  return {
+    lat: ctr.lat,
+    lon: ctr.lon,
+    heading: 345,
+    tilt: 0,
+    lift: 0,
+    scale: 1,
+    opacity: 1,
+  };
+}
+
+function readStoredScoreboardState() {
+  const fb = defaultScoreboardState();
+  try {
+    if (typeof localStorage === 'undefined') return fb;
+    const raw = JSON.parse(localStorage.getItem(SCOREBOARD_STORAGE_KEY) || 'null');
+    if (!raw || !Number.isFinite(Number(raw.lat)) || !Number.isFinite(Number(raw.lon))) return fb;
+    return {
+      lat: Number(raw.lat),
+      lon: Number(raw.lon),
+      heading: Number.isFinite(Number(raw.heading)) ? Number(raw.heading) : fb.heading,
+      tilt: Number.isFinite(Number(raw.tilt)) ? Math.max(-90, Math.min(90, Number(raw.tilt))) : 0,
+      lift: Number.isFinite(Number(raw.lift)) ? Math.max(-35, Math.min(35, Number(raw.lift))) : 0,
+      scale: Number(raw.scale) > 0 ? Math.max(0.25, Math.min(3.5, Number(raw.scale))) : 1,
+      opacity: Number.isFinite(Number(raw.opacity)) ? Math.max(0.05, Math.min(1, Number(raw.opacity))) : 1,
+    };
+  } catch {
+    return fb;
+  }
+}
+
+function writeStoredScoreboardState(st) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(SCOREBOARD_STORAGE_KEY, JSON.stringify(st));
+    }
+  } catch {}
+}
+
+function computeScoreboardBasis(state, groundAltM) {
+  const origin = Cesium.Cartesian3.fromDegrees(state.lon, state.lat, groundAltM + (state.lift || 0));
+  const enu = Cesium.Transforms.eastNorthUpToFixedFrame(origin);
+  const h = Cesium.Math.toRadians(state.heading || 0);
+  const t = Cesium.Math.toRadians(state.tilt || 0);
+  const sinH = Math.sin(h);
+  const cosH = Math.cos(h);
+  const cosT = Math.cos(t);
+  const sinT = Math.sin(t);
+  const rightLocal = new Cesium.Cartesian3(-cosH, sinH, 0);
+  const fwdLocal = new Cesium.Cartesian3(sinH * cosT, cosH * cosT, sinT);
+  const upLocal = new Cesium.Cartesian3(-sinH * sinT, -cosH * sinT, cosT);
+  const toWorldVec = (v) => Cesium.Matrix4.multiplyByPointAsVector(enu, v, new Cesium.Cartesian3());
+  const right = Cesium.Cartesian3.normalize(toWorldVec(rightLocal), new Cesium.Cartesian3());
+  const fwd = Cesium.Cartesian3.normalize(toWorldVec(fwdLocal), new Cesium.Cartesian3());
+  const up = Cesium.Cartesian3.normalize(toWorldVec(upLocal), new Cesium.Cartesian3());
+  return { origin, right, fwd, up };
+}
+
+function scoreboardWorldPoint(basis, rOff, fOff, uOff) {
+  const p = Cesium.Cartesian3.clone(basis.origin);
+  Cesium.Cartesian3.add(p, Cesium.Cartesian3.multiplyByScalar(basis.right, rOff, new Cesium.Cartesian3()), p);
+  Cesium.Cartesian3.add(p, Cesium.Cartesian3.multiplyByScalar(basis.fwd, fOff, new Cesium.Cartesian3()), p);
+  Cesium.Cartesian3.add(p, Cesium.Cartesian3.multiplyByScalar(basis.up, uOff, new Cesium.Cartesian3()), p);
+  return p;
+}
+
+/**
+ * Double-sided, non-mirrored 3D primitive quad pair for the 417 Palm Stadium Jumbotron.
+ * Both front and back faces carry outward normals, CCW winding, and left-to-right upright UVs
+ * so text is always readable from any viewpoint without polygon flipping or blinking.
+ */
+function buildScoreboardPrimitive(state, groundAltM, material, pickEntity) {
+  const basis = computeScoreboardBasis(state, groundAltM);
+  const sc = Math.max(0.25, Math.min(3.5, Number(state.scale) || 1));
+  const hw = 3.4 * sc;
+  const zBot = 2.35 * sc;
+  const zTop = 4.95 * sc;
+  const ht = 0.14 * sc;
+
+  const corners = [
+    // Front face (+fwd): BL, BR, TR, TL
+    scoreboardWorldPoint(basis, -hw, ht, zBot),
+    scoreboardWorldPoint(basis, hw, ht, zBot),
+    scoreboardWorldPoint(basis, hw, ht, zTop),
+    scoreboardWorldPoint(basis, -hw, ht, zTop),
+    // Back face (-fwd): swapped horizontal so text also reads left-to-right from behind
+    scoreboardWorldPoint(basis, hw, -ht, zBot),
+    scoreboardWorldPoint(basis, -hw, -ht, zBot),
+    scoreboardWorldPoint(basis, -hw, -ht, zTop),
+    scoreboardWorldPoint(basis, hw, -ht, zTop),
+  ];
+
+  const posArr = new Float64Array(8 * 3);
+  const normArr = new Float32Array(8 * 3);
+  for (let i = 0; i < 8; i++) {
+    posArr[i * 3] = corners[i].x;
+    posArr[i * 3 + 1] = corners[i].y;
+    posArr[i * 3 + 2] = corners[i].z;
+    const sign = i < 4 ? 1 : -1;
+    normArr[i * 3] = basis.fwd.x * sign;
+    normArr[i * 3 + 1] = basis.fwd.y * sign;
+    normArr[i * 3 + 2] = basis.fwd.z * sign;
+  }
+
+  const stArr = new Float32Array([
+    0, 0, 1, 0, 1, 1, 0, 1,
+    0, 0, 1, 0, 1, 1, 0, 1,
+  ]);
+  const indices = new Uint16Array([
+    0, 1, 2, 0, 2, 3,
+    4, 5, 6, 4, 6, 7,
+  ]);
+
+  const geometry = new Cesium.Geometry({
+    attributes: {
+      position: new Cesium.GeometryAttribute({
+        componentDatatype: Cesium.ComponentDatatype.DOUBLE,
+        componentsPerAttribute: 3,
+        values: posArr,
+      }),
+      normal: new Cesium.GeometryAttribute({
+        componentDatatype: Cesium.ComponentDatatype.FLOAT,
+        componentsPerAttribute: 3,
+        values: normArr,
+      }),
+      st: new Cesium.GeometryAttribute({
+        componentDatatype: Cesium.ComponentDatatype.FLOAT,
+        componentsPerAttribute: 2,
+        values: stArr,
+      }),
+    },
+    indices,
+    primitiveType: Cesium.PrimitiveType.TRIANGLES,
+    boundingSphere: Cesium.BoundingSphere.fromVertices(posArr),
+  });
+
+  const opacity = Number.isFinite(Number(state.opacity)) ? Math.max(0.05, Math.min(1, Number(state.opacity))) : 1;
+  return new Cesium.Primitive({
+    geometryInstances: new Cesium.GeometryInstance({ geometry, id: pickEntity }),
+    appearance: new Cesium.MaterialAppearance({
+      flat: true,
+      faceForward: false,
+      closed: false,
+      translucent: opacity < 0.99,
+      materialSupport: Cesium.MaterialAppearance.MaterialSupport.TEXTURED,
+      material,
+      renderState: {
+        cull: { enabled: true, face: Cesium.CullFace.BACK },
+      },
+    }),
+    asynchronous: false,
+  });
 }
 
 function makeSoccerBallDataUrl() {
@@ -498,6 +657,8 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
   let speedMult = 1.0;
   let trackMode = 'field';
   let camMode = 'free';
+  let pendingDefaultWide = true;
+  let nearYardSettledAtMs = 0;
   let lightMode = 'bright';
   let destroyed = false;
   let customAttachedMovable = null;
@@ -535,14 +696,118 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
     return ent;
   };
 
-  const scoreboardCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
-  if (scoreboardCanvas) {
-    scoreboardCanvas.width = 512;
-    scoreboardCanvas.height = 224;
-    drawScoreboardCanvas(scoreboardCanvas, 0, 0, 0, 'GIRLS vs BOYS · KICKOFF');
-  }
-  let scoreboardEnt = null;
+  const makeScoreboardCanvas = () => {
+    if (typeof document === 'undefined') return null;
+    const c = document.createElement('canvas');
+    c.width = 512;
+    c.height = 224;
+    drawScoreboardCanvas(c, 0, 0, 0, 'GIRLS vs BOYS · KICKOFF');
+    return c;
+  };
+  const scoreboardCanvases = [makeScoreboardCanvas(), makeScoreboardCanvas()];
+  let scoreboardBufIdx = 0;
+  let scoreboardState = readStoredScoreboardState();
+  const scoreboardMaterial =
+    typeof Cesium.Material?.fromType === 'function'
+      ? Cesium.Material.fromType('Image', {
+          image: scoreboardCanvases[0] || makeSoccerBallDataUrl(),
+          repeat: new Cesium.Cartesian2(1, 1),
+          color: Cesium.Color.WHITE.withAlpha(scoreboardState.opacity),
+        })
+      : null;
+  let scoreboardPickEnt = null;
+  let scoreboardPrim = null;
+  let scoreboardMov = null;
   let lastBoardKey = '';
+
+  const rebuildScoreboardMesh = () => {
+    const z0 = surfaceAltM();
+    const sc = Math.max(0.25, Math.min(3.5, Number(scoreboardState.scale) || 1));
+    const zBot = 2.35 * sc;
+    const basis = computeScoreboardBasis(scoreboardState, z0);
+
+    const stalePylon = viewer.entities.getById('pfl-stadium-board-pylons');
+    if (stalePylon) viewer.entities.remove(stalePylon);
+    viewer.entities.add({
+      id: 'pfl-stadium-board-pylons',
+      show: enabled,
+      polyline: {
+        positions: [
+          scoreboardWorldPoint(basis, -2.4 * sc, 0, 0),
+          scoreboardWorldPoint(basis, -2.4 * sc, 0, zBot),
+          scoreboardWorldPoint(basis, 2.4 * sc, 0, zBot),
+          scoreboardWorldPoint(basis, 2.4 * sc, 0, 0),
+        ],
+        width: 5,
+        material: Cesium.Color.fromCssColorString('#64748b'),
+      },
+    });
+    if (!staticEntityIds.includes('pfl-stadium-board-pylons')) {
+      staticEntityIds.push('pfl-stadium-board-pylons');
+    }
+
+    if (scoreboardPrim) {
+      try { viewer.scene.primitives.remove(scoreboardPrim); } catch {}
+      scoreboardPrim = null;
+    }
+    if (!scoreboardPickEnt) {
+      const stalePick = viewer.entities.getById('pfl-stadium-jumbotron');
+      if (stalePick) viewer.entities.remove(stalePick);
+      scoreboardPickEnt = viewer.entities.add({
+        id: 'pfl-stadium-jumbotron',
+        name: '📺 417 Palm Stadium Scoreboard',
+        show: enabled,
+      });
+    }
+    scoreboardPickEnt.show = enabled;
+
+    if (scoreboardMaterial) {
+      if (scoreboardMaterial.uniforms?.color) {
+        scoreboardMaterial.uniforms.color = Cesium.Color.WHITE.withAlpha(scoreboardState.opacity);
+      }
+      scoreboardPrim = buildScoreboardPrimitive(scoreboardState, z0, scoreboardMaterial, scoreboardPickEnt);
+      scoreboardPrim.show = enabled;
+      viewer.scene.primitives.add(scoreboardPrim);
+    }
+
+    if (!scoreboardMov) {
+      scoreboardMov = {
+        kind: 'stadium-scoreboard',
+        label: '📺 417 Palm Stadium Scoreboard',
+        getState: () => ({ ...scoreboardState }),
+        update: (patch = {}) => {
+          if (typeof patch.lat === 'number' && Number.isFinite(patch.lat)) scoreboardState.lat = patch.lat;
+          if (typeof patch.lon === 'number' && Number.isFinite(patch.lon)) scoreboardState.lon = patch.lon;
+          if (typeof patch.heading === 'number' && Number.isFinite(patch.heading)) {
+            scoreboardState.heading = ((patch.heading % 360) + 360) % 360;
+          }
+          if (typeof patch.tilt === 'number' && Number.isFinite(patch.tilt)) {
+            scoreboardState.tilt = Math.max(-90, Math.min(90, patch.tilt));
+          }
+          if (typeof patch.lift === 'number' && Number.isFinite(patch.lift)) {
+            scoreboardState.lift = Math.max(-35, Math.min(35, patch.lift));
+          }
+          if (typeof patch.scale === 'number' && patch.scale > 0) {
+            scoreboardState.scale = Math.max(0.25, Math.min(3.5, patch.scale));
+          }
+          if (typeof patch.opacity === 'number' && Number.isFinite(patch.opacity)) {
+            scoreboardState.opacity = Math.max(0.05, Math.min(1, patch.opacity));
+          }
+          if (!patch?._autoSync) {
+            writeStoredScoreboardState(scoreboardState);
+            if (typeof window !== 'undefined') window.__pflNotifyYardFrameUserEdit?.('stadium-scoreboard');
+          }
+          rebuildScoreboardMesh();
+          governorRequestRender('pfl-move-scoreboard');
+        },
+      };
+    }
+    scoreboardPickEnt._pflMovable = scoreboardMov;
+    if (typeof window !== 'undefined') {
+      window.__pflMovables = window.__pflMovables || {};
+      window.__pflMovables['stadium-scoreboard'] = scoreboardMov;
+    }
+  };
 
   const buildGoalsAndPitch = () => {
     for (const id of staticEntityIds) {
@@ -568,7 +833,7 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
 
     addStatic({
       id: 'pfl-soccer-dolly1-rail',
-      show: enabled && (camMode !== 'free'),
+      show: enabled && (camMode === 'dolly1' || camMode === 'auto'),
       polyline: {
         positions: [
           enuTrackToLatLonAlt(-12, -15.5, z0 + 4.8, trackMode).cart,
@@ -651,11 +916,12 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
       });
     }
 
-    // North / Bayou-Side Mini-Stadium Bleachers (left & right wings along y = +10.2..+12.8m)
+    // South / Far-Side Mini-Stadium Bleachers toward Bayou Bushes (left & right wings along y = -10.2..-12.8m)
+    // Leaves North Palm Drive side completely clear of fences & bleachers.
     for (const [wing, xA, xB] of [['west', -14.5, -4.2], ['east', 4.2, 14.5]]) {
       for (let tier = 0; tier < 3; tier++) {
-        const ty0 = 10.4 + tier * 0.85;
-        const ty1 = ty0 + 0.65;
+        const ty0 = -10.4 - tier * 0.85;
+        const ty1 = ty0 - 0.65;
         const tz = 0.48 + tier * 0.48;
         addStatic({
           id: `pfl-stadium-bleacher-${wing}-t${tier}`,
@@ -673,15 +939,15 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
         id: `pfl-stadium-rails-${wing}`,
         show: enabled,
         polyline: {
-          positions: [fPt(xA, 12.8, 0), fPt(xA, 12.8, 2.1), fPt(xB, 12.8, 2.1), fPt(xB, 12.8, 0)],
+          positions: [fPt(xA, -12.8, 0), fPt(xA, -12.8, 2.1), fPt(xB, -12.8, 2.1), fPt(xB, -12.8, 0)],
           width: 3,
           material: Cesium.Color.LIGHTGRAY,
         },
       });
     }
 
-    // 4 Corner Stadium Floodlight Towers
-    for (const [lid, lx, ly] of [['nw', -18, 10.5], ['ne', 18, 10.5], ['sw', -18, -10.5], ['se', 18, -10.5]]) {
+    // 4 Corner Stadium Floodlight Towers (kept cleanly inside pitch perimeter, well off Palm Dr asphalt)
+    for (const [lid, lx, ly] of [['nw', -17.4, 9.2], ['ne', 17.4, 9.2], ['sw', -17.4, -9.6], ['se', 17.4, -9.6]]) {
       addStatic({
         id: `pfl-stadium-light-${lid}`,
         show: enabled,
@@ -701,33 +967,8 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
       });
     }
 
-    // Bayou-Side LED Jumbotron Scoreboard (x = -3.4..+3.4m, y = +11.2m, z = 2.6..5.4m, tilted slightly 84 deg!)
-    addStatic({
-      id: 'pfl-stadium-board-pylons',
-      show: enabled,
-      polyline: {
-        positions: [fPt(-2.4, 11.4, 0), fPt(-2.4, 11.4, 2.6), fPt(2.4, 11.4, 2.6), fPt(2.4, 11.4, 0)],
-        width: 5,
-        material: Cesium.Color.fromCssColorString('#64748b'),
-      },
-    });
-    scoreboardEnt = addStatic({
-      id: 'pfl-stadium-jumbotron',
-      show: enabled,
-      polygon: {
-        hierarchy: [fPt(-3.4, 11.15, 2.55), fPt(3.4, 11.15, 2.55), fPt(3.4, 11.45, 5.35), fPt(-3.4, 11.45, 5.35)],
-        perPositionHeight: true,
-        material: new Cesium.ImageMaterialProperty({
-          image: scoreboardCanvas || makeSoccerBallDataUrl(),
-        }),
-        textureCoordinates: new Cesium.PolygonHierarchy([
-          new Cesium.Cartesian2(0, 0),
-          new Cesium.Cartesian2(1, 0),
-          new Cesium.Cartesian2(1, 1),
-          new Cesium.Cartesian2(0, 1),
-        ]),
-      },
-    });
+    // Bayou-Side LED Jumbotron Scoreboard (double-sided 3D primitive, movable + persistent)
+    rebuildScoreboardMesh();
   };
   buildGoalsAndPitch();
 
@@ -822,16 +1063,16 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
   const paulVestActor = createSyncedActor(MODELS.paulVest, makeActorMatrix(curState.paulVestX, curState.paulVestY, curState.paulVestHeading));
   const michaelActor = createSyncedActor(MODELS.michaelGold, makeActorMatrix(curState.michaelX, curState.michaelY, curState.michaelHeadingRad));
   const spectatorSpecs = [
-    { url: MODELS.girlCl, x: -12.0, y: 10.6, z: 0.48, anim: 'Woot', offset: 0.2 },
-    { url: MODELS.paulVest, x: -8.8, y: 11.45, z: 0.96, anim: 'Idle', offset: 0.9 },
-    { url: MODELS.girlShorts, x: -5.8, y: 10.6, z: 0.48, anim: 'Woot', offset: 1.5 },
-    { url: MODELS.michaelGold, x: 5.8, y: 10.6, z: 0.48, anim: 'Dance', offset: 0.4 },
-    { url: MODELS.girlCl, x: 9.0, y: 11.45, z: 0.96, anim: 'Woot', offset: 2.1 },
-    { url: MODELS.paulNasa, x: 12.2, y: 10.6, z: 0.48, anim: 'Idle', offset: 1.1 },
+    { url: MODELS.girlCl, x: -12.0, y: -10.6, z: 0.48, anim: 'Woot', offset: 0.2 },
+    { url: MODELS.paulVest, x: -8.8, y: -11.45, z: 0.96, anim: 'Idle', offset: 0.9 },
+    { url: MODELS.girlShorts, x: -5.8, y: -10.6, z: 0.48, anim: 'Woot', offset: 1.5 },
+    { url: MODELS.michaelGold, x: 5.8, y: -10.6, z: 0.48, anim: 'Dance', offset: 0.4 },
+    { url: MODELS.girlCl, x: 9.0, y: -11.45, z: 0.96, anim: 'Woot', offset: 2.1 },
+    { url: MODELS.paulNasa, x: 12.2, y: -10.6, z: 0.48, anim: 'Idle', offset: 1.1 },
   ];
   const spectators = spectatorSpecs.map((sp) => {
     const loc = enuTrackToLatLonAlt(sp.x, sp.y, surfaceAltM() + sp.z, 'field');
-    const hpr = new Cesium.HeadingPitchRoll(Math.PI * 0.5 - Cesium.Math.toRadians(TRACK_ORIGINS.field.yawDeg || 0), 0, 0);
+    const hpr = new Cesium.HeadingPitchRoll(-Math.PI * 0.5 - Cesium.Math.toRadians(TRACK_ORIGINS.field.yawDeg || 0), 0, 0);
     const mat = Cesium.Transforms.headingPitchRollToFixedFrame(loc.cart, hpr);
     return { ...sp, actor: createSyncedActor(sp.url, mat), fixedLoc: loc.cart, fixedMat: mat };
   });
@@ -960,6 +1201,8 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
   const syncUi = (st) => {
     if (!uiRefs) return;
     uiRefs.bar.style.display = enabled ? 'flex' : 'none';
+    const stdWrap = uiRefs.bar.closest?.('.pfl-std-box');
+    if (stdWrap) stdWrap.style.display = enabled ? '' : 'none';
     if (!enabled) return;
     uiRefs.playBtn.textContent = playing ? '⏸ Pause' : '▶ Play';
     uiRefs.playBtn.style.background = playing ? '#059669' : '#0284c7';
@@ -999,10 +1242,13 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
       b.style.borderColor = m ? (id === 'free' ? '#2dd4bf' : '#e879f9') : '#475569';
     });
     const bKey = `${st.lisaScore}-${st.paulScore}-${Math.floor(st.t)}-${st.phaseLabel}`;
-    if (scoreboardCanvas && scoreboardEnt?.polygon && bKey !== lastBoardKey) {
+    if (scoreboardCanvases[0] && scoreboardMaterial?.uniforms && bKey !== lastBoardKey) {
       lastBoardKey = bKey;
-      drawScoreboardCanvas(scoreboardCanvas, st.lisaScore, st.paulScore, st.t, st.phaseLabel);
-      scoreboardEnt.polygon.material = new Cesium.ImageMaterialProperty({ image: scoreboardCanvas });
+      scoreboardBufIdx ^= 1;
+      const nextCanv = scoreboardCanvases[scoreboardBufIdx];
+      drawScoreboardCanvas(nextCanv, st.lisaScore, st.paulScore, st.t, st.phaseLabel);
+      scoreboardMaterial.uniforms.image = nextCanv;
+      governorRequestRender('soccer-scoreboard-tick');
     }
   };
 
@@ -1175,6 +1421,42 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
   }
+  const canvasEl = viewer?.scene?.canvas || null;
+  let widePtrDown = null;
+  const releaseWideOnUserInput = () => {
+    pendingDefaultWide = false;
+    if (camMode !== 'free') {
+      camMode = 'free';
+      buildGoalsAndPitch();
+      syncUi(curState);
+      governorRequestRender('lisa-soccer-user-free');
+    }
+  };
+  const onCanvasPointerDown = (e) => {
+    widePtrDown = { x: e.clientX, y: e.clientY };
+  };
+  const onCanvasPointerMove = (e) => {
+    if (widePtrDown && Math.hypot(e.clientX - widePtrDown.x, e.clientY - widePtrDown.y) > 6) {
+      widePtrDown = null;
+      releaseWideOnUserInput();
+    }
+  };
+  const onCanvasPointerUp = () => {
+    widePtrDown = null;
+  };
+  const onCanvasWheel = () => {
+    releaseWideOnUserInput();
+  };
+  if (canvasEl) {
+    canvasEl.addEventListener('pointerdown', onCanvasPointerDown, { passive: true });
+    canvasEl.addEventListener('pointermove', onCanvasPointerMove, { passive: true });
+    canvasEl.addEventListener('pointerup', onCanvasPointerUp, { passive: true });
+    canvasEl.addEventListener('pointercancel', onCanvasPointerUp, { passive: true });
+    canvasEl.addEventListener('wheel', onCanvasWheel, { passive: true });
+  }
+  const terrainUnsub = viewer?.scene?.terrainProviderChanged?.addEventListener?.(() => {
+    groundM = activeYardDatumM(viewer, TRACK_ORIGINS[trackMode].lon, TRACK_ORIGINS[trackMode].lat);
+  });
 
   if (uiRefs) {
     uiRefs.minBtn?.addEventListener('click', () => {
@@ -1215,6 +1497,7 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
     });
     uiRefs.bar.querySelectorAll('[data-soc-cam]').forEach((b) => {
       b.addEventListener('click', () => {
+        pendingDefaultWide = false;
         camMode = b.getAttribute('data-soc-cam') || 'free';
         buildGoalsAndPitch();
         applyFrameState(curState, camMode !== 'free');
@@ -1291,6 +1574,25 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
       groundM = activeYardDatumM(viewer, TRACK_ORIGINS[trackMode].lon, TRACK_ORIGINS[trackMode].lat);
     }
 
+    if (pendingDefaultWide && camMode === 'free' && !interactiveMode) {
+      const shareRestoring = Boolean(
+        typeof window !== 'undefined' && window.__pflShareRestoreActive,
+      );
+      const flying = cameraFlightActive(viewer?.camera);
+      if (isCameraNearYard() && !shareRestoring && !flying) {
+        if (!nearYardSettledAtMs) {
+          nearYardSettledAtMs = nowMs;
+        } else if (nowMs - nearYardSettledAtMs >= 450) {
+          pendingDefaultWide = false;
+          groundM = activeYardDatumM(viewer, TRACK_ORIGINS[trackMode].lon, TRACK_ORIGINS[trackMode].lat);
+          camMode = 'aerial3';
+          buildGoalsAndPitch();
+        }
+      } else {
+        nearYardSettledAtMs = 0;
+      }
+    }
+
     if (interactiveMode) {
       timelineT = (timelineT + dt * 0.5) % SOCCER_TIMELINE_DURATION_S;
       applyFrameState(stepInteractive(dt), false);
@@ -1316,8 +1618,10 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
     ballEnt.show = enabled;
     for (const id of staticEntityIds) {
       const e = viewer.entities.getById(id);
-      if (e) e.show = enabled && (id !== 'pfl-soccer-dolly1-rail' || camMode !== 'free');
+      if (e) e.show = enabled && (id !== 'pfl-soccer-dolly1-rail' || camMode === 'dolly1' || camMode === 'auto');
     }
+    if (scoreboardPrim) scoreboardPrim.show = enabled;
+    if (scoreboardPickEnt) scoreboardPickEnt.show = enabled;
     syncUi(curState);
     governorRequestRender('lisa-soccer-toggle');
     return enabled;
@@ -1342,6 +1646,7 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
       return trackMode;
     },
     setCameraMode: (m) => {
+      pendingDefaultWide = false;
       camMode = ['free', 'auto', 'dolly1', 'follow2', 'face4', 'aerial3'].includes(m) ? m : 'free';
       buildGoalsAndPitch();
       applyFrameState(curState, camMode !== 'free');
@@ -1366,11 +1671,27 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
         window.removeEventListener('keydown', onKeyDown);
         window.removeEventListener('keyup', onKeyUp);
       }
+      if (canvasEl) {
+        canvasEl.removeEventListener('pointerdown', onCanvasPointerDown);
+        canvasEl.removeEventListener('pointermove', onCanvasPointerMove);
+        canvasEl.removeEventListener('pointerup', onCanvasPointerUp);
+        canvasEl.removeEventListener('pointercancel', onCanvasPointerUp);
+        canvasEl.removeEventListener('wheel', onCanvasWheel);
+      }
+      try { terrainUnsub?.(); } catch {}
       for (const act of allActors) {
         try { act.model?.activeAnimations?.removeAll?.(); } catch {}
         try { if (act.model) viewer.scene.primitives.remove(act.model); } catch {}
       }
       try { viewer.entities.remove(ballEnt); } catch {}
+      if (scoreboardPrim) {
+        try { viewer.scene.primitives.remove(scoreboardPrim); } catch {}
+        scoreboardPrim = null;
+      }
+      if (scoreboardPickEnt) {
+        try { viewer.entities.remove(scoreboardPickEnt); } catch {}
+        scoreboardPickEnt = null;
+      }
       for (const id of staticEntityIds) {
         try { viewer.entities.removeById(id); } catch {}
       }
@@ -1383,6 +1704,9 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
         delete window.__pflSetSoccerTimeline;
         delete window.__pflAttachGlbToSoccerPath;
         delete window.__pflCaptureSnapshot;
+        if (window.__pflMovables?.['stadium-scoreboard']) {
+          delete window.__pflMovables['stadium-scoreboard'];
+        }
       }
     },
   };

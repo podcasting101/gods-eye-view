@@ -5,7 +5,12 @@ import {
   governorRequestRender,
 } from '../renderGovernor.js';
 import { activeYardDatumM } from './yardFrames.js';
-import { resolveTerrainGroundM } from './placedObjects.js';
+import {
+  resolveTerrainGroundM,
+  isFlatEllipsoidGlobe,
+  STORED_GROUND_HEIGHT_M,
+} from './placedObjects.js';
+import { cameraFlightActive } from '../render/cesium/internals.js';
 import { createSexWorldDemoTour } from './sexWorldDemoTour.js';
 import {
   parsePhotoMetadata,
@@ -226,6 +231,8 @@ export function loadPflWindowFramework({ viewer }) {
     if (cfg.height && cfg.height >= 120) box.style.height = cfg.height + 'px';
     let scale = Number(cfg.scale) || 1.0;
     box.style.fontSize = Math.round(12 * scale) + 'px';
+    box.style.transformOrigin = 'top left';
+    if (scale !== 1) box.style.transform = `scale(${scale})`;
     box.addEventListener('pointerdown', () => bringBoxToFront(box));
 
     const hdr = document.createElement('div');
@@ -339,12 +346,33 @@ export function loadPflWindowFramework({ viewer }) {
     defaultMinimized: true,
   });
 
+  const soccerBarEl = document.getElementById('pfl-soccer-timeline-bar');
+  if (soccerBarEl) {
+    const soccerWin = createStandardBox({
+      id: 'pfl-win-soccer-timeline',
+      title: '⚽ 3v3 STADIUM TIMELINE',
+      defaultLeft: 8,
+      defaultTop: Math.max(160, (window.innerHeight || 900) - 162),
+      defaultWidth: 465,
+      defaultMinimized: true,
+    });
+    soccerWin.box.style.zIndex = '9655';
+    soccerBarEl.style.cssText =
+      'position:static;width:100%;max-width:none;background:transparent;border:none;' +
+      'border-radius:0;padding:2px 0;box-shadow:none;backdrop-filter:none;' +
+      'display:flex;flex-direction:column;gap:6px;color:#e2e8f0;font-family:Inter,system-ui,sans-serif;font-size:11px';
+    const innerMinBtn = soccerBarEl.querySelector('#pfl-soc-min-btn');
+    if (innerMinBtn) innerMinBtn.style.display = 'none';
+    soccerWin.body.appendChild(soccerBarEl);
+  }
+
   // 🧲 Gather Boxes: neatly dock all floating PFL boxes into non-overlapping perimeter slots
   function gatherBoxes() {
     const vw = window.innerWidth || 1440;
     const vh = window.innerHeight || 900;
     const dockSlots = {
       'pfl-win-command-dock': { left: 8, top: 6, minimize: true },
+      'pfl-win-soccer-timeline': { left: 8, top: Math.max(160, vh - 162), minimize: true },
       'pfl-win-wyze-patrol': { left: 8, top: Math.max(240, vh - 86), minimize: true },
       'pfl-win-kalshi-arena': { left: 8, top: Math.max(200, vh - 124), minimize: true },
       'pfl-win-local-vault': { left: Math.min(390, Math.max(8, vw - 480)), top: Math.max(240, vh - 86), minimize: true },
@@ -738,6 +766,7 @@ export function loadPflWindowFramework({ viewer }) {
             <button type="button" class="pfl-std-cbtn" id="pfl-drag-speed-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Cycle mouse drag sensitivity">🐢 0.30×</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-reset-all-objects-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Reset House, Monaco RV, Lisa, Chair &amp; Yard Photos back to surveyed positions">↺ All</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-avatar-light-btn" style="border-color:#5eead4;color:#ccfbf1" title="Cycle uniform character illumination: Uniform Unlit (bright even at night) / Studio Fill / Scene Sun">🔆 Light: Uniform</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-bed-livewire-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Overlay live LiveWire DWPose skeleton &amp; rig onto Paul &amp; Lisa's rooftop Bed Photo">🛏️ Bed LiveWire: ON</button>
           </div>
           <label style="display:flex;justify-content:space-between;font-size:10px"><span>Heading (°)</span><span id="pfl-hdg-val">154°</span></label>
           <input type="range" id="pfl-hdg-slider" min="0" max="360" step="1" value="154" style="width:100%" />
@@ -1306,6 +1335,7 @@ export function loadPflWindowFramework({ viewer }) {
     'back-yard-cam2-water',
     'house-side-20261012',
     'back-yard-cam1-plan',
+    'stadium-scoreboard',
   ];
   function collectSceneLayoutSnapshot() {
     const pick = (k) => {
@@ -2069,7 +2099,7 @@ export function loadPflWindowFramework({ viewer }) {
   }
   function movableSupportsTilt(mov) {
     const kind = String(mov?.kind || '');
-    if (kind.startsWith('yardframe:')) return true;
+    if (kind.startsWith('yardframe:') || kind === 'stadium-scoreboard') return true;
     const st = mov?.getState?.();
     return Boolean(st && typeof st.tilt === 'number' && Number.isFinite(st.tilt));
   }
@@ -3010,8 +3040,18 @@ export function loadPflWindowFramework({ viewer }) {
         if (viewer?.camera?.frustum && 'near' in viewer.camera.frustum && c.height < 140) {
           viewer.camera.frustum.near = 0.08;
         }
-        const floorH = resolveLocalGroundM(lon, lat) + 0.85;
-        if (!droneOrbitState.active && c.height < floorH) {
+        const isFlying = cameraFlightActive(viewer?.camera);
+        const isShareRestoring = Boolean(
+          typeof window !== 'undefined' && window.__pflShareRestoreActive,
+        );
+        const nearLiverpool = Math.hypot(lat - 29.24755, lon - -95.23140) < 0.02;
+        const rawGround = resolveLocalGroundM(lon, lat);
+        const safeGround =
+          nearLiverpool && isFlatEllipsoidGlobe(viewer)
+            ? Math.min(rawGround, STORED_GROUND_HEIGHT_M)
+            : rawGround;
+        const floorH = safeGround + 0.85;
+        if (!droneOrbitState.active && !isFlying && !isShareRestoring && c.height < floorH) {
           viewer.camera.setView({
             destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, floorH),
             orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
@@ -3377,6 +3417,20 @@ export function loadPflWindowFramework({ viewer }) {
   compassWin.body.querySelector('#pfl-avatar-light-btn')?.addEventListener('click', () => {
     const order = ['bright', 'studio', 'sun'];
     applyGlobalAvatarLightMode(order[(order.indexOf(avatarLightMode) + 1) % order.length]);
+  });
+
+  const bedLwBtn = compassWin.body.querySelector('#pfl-bed-livewire-btn');
+  const syncBedLwBtn = (on) => {
+    if (!bedLwBtn) return;
+    bedLwBtn.textContent = on ? '🛏️ Bed LiveWire: ON' : '🛏️ Bed LiveWire: OFF';
+    bedLwBtn.style.borderColor = on ? '#38bdf8' : '#64748b';
+    bedLwBtn.style.color = on ? '#7dd3fc' : '#94a3b8';
+  };
+  syncBedLwBtn(window.__pflGetBedLiveWireState?.()?.enabled !== false);
+  bedLwBtn?.addEventListener('click', () => {
+    const cur = window.__pflGetBedLiveWireState?.()?.enabled !== false;
+    const next = window.__pflSetBedLiveWireOverlay ? window.__pflSetBedLiveWireOverlay(!cur) : !cur;
+    syncBedLwBtn(Boolean(next));
   });
 
   try {

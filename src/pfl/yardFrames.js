@@ -743,6 +743,267 @@ function syncQuadEntityShow(ent, visible) {
   }
 }
 
+const BED_LIVEWIRE_KEY = 'pfl_bed_livewire_overlay_v1';
+let _bedBaseImg = null;
+let _bedBaseImgLoading = false;
+let _bedLiveBufs = null;
+let _bedLiveBufIdx = 0;
+let _bedLiveCurrentCanvas = null;
+let _bedLivePollTimer = null;
+let _bedLiveInFlight = false;
+let _bedLiveOverlayOn = (() => {
+  try {
+    if (typeof localStorage === 'undefined') return true;
+    const raw = localStorage.getItem(BED_LIVEWIRE_KEY);
+    return raw === null ? true : raw !== '0' && raw !== 'false';
+  } catch {
+    return true;
+  }
+})();
+const _bedSmoothPaul = {};
+let _bedLastPayload = null;
+const _bedLiveStats = {
+  framesDrawn: 0,
+  paulDetected: false,
+  lastAgeSec: null,
+  fps: 0,
+  goLive: false,
+};
+
+function smoothJointMap(target, srcMap, alpha = 0.48) {
+  if (!srcMap || typeof srcMap !== 'object') return;
+  for (const [k, pt] of Object.entries(srcMap)) {
+    if (!Array.isArray(pt) || pt.length < 2) continue;
+    const nx = Number(pt[0]);
+    const ny = Number(pt[1]);
+    if (!Number.isFinite(nx) || !Number.isFinite(ny)) continue;
+    if (!target[k]) {
+      target[k] = [nx, ny];
+    } else {
+      target[k][0] += (nx - target[k][0]) * alpha;
+      target[k][1] += (ny - target[k][1]) * alpha;
+    }
+  }
+}
+
+function drawGlowLimbs(ctx, joints, pairs, sx, sy, color, glowColor, widthPx = 4.2) {
+  if (!joints) return;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = glowColor;
+  ctx.strokeStyle = glowColor;
+  ctx.lineWidth = widthPx + 3;
+  for (const [a, b] of pairs) {
+    const pA = joints[String(a)];
+    const pB = joints[String(b)];
+    if (!pA || !pB) continue;
+    ctx.beginPath();
+    ctx.moveTo(pA[0] * sx, pA[1] * sy);
+    ctx.lineTo(pB[0] * sx, pB[1] * sy);
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = widthPx;
+  for (const [a, b] of pairs) {
+    const pA = joints[String(a)];
+    const pB = joints[String(b)];
+    if (!pA || !pB) continue;
+    ctx.beginPath();
+    ctx.moveTo(pA[0] * sx, pA[1] * sy);
+    ctx.lineTo(pB[0] * sx, pB[1] * sy);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function compositeBedLiveWireFrame(viewer) {
+  if (typeof document === 'undefined' || !_bedBaseImg || !_bedBaseImg.naturalWidth) return false;
+  if (!_bedLiveBufs) {
+    const mk = () => {
+      const c = document.createElement('canvas');
+      c.width = 1024;
+      c.height = 578;
+      return c;
+    };
+    _bedLiveBufs = [mk(), mk()];
+  }
+  _bedLiveBufIdx ^= 1;
+  const canv = _bedLiveBufs[_bedLiveBufIdx];
+  const ctx = canv.getContext('2d');
+  if (!ctx) return false;
+
+  const W = canv.width;
+  const H = canv.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(_bedBaseImg, 0, 0, W, H);
+
+  if (_bedLiveOverlayOn && _bedLastPayload) {
+    const sx = W / 910;
+    const sy = H / 512;
+    const sp = _bedLastPayload.sparse_pose || {};
+    const tel = _bedLastPayload.telemetry || {};
+    smoothJointMap(_bedSmoothPaul, sp.paul_joints_2d || {}, 0.48);
+
+    // Paul DWPose Skeleton Overlay (translucent cyan/emerald rig matching real body pose & crossed ankles)
+    const pj = _bedSmoothPaul;
+    if (Object.keys(pj).length > 0) {
+      const polyIds = ['2', '5', '11', '8'];
+      if (polyIds.every((k) => pj[k])) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.22)';
+        ctx.beginPath();
+        polyIds.forEach((k, idx) => {
+          const x = pj[k][0] * sx;
+          const y = pj[k][1] * sy;
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      drawGlowLimbs(ctx, pj, [[0, 1], [0, 14], [0, 15], [14, 16], [15, 17]], sx, sy, '#e0f2fe', 'rgba(56,189,248,0.85)', 3.2);
+      drawGlowLimbs(ctx, pj, [[1, 2], [1, 5], [2, 8], [5, 11], [8, 11]], sx, sy, '#7dd3fc', 'rgba(14,165,233,0.9)', 4.4);
+      drawGlowLimbs(ctx, pj, [[2, 3], [3, 4], [5, 6], [6, 7]], sx, sy, '#38bdf8', 'rgba(56,189,248,0.9)', 4.2);
+      drawGlowLimbs(ctx, pj, [[8, 9], [9, 10]], sx, sy, '#22d3ee', 'rgba(6,182,212,0.92)', 4.8);
+      drawGlowLimbs(ctx, pj, [[11, 12], [12, 13]], sx, sy, '#34d399', 'rgba(16,185,129,0.92)', 4.8);
+
+      ctx.save();
+      for (const [k, pt] of Object.entries(pj)) {
+        const px = pt[0] * sx;
+        const py = pt[1] * sy;
+        ctx.fillStyle = k === '0' ? '#fde047' : '#ffffff';
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px, py, k === '0' ? 6.5 : 4.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      if (pj['0']) {
+        ctx.strokeStyle = 'rgba(250, 204, 21, 0.8)';
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.arc(pj['0'][0] * sx, pj['0'][1] * sy, 18, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Lisa Rig Zone Overlay (luminous magenta/rose)
+    const dz = sp.doll_zones_2d || {};
+    if (Object.keys(dz).length > 0) {
+      drawGlowLimbs(
+        ctx,
+        dz,
+        [
+          ['lips_face', 'neck_collar'],
+          ['right_shoulder', 'neck_collar'],
+          ['neck_collar', 'left_shoulder'],
+          ['right_shoulder', 'pussy_pelvis'],
+          ['left_shoulder', 'pussy_pelvis'],
+          ['waist_hip', 'pussy_pelvis'],
+          ['pussy_pelvis', 'knee_leg'],
+          ['knee_leg', 'feet_toes'],
+        ],
+        sx,
+        sy,
+        '#f472b6',
+        'rgba(236, 72, 153, 0.85)',
+        3.8,
+      );
+      ctx.save();
+      for (const pt of Object.values(dz)) {
+        if (!Array.isArray(pt) || pt.length < 2) continue;
+        ctx.fillStyle = '#fdf2f8';
+        ctx.strokeStyle = '#ec4899';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(pt[0] * sx, pt[1] * sy, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Sleek compact LiveWire status badge in upper-left corner
+    const badgeLabel = `● LIVEWIRE POSE · ${tel.paul_present ? 'PAUL LIVE' : 'STANDBY'} · ${Number(tel.fps || 0).toFixed(1)} FPS · ${String(tel.lisa_mood || 'WATCHING').slice(0, 20)}`;
+    ctx.save();
+    ctx.fillStyle = 'rgba(4, 9, 22, 0.78)';
+    ctx.strokeStyle = tel.paul_present ? 'rgba(56, 189, 248, 0.85)' : 'rgba(148, 163, 184, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.fillRect(14, 14, 520, 32);
+    ctx.strokeRect(14, 14, 520, 32);
+    ctx.fillStyle = tel.paul_present ? '#7dd3fc' : '#cbd5e1';
+    ctx.font = '700 14px "JetBrains Mono", monospace';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeLabel, 24, 30);
+    ctx.restore();
+  }
+
+  _bedLiveCurrentCanvas = canv;
+  _bedLiveStats.framesDrawn += 1;
+
+  const cur = viewer?.entities?.getById?.(ENTITY_PREFIX + 'bed-station-20261012');
+  if (cur?._pflQuadPrimitive?.appearance?.material?.uniforms) {
+    cur._pflQuadPrimitive.appearance.material.uniforms.image = canv;
+    governorRequestRender('bed-livewire-pose');
+  }
+  return true;
+}
+
+function startBedLiveWireLoop(viewer) {
+  if (typeof window === 'undefined' || typeof fetch !== 'function') return;
+  if (!_bedBaseImg && !_bedBaseImgLoading && typeof Image !== 'undefined') {
+    _bedBaseImgLoading = true;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      _bedBaseImg = img;
+      _bedBaseImgLoading = false;
+      compositeBedLiveWireFrame(viewer);
+    };
+    img.onerror = () => { _bedBaseImgLoading = false; };
+    img.src = '/yard-frames/bed-station-solar-2026-11-17.jpg';
+  }
+  window.__pflGetBedLiveWireState = () => ({ enabled: _bedLiveOverlayOn, ..._bedLiveStats });
+  window.__pflSetBedLiveWireOverlay = (on) => {
+    _bedLiveOverlayOn = Boolean(on);
+    try { localStorage.setItem(BED_LIVEWIRE_KEY, _bedLiveOverlayOn ? '1' : '0'); } catch {}
+    compositeBedLiveWireFrame(viewer);
+    return _bedLiveOverlayOn;
+  };
+  if (_bedLivePollTimer) return;
+  const pollOnce = async () => {
+    if (_bedLiveInFlight || !_bedLiveOverlayOn || !yardFramesVisible) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    _bedLiveInFlight = true;
+    try {
+      const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location?.hostname || '');
+      const url = isLocal ? 'http://127.0.0.1:8093/api/livewire/status' : '/api/livewire_relay.php';
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) return;
+      const d = await r.json();
+      if (!d || typeof d !== 'object') return;
+      _bedLastPayload = d;
+      _bedLiveStats.paulDetected = Boolean(d.telemetry?.paul_present || d.sparse_pose?.paul_joints_2d);
+      _bedLiveStats.lastAgeSec = d.age_sec ?? null;
+      _bedLiveStats.fps = Number(d.telemetry?.fps || 0);
+      _bedLiveStats.goLive = Boolean(d.go_live);
+      compositeBedLiveWireFrame(viewer);
+    } catch {
+      /* ignore transient offline */
+    } finally {
+      _bedLiveInFlight = false;
+    }
+  };
+  setTimeout(pollOnce, 400);
+  _bedLivePollTimer = setInterval(pollOnce, 600);
+}
+
 /** Build (or rebuild) the Cesium entity (and true-3D quad primitive when tilted/oblique) for one frame. */
 function buildFrameEntity(viewer, def, params) {
   const { positions, widthM, heightM, distanceM } = computeCorners(params, viewer);
@@ -754,16 +1015,22 @@ function buildFrameEntity(viewer, def, params) {
   }
   const opacity = typeof params.opacity === 'number' ? params.opacity : 1.0;
   const isCleanGarage = def.id === 'garage-carport-20261117';
+  const isBedLive = def.id === 'bed-station-20261012';
   const imgUrl =
     def.id === 'yard-overview-20261012' && params.stitchedPano
       ? (window.__pflLiveStitchUrl || '/yard-frames/front-yard-stitched-live.png?v=18')
       : def.id === 'back-yard-cam2-water' && params.stitchedWaterPano
         ? '/yard-frames/back-yard-cam2-stitched-2026-10-26.png'
         : def.image;
-  const initialImageSource = isCleanGarage && _cleanGarageCanvas ? _cleanGarageCanvas : imgUrl;
+  const initialImageSource =
+    isCleanGarage && _cleanGarageCanvas
+      ? _cleanGarageCanvas
+      : isBedLive && _bedLiveOverlayOn && _bedLiveCurrentCanvas
+        ? _bedLiveCurrentCanvas
+        : imgUrl;
   const isTranslucent = opacity < 0.99 || Boolean(params.stitchedPano) || Boolean(params.stitchedWaterPano);
   const useTrue3dQuad =
-    (!params.flat || Math.abs(Number(params.tiltDeg || 0)) >= 0.5) &&
+    (isBedLive || !params.flat || Math.abs(Number(params.tiltDeg || 0)) >= 0.5) &&
     typeof Cesium.Primitive === 'function' &&
     typeof Cesium.Geometry === 'function' &&
     Boolean(viewer?.scene?.primitives);
@@ -840,7 +1107,7 @@ function buildFrameEntity(viewer, def, params) {
         gImg.onerror = () => { _cleanGarageLoading = false; };
         gImg.src = imgUrl;
       }
-    } else if (!isCleanGarage) {
+    } else if (!isCleanGarage && !(isBedLive && _bedLiveCurrentCanvas)) {
       const pre = new Image();
       pre.onload = () => {
         governorRequestRender('yardframe-tex-ready');
@@ -1135,6 +1402,7 @@ export function loadYardFrames({ viewer }) {
       }
     };
   }
+  startBedLiveWireLoop(viewer);
   return {
     entities: viewer.entities,
     destroy: () => destroyYardFrames(viewer),
@@ -1143,6 +1411,10 @@ export function loadYardFrames({ viewer }) {
 
 /** Remove every yard-frame entity and editor surface owned by this module. */
 export function destroyYardFrames(viewer) {
+  if (_bedLivePollTimer) {
+    clearInterval(_bedLivePollTimer);
+    _bedLivePollTimer = null;
+  }
   if (typeof yardDatumCleanup === 'function') {
     try {
       yardDatumCleanup();

@@ -139,6 +139,7 @@ export class ShareLinkManager {
     this._destroyed = false;
     this._restoreGeneration = 0;
     this._activeCameraFlight = null;
+    this._terrainRestoreCleanup = null;
     this._isNavigationCurrent =
       typeof isNavigationCurrent === 'function'
         ? isNavigationCurrent
@@ -412,8 +413,31 @@ export class ShareLinkManager {
     let cameraPromise = Promise.resolve({
       status: applyCamera ? 'superseded' : 'skipped',
     });
+    const allowSubEllipsoid = () => {
+      if (!Number.isFinite(state.alt) || state.alt >= 5) return;
+      const ctrl = this.viewer?.scene?.screenSpaceCameraController;
+      if (ctrl) {
+        ctrl.enableCollisionDetection = false;
+        if ('minimumZoomDistance' in ctrl) {
+          ctrl.minimumZoomDistance = Math.min(Number(ctrl.minimumZoomDistance) || 1, 0.25);
+        }
+      }
+    };
+    let restoreGeneration = this._restoreGeneration;
+    let ownsShareRestoreLock = false;
     if (applyCamera && this._isNavigationCurrent(navigationToken)) {
-      const restoreGeneration = ++this._restoreGeneration;
+      this._terrainRestoreCleanup?.();
+      this._terrainRestoreCleanup = null;
+      allowSubEllipsoid();
+      restoreGeneration = ++this._restoreGeneration;
+      if (
+        typeof window !== 'undefined' &&
+        Number.isFinite(state.alt) &&
+        state.alt < 5
+      ) {
+        ownsShareRestoreLock = true;
+        window.__pflShareRestoreActive = restoreGeneration;
+      }
       let settleCamera;
       cameraPromise = new Promise((resolve) => {
         settleCamera = resolve;
@@ -444,6 +468,7 @@ export class ShareLinkManager {
             releaseOwnedFlight('superseded');
             return;
           }
+          allowSubEllipsoid();
           this._camera.setView(view);
           releaseOwnedFlight('applied');
         },
@@ -468,37 +493,105 @@ export class ShareLinkManager {
       if (panelState.specs.length === 0) panelState = null;
     }
     let restoreStatus = 'skipped';
-    if (this._onRestore) {
-      await this._onRestore({
-        style: visualCurrent ? state.style : undefined,
-        bloom: visualCurrent ? state.bloom : undefined,
-        sharpen: visualCurrent ? state.sharpen : undefined,
-        bloomIntensity: visualCurrent ? state.bloomIntensity : undefined,
-        bloomVersion: visualCurrent ? state.bloomVersion : undefined,
-        sharpenIntensity: visualCurrent ? state.sharpenIntensity : undefined,
-        hudVariant: visualCurrent ? state.hudVariant : undefined,
-        hudVisible: visualCurrent ? state.hudVisible : undefined,
-        detectionMode: visualCurrent ? state.detectionMode : undefined,
-        detectionDensity: visualCurrent ? state.detectionDensity : undefined,
-        detectionAllocation: visualCurrent
-          ? state.detectionAllocation
-          : undefined,
-        detectionFadePct: visualCurrent ? state.detectionFadePct : undefined,
-        detectionOutsideOpacityPct: visualCurrent
-          ? state.detectionOutsideOpacityPct
-          : undefined,
-        celestialRing: visualCurrent ? state.celestialRing : undefined,
-        scopeEnabled: visualCurrent ? state.scopeEnabled : undefined,
-        scopeFeatherPct: visualCurrent ? state.scopeFeatherPct : undefined,
-        scopeOpacityPct: visualCurrent ? state.scopeOpacityPct : undefined,
-        scopeTerminusPct: visualCurrent ? state.scopeTerminusPct : undefined,
-        mapStack: mapCurrent ? state.mapStack : undefined,
-        panelState,
-        styleParams: visualCurrent ? state.styleParams : undefined,
-      });
-      restoreStatus = 'applied';
+    let camera;
+    try {
+      if (this._onRestore) {
+        await this._onRestore({
+          style: visualCurrent ? state.style : undefined,
+          bloom: visualCurrent ? state.bloom : undefined,
+          sharpen: visualCurrent ? state.sharpen : undefined,
+          bloomIntensity: visualCurrent ? state.bloomIntensity : undefined,
+          bloomVersion: visualCurrent ? state.bloomVersion : undefined,
+          sharpenIntensity: visualCurrent ? state.sharpenIntensity : undefined,
+          hudVariant: visualCurrent ? state.hudVariant : undefined,
+          hudVisible: visualCurrent ? state.hudVisible : undefined,
+          detectionMode: visualCurrent ? state.detectionMode : undefined,
+          detectionDensity: visualCurrent ? state.detectionDensity : undefined,
+          detectionAllocation: visualCurrent
+            ? state.detectionAllocation
+            : undefined,
+          detectionFadePct: visualCurrent ? state.detectionFadePct : undefined,
+          detectionOutsideOpacityPct: visualCurrent
+            ? state.detectionOutsideOpacityPct
+            : undefined,
+          celestialRing: visualCurrent ? state.celestialRing : undefined,
+          scopeEnabled: visualCurrent ? state.scopeEnabled : undefined,
+          scopeFeatherPct: visualCurrent ? state.scopeFeatherPct : undefined,
+          scopeOpacityPct: visualCurrent ? state.scopeOpacityPct : undefined,
+          scopeTerminusPct: visualCurrent ? state.scopeTerminusPct : undefined,
+          mapStack: mapCurrent ? state.mapStack : undefined,
+          panelState,
+          styleParams: visualCurrent ? state.styleParams : undefined,
+        });
+        allowSubEllipsoid();
+        restoreStatus = 'applied';
+      }
+      camera = await cameraPromise;
+      if (
+        applyCamera &&
+        camera.status === 'applied' &&
+        !this._destroyed &&
+        restoreGeneration === this._restoreGeneration &&
+        this._isNavigationCurrent(navigationToken) &&
+        Number.isFinite(state.alt) &&
+        state.alt < 5
+      ) {
+        allowSubEllipsoid();
+        const settledPose = this._camera.pose?.();
+        if (
+          Number.isFinite(settledPose?.height) &&
+          Math.abs(settledPose.height - state.alt) > 0.5
+        ) {
+          this._camera.setView(view);
+        }
+        const terrainChanged = this.viewer?.scene?.terrainProviderChanged;
+        if (terrainChanged?.addEventListener) {
+          let timerId = null;
+          let off = null;
+          const cleanup = () => {
+            if (timerId !== null) {
+              clearTimeout(timerId);
+              timerId = null;
+            }
+            if (typeof off === 'function') {
+              try {
+                off();
+              } catch {}
+              off = null;
+            }
+            if (this._terrainRestoreCleanup === cleanup) {
+              this._terrainRestoreCleanup = null;
+            }
+          };
+          const onTerrain = () => {
+            if (
+              this._destroyed ||
+              restoreGeneration !== this._restoreGeneration ||
+              !this._isNavigationCurrent(navigationToken)
+            ) {
+              cleanup();
+              return;
+            }
+            allowSubEllipsoid();
+            const curH = this._camera.pose?.()?.height;
+            if (Number.isFinite(curH) && Math.abs(curH - state.alt) > 0.5) {
+              this._camera.setView(view);
+            }
+          };
+          off = terrainChanged.addEventListener(onTerrain);
+          timerId = setTimeout(cleanup, 6000);
+          this._terrainRestoreCleanup = cleanup;
+        }
+      }
+    } finally {
+      if (
+        ownsShareRestoreLock &&
+        typeof window !== 'undefined' &&
+        window.__pflShareRestoreActive === restoreGeneration
+      ) {
+        window.__pflShareRestoreActive = false;
+      }
     }
-    const camera = await cameraPromise;
     return {
       succeeded: !this._destroyed,
       camera: camera.status,
@@ -834,6 +927,8 @@ export class ShareLinkManager {
     this._restoreGeneration += 1;
     this._activeCameraFlight = null;
     this._destroyed = true;
+    this._terrainRestoreCleanup?.();
+    this._terrainRestoreCleanup = null;
     clearTimeout(this._debounceTimer);
     this._debounceTimer = null;
     for (const off of this._cameraOffs.splice(0)) off();
