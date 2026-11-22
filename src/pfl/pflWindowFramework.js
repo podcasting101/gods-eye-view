@@ -7122,9 +7122,14 @@ export function loadPflWindowFramework({ viewer }) {
     const rw = Math.round(rect.width);
     const rh = Math.round(rect.height);
     if (rw < 20 || rh < 20) return;
-    const scale = Math.min(1, Math.sqrt(135000 / Math.max(1, rw * rh)));
-    const nextW = Math.max(160, Math.min(640, Math.round(rw * scale)));
-    const nextH = Math.max(120, Math.min(480, Math.round(rh * scale)));
+    const scale = Math.min(
+      1,
+      Math.sqrt(135000 / Math.max(1, rw * rh)),
+      640 / rw,
+      480 / rh,
+    );
+    const nextW = Math.max(160, Math.round(rw * scale));
+    const nextH = Math.max(120, Math.round(rh * scale));
     if (canvas360.width !== nextW || canvas360.height !== nextH) {
       canvas360.width = nextW;
       canvas360.height = nextH;
