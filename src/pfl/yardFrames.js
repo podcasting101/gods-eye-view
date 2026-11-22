@@ -192,35 +192,35 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'bed-station-20261012': {
     hiddenByStitch: false,
-    camLat: 29.247605,
-    camLon: -95.231412,
-    camHeightM: 0.32,
-    // Photo space: headboard at upper-right, bed axis (head -> feet) points down-left at ~240° math-angle,
-    // so a heading of 60° rotates the photo clockwise until the feet point Due West (270°) & headboard Due East.
-    headingDeg: 60,
+    camLat: 29.247582,
+    camLon: -95.231355,
+    camHeightM: 7.95,
+    // Photo space: headboard at upper-right, bed axis (head -> feet) rotated so feet face Due East.
+    headingDeg: 240,
     pitchDeg: -5,
     distanceM: 2.5,
     fovHDeg: 68,
     fovVDeg: 38,
     widthScale: 1.0,
     rollDeg: 0,
-    sizeScale: 1.0,
+    sizeScale: 1.65,
     flat: true,
     texRot: 0,
   },
   'garage-carport-20261117': {
     hiddenByStitch: false,
-    camLat: 29.247568,
-    camLon: -95.231238,
-    camHeightM: 2.1,
+    camLat: 29.2475215,
+    camLon: -95.2311206,
+    camHeightM: 3.8,
     headingDeg: 194,
     pitchDeg: -5,
-    distanceM: 2.45,
-    fovHDeg: 78,
-    fovVDeg: 45,
+    distanceM: 4.5,
+    fovHDeg: 86,
+    fovVDeg: 52,
     widthScale: 1.0,
+    sizeScale: 1.0,
     rollDeg: 0,
-    flat: false,
+    flat: true,
     texRot: 0,
   },
 };
@@ -323,6 +323,11 @@ function loadSavedLayout() {
         fixedFeetDueWestAndGarageV21: true,
         fixedBedQueenDueWestV22: true,
         fixedGarageCleanBayV23: true,
+        fixedLot23AlignedV24: true,
+        restoredYardTeslaV25: true,
+        fixedSaveFlagsBugV26: true,
+        restoredPaulGarageAndBedV27: true,
+        userEditedIds: [],
         savedAt: new Date().toISOString(),
         frames: { ...CALIBRATED_HOUSE_SURVEY },
       };
@@ -331,8 +336,10 @@ function loadSavedLayout() {
     }
     const parsed = JSON.parse(raw);
     const frames = (parsed && parsed.frames) || {};
+    const userEdited = new Set(Array.isArray(parsed?.userEditedIds) ? parsed.userEditedIds : []);
     if (parsed && !parsed.fixedRoofGluedNoParallaxV20) {
       for (const id of Object.keys(CALIBRATED_HOUSE_SURVEY)) {
+        if (userEdited.has(id)) continue;
         frames[id] = {
           ...(frames[id] || {}),
           ...CALIBRATED_HOUSE_SURVEY[id],
@@ -350,6 +357,7 @@ function loadSavedLayout() {
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     } else if (parsed && !parsed.fixedFeetDueWestAndGarageV21) {
       for (const id of ['bed-station-20261012', 'garage-carport-20261117']) {
+        if (userEdited.has(id)) continue;
         frames[id] = {
           ...(frames[id] || {}),
           ...CALIBRATED_HOUSE_SURVEY[id],
@@ -360,25 +368,30 @@ function loadSavedLayout() {
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
     if (parsed && !parsed.fixedBedQueenDueWestV22) {
-      frames['bed-station-20261012'] = {
-        ...(frames['bed-station-20261012'] || {}),
-        ...CALIBRATED_HOUSE_SURVEY['bed-station-20261012'],
-      };
+      if (!userEdited.has('bed-station-20261012')) {
+        frames['bed-station-20261012'] = {
+          ...(frames['bed-station-20261012'] || {}),
+          ...CALIBRATED_HOUSE_SURVEY['bed-station-20261012'],
+        };
+      }
       parsed.fixedBedQueenDueWestV22 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
     if (parsed && !parsed.fixedGarageCleanBayV23) {
-      frames['garage-carport-20261117'] = {
-        ...(frames['garage-carport-20261117'] || {}),
-        ...CALIBRATED_HOUSE_SURVEY['garage-carport-20261117'],
-      };
+      if (!userEdited.has('garage-carport-20261117')) {
+        frames['garage-carport-20261117'] = {
+          ...(frames['garage-carport-20261117'] || {}),
+          ...CALIBRATED_HOUSE_SURVEY['garage-carport-20261117'],
+        };
+      }
       parsed.fixedGarageCleanBayV23 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
     if (parsed && !parsed.fixedLot23AlignedV24) {
-      for (const id of ['yard-overview-20261012', 'back-yard-cam2-water', 'bed-station-20261012', 'garage-carport-20261117']) {
+      for (const id of ['yard-overview-20261012', 'back-yard-cam2-water']) {
+        if (userEdited.has(id)) continue;
         frames[id] = {
           ...(frames[id] || {}),
           ...CALIBRATED_HOUSE_SURVEY[id],
@@ -390,12 +403,29 @@ function loadSavedLayout() {
     }
     if (parsed && !parsed.restoredYardTeslaV25) {
       for (const id of ['yard-overview-20261012']) {
+        if (userEdited.has(id)) continue;
         frames[id] = {
           ...(frames[id] || {}),
           ...CALIBRATED_HOUSE_SURVEY[id],
         };
       }
       parsed.restoredYardTeslaV25 = true;
+      parsed.frames = frames;
+      window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
+    }
+    if (parsed && !parsed.restoredPaulGarageAndBedV27) {
+      const prevGarageScale = Number(frames['garage-carport-20261117']?.sizeScale);
+      frames['garage-carport-20261117'] = {
+        ...(frames['garage-carport-20261117'] || {}),
+        ...CALIBRATED_HOUSE_SURVEY['garage-carport-20261117'],
+        ...(prevGarageScale > 1.05 ? { sizeScale: Math.min(3.5, prevGarageScale) } : {}),
+      };
+      frames['bed-station-20261012'] = {
+        ...(frames['bed-station-20261012'] || {}),
+        ...CALIBRATED_HOUSE_SURVEY['bed-station-20261012'],
+      };
+      parsed.fixedSaveFlagsBugV26 = true;
+      parsed.restoredPaulGarageAndBedV27 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -721,6 +751,28 @@ function buildFrameEntity(viewer, def, params) {
 // Live registry: id -> { def, params, entity, mov }.
 const frameState = new Map();
 
+function getBaseDistanceM(id) {
+  return (
+    CALIBRATED_HOUSE_SURVEY[id]?.distanceM ||
+    frameState.get(id)?.def?.distanceM ||
+    DEFAULT_DISTANCE_M
+  );
+}
+
+/** Adjust quad size via `sizeScale` for flat movables so Object Pad & cloud layout stay in sync. */
+function applyFrameSizeParam(id, p, targetDistM, deltaM = 0) {
+  const st = frameState.get(id);
+  if (st?.mov && p.flat) {
+    const baseDist = getBaseDistanceM(id);
+    const curScale = typeof p.sizeScale === 'number' && p.sizeScale > 0 ? p.sizeScale : 1;
+    const nextEff = targetDistM != null ? targetDistM : baseDist * curScale + deltaM;
+    p.distanceM = baseDist;
+    p.sizeScale = Math.max(0.25, Math.min(3.5, nextEff / baseDist));
+    return;
+  }
+  p.distanceM = targetDistM != null ? targetDistM : p.distanceM + deltaM;
+}
+
 function rebuildFrame(viewer, id) {
   const st = frameState.get(id);
   if (!st) return null;
@@ -737,14 +789,23 @@ function rebuildFrame(viewer, id) {
   return st.entity;
 }
 
-function saveLayout() {
+function saveLayout(editedId = null) {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return;
+    let prev = {};
+    try {
+      const rawPrev = window.localStorage.getItem(LAYOUT_KEY);
+      if (rawPrev) prev = JSON.parse(rawPrev) || {};
+    } catch {}
+    const userEditedSet = new Set(Array.isArray(prev.userEditedIds) ? prev.userEditedIds : []);
+    const targetId = editedId === false ? null : (editedId || (typeof editor !== 'undefined' && editor?.selectedId) || null);
+    if (targetId) userEditedSet.add(targetId);
     const frames = {};
     for (const [id, st] of frameState) frames[id] = { ...st.params };
     window.localStorage.setItem(
       LAYOUT_KEY,
       JSON.stringify({
+        ...prev,
         version: 1,
         fixedSidewaysRoadV1: true,
         fixedHouseSurveyV3: true,
@@ -761,6 +822,11 @@ function saveLayout() {
         fixedFeetDueWestAndGarageV21: true,
         fixedBedQueenDueWestV22: true,
         fixedGarageCleanBayV23: true,
+        fixedLot23AlignedV24: true,
+        restoredYardTeslaV25: true,
+        fixedSaveFlagsBugV26: true,
+        restoredPaulGarageAndBedV27: true,
+        userEditedIds: Array.from(userEditedSet),
         savedAt: new Date().toISOString(),
         frames,
       }),
@@ -846,7 +912,7 @@ export function loadYardFrames({ viewer }) {
           params.hiddenByStitch = false;
           const rebuilt = rebuildFrame(viewer, f.id);
           if (rebuilt) rebuilt._pflMovable = mov;
-          saveLayout();
+          saveLayout(patch?._autoSync ? false : f.id);
           governorRequestRender('pfl-move-yardframe');
         },
       };
@@ -1080,7 +1146,14 @@ function refreshPanel() {
   }
   if (sizeSlider) {
     sizeSlider.disabled = !st;
-    if (st) sizeSlider.value = String(st.params.distanceM || DEFAULT_DISTANCE_M);
+    if (st) {
+      const sizeScale = typeof st.params.sizeScale === 'number' && st.params.sizeScale > 0 ? st.params.sizeScale : 1;
+      sizeSlider.value = String(
+        st.mov && st.params.flat
+          ? (st.params.distanceM || getBaseDistanceM(st.def.id)) * sizeScale
+          : (st.params.distanceM || DEFAULT_DISTANCE_M),
+      );
+    }
   }
   if (widthSlider) {
     widthSlider.disabled = !st;
@@ -1121,7 +1194,8 @@ function applyChange(viewer, id, mutate, opts = {}) {
     pinFrameCenterGeo(st.params, centerBefore);
   }
   rebuildFrame(viewer, id);
-  saveLayout();
+  saveLayout(id);
+  if (typeof window !== 'undefined') window.__pflNotifyYardFrameUserEdit?.(id);
 }
 
 function nudgeParams(p, northM, eastM) {
@@ -1183,9 +1257,13 @@ function installHandlers(viewer) {
   }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
   const endDrag = () => {
     if (!editor || !editor.dragging) return;
+    const movedId = editor.selectedId;
     editor.dragging = false;
     viewer.scene.screenSpaceCameraController.enableInputs = true;
-    saveLayout();
+    saveLayout(movedId);
+    if (typeof window !== 'undefined' && movedId) {
+      window.__pflNotifyYardFrameUserEdit?.(movedId);
+    }
   };
   handler.setInputAction(endDrag, Cesium.ScreenSpaceEventType.LEFT_UP);
   editor.endDrag = endDrag;
@@ -1238,15 +1316,11 @@ function installHandlers(viewer) {
         break;
       case '-':
       case '_':
-        change((p) => {
-          p.distanceM -= STEP.sizeM;
-        }, true);
+        change((p) => applyFrameSizeParam(id, p, null, -STEP.sizeM), true);
         break;
       case '=':
       case '+':
-        change((p) => {
-          p.distanceM += STEP.sizeM;
-        }, true);
+        change((p) => applyFrameSizeParam(id, p, null, STEP.sizeM), true);
         break;
       case '[':
         change((p) => {
@@ -1507,9 +1581,8 @@ function buildPanel(viewer) {
   };
 
   makeSliderRow('Size', 'size-slider', 1.5, 18, 0.1, 6.5, (v) => {
-    applyChange(viewer, editor.selectedId, (p) => {
-      p.distanceM = v;
-    }, { lockCenter: true });
+    const id = editor.selectedId;
+    applyChange(viewer, id, (p) => applyFrameSizeParam(id, p, v), { lockCenter: true });
   });
   makeSliderRow('Width', 'width-slider', 0.45, 1.35, 0.01, 0.85, (v) => {
     applyChange(viewer, editor.selectedId, (p) => {
@@ -1536,10 +1609,10 @@ function buildPanel(viewer) {
     return b;
   };
   addBtn('Smaller −', (p) => {
-    p.distanceM -= STEP.sizeM;
+    if (editor?.selectedId) applyFrameSizeParam(editor.selectedId, p, null, -STEP.sizeM);
   }, { lockCenter: true, className: 'gev-preset' });
   addBtn('Bigger +', (p) => {
-    p.distanceM += STEP.sizeM;
+    if (editor?.selectedId) applyFrameSizeParam(editor.selectedId, p, null, STEP.sizeM);
   }, { lockCenter: true, className: 'gev-preset' });
   addBtn('Narrower ◂', (p) => {
     p.widthScale = (typeof p.widthScale === 'number' ? p.widthScale : 1) - STEP.widthScale;

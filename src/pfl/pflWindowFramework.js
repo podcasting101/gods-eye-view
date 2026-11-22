@@ -68,6 +68,10 @@ export function loadPflWindowFramework({ viewer }) {
       min-height: 34px !important;
       resize: none !important;
     }
+    #pfl-win-command-dock.pfl-minimized {
+      width: auto !important;
+      max-width: calc(100vw - 16px) !important;
+    }
     #pfl-dual-pads-grid {
       width: 100%;
       display: grid;
@@ -102,7 +106,8 @@ export function loadPflWindowFramework({ viewer }) {
         max-width: 248px !important;
       }
       #pfl-win-command-dock.pfl-minimized {
-        max-width: 392px !important;
+        width: auto !important;
+        max-width: calc(100vw - 16px) !important;
         box-sizing: border-box !important;
       }
       #pfl-win-command-dock.pfl-minimized .pfl-compact-hide {
@@ -400,10 +405,20 @@ export function loadPflWindowFramework({ viewer }) {
       titleSpan.innerHTML = '🧭 <span class="pfl-compact-hide">PFL </span>CMD<span class="pfl-compact-hide"> DOCK</span>';
     }
     const ctrlsEl = cmdWin.box.querySelector('.pfl-std-ctrls');
+    const hdrHolodeckBtn = document.createElement('a');
+    hdrHolodeckBtn.id = 'pfl-hdr-holodeck-btn';
+    hdrHolodeckBtn.href = IS_LOCAL_NODE ? 'http://127.0.0.1:8766/' : '/holodeck/';
+    hdrHolodeckBtn.target = '_blank';
+    hdrHolodeckBtn.rel = 'noopener';
+    hdrHolodeckBtn.className = 'pfl-std-cbtn';
+    hdrHolodeckBtn.title = 'Enter the 3D Gaussian Splat Holodeck Server';
+    hdrHolodeckBtn.style.cssText = 'background:rgba(34,211,238,0.22);border-color:#22d3ee;color:#67e8f9;text-decoration:none;white-space:nowrap;flex-shrink:0;font-weight:700';
+    hdrHolodeckBtn.innerHTML = '🌐 Holodeck';
+
     const rbacPill = document.createElement('span');
     rbacPill.id = 'pfl-rbac-pill';
     rbacPill.className = 'pfl-std-cbtn';
-    rbacPill.title = 'WordPress Session & Role-Based Scene Access';
+    rbacPill.title = 'Active login status badge (Admin = your 3D object moves & sizes auto-save globally; Guests edit locally only)';
     rbacPill.style.cssText = 'border-color:#38bdf8;color:#7dd3fc;white-space:nowrap;flex-shrink:0;cursor:default';
     rbacPill.textContent = IS_LOCAL_NODE ? '👑 Local Admin' : '👁️ Guest';
 
@@ -411,7 +426,7 @@ export function loadPflWindowFramework({ viewer }) {
     gatherBtn.type = 'button';
     gatherBtn.id = 'pfl-btn-gather-boxes';
     gatherBtn.className = 'pfl-std-cbtn';
-    gatherBtn.title = 'Snap every floating PFL box back into view';
+    gatherBtn.title = 'Snap all open floating UI windows back on screen (does not move 3D house/RV/photos)';
     gatherBtn.innerHTML = '🧲<span class="pfl-compact-hide"> Gather</span>';
     gatherBtn.style.cssText = 'border-color:#facc15;color:#fde047';
     gatherBtn.addEventListener('click', gatherBoxes);
@@ -419,13 +434,13 @@ export function loadPflWindowFramework({ viewer }) {
     resetBtn.type = 'button';
     resetBtn.id = 'pfl-btn-reset-layout';
     resetBtn.className = 'pfl-std-cbtn';
-    resetBtn.title = 'Forget saved window positions and reload the default layout';
+    resetBtn.title = 'Reset floating UI window positions/sizes to default corners and reload (keeps your saved 3D scene)';
     resetBtn.innerHTML = '♻️<span class="pfl-compact-hide"> Reset</span>';
     resetBtn.addEventListener('click', () => {
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
       window.location.reload();
     });
-    ctrlsEl?.prepend(rbacPill, gatherBtn, resetBtn);
+    ctrlsEl?.prepend(hdrHolodeckBtn, rbacPill, gatherBtn, resetBtn);
   }
 
   setTimeout(() => {
@@ -785,7 +800,7 @@ export function loadPflWindowFramework({ viewer }) {
   let sync360SphereEntities = () => {};
   let walkCollisionsOn = true;
   const HOUSE_DEFAULT_POSE = { lat: 29.2475785, lon: -95.231348, heading: 99, lift: -0.5, scale: 1, opacity: 1 };
-  const MONACO_DEFAULT_POSE = { lat: 29.2474517, lon: -95.2312069, heading: 194, lift: 0, scale: 1, opacity: 1 };
+  const MONACO_DEFAULT_POSE = { lat: 29.2474149, lon: -95.2311799, heading: 24, lift: 0, scale: 1, opacity: 1 };
   const DOCK_DEFAULT_POSE = { lat: 29.247786, lon: -95.231388, heading: 14, lift: 0, scale: 1, opacity: 1 };
 
   function houseLocalToGeo(localEastM, localNorthM, hState = null) {
@@ -1256,6 +1271,17 @@ export function loadPflWindowFramework({ viewer }) {
     }, 1200);
   }
 
+  window.__pflNotifyYardFrameUserEdit = (frameId) => {
+    if (isGlobalEditAllowed()) {
+      try { localStorage.setItem(SCENE_LAYOUT_TS_KEY, String(Date.now())); } catch {}
+      scheduleAdminAutoPublish();
+    }
+    if (activeMovable && activeMovable.kind === `yardframe:${frameId}`) {
+      syncObjectSliders(activeMovable);
+      syncActiveMovableGizmo();
+    }
+  };
+
   function applyPublishedSceneLayout(layoutObj, retryMissing = true) {
     if (!layoutObj || typeof layoutObj !== 'object') return;
     const objs = layoutObj.objects && typeof layoutObj.objects === 'object' ? layoutObj.objects : {};
@@ -1279,6 +1305,7 @@ export function loadPflWindowFramework({ viewer }) {
             lift: Number(pose.lift ?? 0),
             scale: Number(pose.scale ?? 1) || 1,
             opacity: Number.isFinite(Number(pose.opacity)) ? Number(pose.opacity) : 1,
+            _autoSync: true,
           });
         } catch {}
       }
@@ -3521,6 +3548,7 @@ export function loadPflWindowFramework({ viewer }) {
         <button type="button" class="pfl-std-cbtn" id="pfl-drop-pad-btn" style="border-color:#4ade80;color:#4ade80" title="Drop a persistent Second-Life teleport pad at your exact current camera position, angle &amp; lens FOV">➕ Drop Pad Here</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-enter-holodeck-btn" style="border-color:#a855f7;color:#e9d5ff" title="${IS_LOCAL_NODE ? 'Step through the 1S788 Carport Portal into the 3D Gaussian Splat Holodeck Hallway (:8766)' : 'Step through the 1S788 Cloud Holodeck Portal into your hosted 3D Gaussian Splats (/holodeck/)'}">${IS_LOCAL_NODE ? '🚪 Enter Holodeck Hallway (:8766)' : '🚪 Enter Cloud Holodeck (/holodeck/)'}</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-house-3d-toggle" style="border-color:#fbbf24;color:#fde047" title="Toggle 3D 417 Palm Dr Yellow Coastal House GLB model &amp; auto-elevate Bed photo onto upstairs west-bedroom roof">🏠 3D House: ON</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-world-labels-toggle" style="border-color:#38bdf8;color:#7dd3fc" title="Show or hide floating 3D text labels &amp; map tags so you can inspect clean ground-level views (keeps 3D models, spheres &amp; photos visible)">🏷️ Labels: ON</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-yard-splat-toggle" style="border-color:rgba(148,163,184,0.35);color:#94a3b8" title="Toggle self-hosted 417 Palm Dr Front Yard 3D Gaussian Point Splat tileset">✨ Yard 3D Splat: OFF</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-walk-collisions-toggle" style="border-color:#4ade80;color:#86efac" title="Toggle solid 3D wall colliders with Front, Carport &amp; Bayou Doorways">🧱 Collisions: ON</button>
         <button type="button" class="pfl-std-cbtn" id="pfl-s788-canopy-toggle" style="border-color:rgba(148,163,184,0.35);color:#94a3b8" title="Toggle 3D engineering wireframe of MIL-STD S-788/G shelters (102&quot;L × 84&quot;W × 67&quot;H = 2.59m × 2.13m × 1.70m) + 11ft (3.35m) walk-through overhead solar canopy">🏗️ S-788 &amp; 11ft Canopy: OFF</button>
@@ -3978,9 +4006,9 @@ export function loadPflWindowFramework({ viewer }) {
       if (!bedMov) return;
       const bst = bedMov.getState();
       if (isOnAndLoaded && Number(bst.lift || 0) < 4.0) {
-        bedMov.update({ lift: 7.95 });
+        bedMov.update({ lift: 7.95, _autoSync: true });
       } else if (!isOnAndLoaded && Number(bst.lift || 0) > 4.0) {
-        bedMov.update({ lift: 0.35 });
+        bedMov.update({ lift: 0.35, _autoSync: true });
       }
     } catch {}
   };
@@ -4000,6 +4028,56 @@ export function loadPflWindowFramework({ viewer }) {
     buildYard3dLandmarks();
     governorRequestRender('pfl-house-toggle');
   });
+
+  const WORLD_LABELS_KEY = 'pfl_world_labels_on_v1';
+  let worldLabelsOn = true;
+  try {
+    const rawLbl = localStorage.getItem(WORLD_LABELS_KEY);
+    if (rawLbl !== null) worldLabelsOn = rawLbl !== 'false';
+  } catch {}
+  const worldLabelsBtn = telepresenceDeck.querySelector('#pfl-world-labels-toggle');
+  const setEntityLabelsVisible = (ent, visible) => {
+    if (!ent) return;
+    try {
+      if (ent.billboard) ent.billboard.show = visible;
+      if (ent.label) ent.label.show = visible;
+    } catch {}
+  };
+  const applyWorldLabelsVisibility = () => {
+    try {
+      for (const ent of viewer?.entities?.values || []) setEntityLabelsVisible(ent, worldLabelsOn);
+      const dsCount = viewer?.dataSources?.length || 0;
+      for (let i = 0; i < dsCount; i++) {
+        const ds = viewer.dataSources.get(i);
+        for (const ent of ds?.entities?.values || []) setEntityLabelsVisible(ent, worldLabelsOn);
+      }
+    } catch {}
+    governorRequestRender('pfl-world-labels');
+  };
+  const syncLabelsBtnUi = () => {
+    if (!worldLabelsBtn) return;
+    worldLabelsBtn.textContent = worldLabelsOn ? '🏷️ Labels: ON' : '🏷️ Labels: OFF';
+    worldLabelsBtn.style.borderColor = worldLabelsOn ? '#38bdf8' : 'rgba(148,163,184,0.35)';
+    worldLabelsBtn.style.color = worldLabelsOn ? '#7dd3fc' : '#94a3b8';
+  };
+  const setWorldLabels = (on) => {
+    worldLabelsOn = Boolean(on);
+    try { localStorage.setItem(WORLD_LABELS_KEY, String(worldLabelsOn)); } catch {}
+    syncLabelsBtnUi();
+    applyWorldLabelsVisibility();
+    return worldLabelsOn;
+  };
+  syncLabelsBtnUi();
+  worldLabelsBtn?.addEventListener('click', () => setWorldLabels(!worldLabelsOn));
+  window.__pflSetWorldLabels = setWorldLabels;
+  try {
+    viewer?.entities?.collectionChanged?.addEventListener?.((_col, added) => {
+      if (!worldLabelsOn && Array.isArray(added)) {
+        for (const ent of added) setEntityLabelsVisible(ent, false);
+      }
+    });
+  } catch {}
+  if (!worldLabelsOn) setTimeout(applyWorldLabelsVisibility, 1200);
 
   const S788_PREVIEW_KEY = 'pfl_s788_wireframe_v2';
   let s788PreviewOn = false;
@@ -4712,7 +4790,7 @@ export function loadPflWindowFramework({ viewer }) {
         </div>
       </div>
       <div style="position:relative;background:#020617;border:1px solid rgba(56,189,248,0.4);border-radius:8px;overflow:hidden;margin-bottom:6px">
-        <video id="pfl-patrol-video" autoplay muted playsinline controls style="width:100%;max-height:215px;display:block;background:#000"></video>
+        <video id="pfl-patrol-video" autoplay muted playsinline controls style="width:100%;max-height:215px;object-fit:contain;display:block;background:#000"></video>
       </div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px" id="pfl-patrol-cam-btns">
         <button type="button" class="pfl-std-cbtn" data-live-src="wyze-cam-v4" data-fly-lat="29.24753" data-fly-lon="-95.23144" data-fly-hdg="223" style="border-color:#38bdf8;color:#38bdf8">▶ V4 Front Yard</button>
@@ -6432,8 +6510,12 @@ export function loadPflWindowFramework({ viewer }) {
     defaultWidth: 780,
   });
   mlsWin.box.style.display = 'none';
+  mlsWin.box.style.minWidth = '340px';
+  mlsWin.box.style.minHeight = '280px';
+  mlsWin.body.style.display = 'flex';
+  mlsWin.body.style.flexDirection = 'column';
   mlsWin.body.innerHTML = `
-    <div id="pfl-mls-walkthrough-root" style="font-family:'Inter',system-ui,sans-serif;font-size:11.5px;color:#e2e8f0;display:flex;flex-direction:column;gap:8px">
+    <div id="pfl-mls-walkthrough-root" style="height:100%;min-height:0;font-family:'Inter',system-ui,sans-serif;font-size:11.5px;color:#e2e8f0;display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
         <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
           <button type="button" class="pfl-std-cbtn" id="pfl-mls-autotour-btn" style="background:rgba(250,204,21,0.18);border-color:#facc15;color:#fde047;padding:4px 10px;font-size:11px">▶ Play Guided Room-by-Room Walkthrough</button>
@@ -6449,7 +6531,7 @@ export function loadPflWindowFramework({ viewer }) {
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:minmax(240px, 1fr) minmax(280px, 1.35fr);gap:10px;align-items:start;min-width:0">
+      <div style="flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(240px, 1fr) minmax(280px, 1.35fr);gap:10px;align-items:stretch;min-width:0">
         <div id="pfl-mls-floorplan-pane" style="display:flex;flex-direction:column;gap:6px;background:rgba(15,23,42,0.82);border:1px solid rgba(56,189,248,0.32);border-radius:8px;padding:7px;min-width:0">
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#7dd3fc;display:flex;justify-content:space-between">
             <span>⬆️ NORTH = CHOCOLATE BAYOU</span>
@@ -6488,9 +6570,9 @@ export function loadPflWindowFramework({ viewer }) {
           <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#94a3b8;text-align:center">⬇️ SOUTH = PALM DRIVE &amp; EAST CARPORT</div>
         </div>
 
-        <div style="display:flex;flex-direction:column;gap:6px;min-width:0;overflow:hidden">
-          <div style="position:relative;background:#020617;border:1.5px solid rgba(250,204,21,0.5);border-radius:8px;overflow:hidden;min-height:230px;display:flex;align-items:center;justify-content:center">
-            <img id="pfl-mls-photo-img" src="/palm-drive-mls/m00.webp" alt="417 Palm Drive MLS Interior Walkthrough" style="width:100%;max-height:310px;object-fit:contain;display:block;background:#020617" />
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:0;min-height:0;height:100%;overflow:hidden">
+          <div style="position:relative;flex:1 1 260px;min-height:160px;background:#020617;border:1.5px solid rgba(250,204,21,0.5);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+            <img id="pfl-mls-photo-img" src="/palm-drive-mls/m00.webp" alt="417 Palm Drive MLS Interior Walkthrough" style="width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block;background:#020617" />
             <div id="pfl-mls-photo-badge" style="position:absolute;top:6px;left:6px;background:rgba(9,14,26,0.88);border:1px solid rgba(56,189,248,0.65);border-radius:5px;padding:2px 7px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#7dd3fc">1 / 32 · m00</div>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
@@ -6981,8 +7063,13 @@ export function loadPflWindowFramework({ viewer }) {
   });
   viewer360Win.box.style.display = 'none';
   viewer360Win.box.style.zIndex = '9785';
+  viewer360Win.box.style.minWidth = '320px';
+  viewer360Win.box.style.minHeight = '280px';
+  viewer360Win.body.style.display = 'flex';
+  viewer360Win.body.style.flexDirection = 'column';
+  viewer360Win.body.style.overflow = 'hidden';
   viewer360Win.body.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:7px;font-family:'Inter',system-ui,sans-serif;font-size:11px;color:#e2e8f0">
+    <div style="height:100%;min-height:0;display:flex;flex-direction:column;gap:7px;font-family:'Inter',system-ui,sans-serif;font-size:11px;color:#e2e8f0">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
         <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
           <button type="button" class="pfl-std-cbtn" id="pfl-360-prev" style="padding:3px 8px">◀ Prev Spot</button>
@@ -6996,9 +7083,9 @@ export function loadPflWindowFramework({ viewer }) {
         <span id="pfl-360-title-lbl">🌐 360° Panorama</span>
         <span id="pfl-360-pose-lbl">🧭 HDG 14° · PITCH 0° · FOV 95°</span>
       </div>
-      <div style="position:relative;border-radius:8px;overflow:hidden;border:1.5px solid rgba(34,211,238,0.55);background:#020617">
-        <canvas id="pfl-360-canvas" width="480" height="270" style="width:100%;height:350px;display:block;cursor:grab;touch-action:none"></canvas>
-        <img id="pfl-360-compare-2026" alt="2026 MLS Room Comparison" style="display:none;position:absolute;right:8px;bottom:8px;width:36%;max-height:44%;object-fit:cover;border:2px solid #facc15;border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,0.8);cursor:pointer" title="Click to toggle full 2026 MLS room photo" />
+      <div id="pfl-360-stage" style="flex:1 1 350px;min-height:160px;position:relative;border-radius:8px;overflow:hidden;border:1.5px solid rgba(34,211,238,0.55);background:#020617">
+        <canvas id="pfl-360-canvas" width="480" height="270" style="width:100%;height:100%;display:block;cursor:grab;touch-action:none"></canvas>
+        <img id="pfl-360-compare-2026" alt="2026 MLS Room Comparison" style="display:none;position:absolute;right:8px;bottom:8px;width:36%;height:auto;max-height:44%;object-fit:contain;background:#020617;border:2px solid #facc15;border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,0.8);cursor:pointer" title="Click to toggle full 2026 MLS room photo" />
         <div id="pfl-360-compare-tag" style="display:none;position:absolute;right:12px;bottom:12px;background:rgba(9,14,26,0.88);color:#fde047;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 5px;border-radius:4px;pointer-events:none">2026 MLS COMPARE</div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
@@ -7012,6 +7099,7 @@ export function loadPflWindowFramework({ viewer }) {
     </div>
   `;
 
+  const stage360El = viewer360Win.body.querySelector('#pfl-360-stage');
   const canvas360 = viewer360Win.body.querySelector('#pfl-360-canvas');
   const ctx360 = canvas360?.getContext?.('2d');
   const compareImgEl = viewer360Win.body.querySelector('#pfl-360-compare-2026');
@@ -7026,16 +7114,52 @@ export function loadPflWindowFramework({ viewer }) {
   let out360ImgData = ctx360 ? ctx360.createImageData(480, 270) : null;
   let timePlay360Timer = 0;
   let timePlay360Mode = false;
+  let resize360Raf = 0;
+
+  function sync360CanvasSize() {
+    if (!canvas360 || !ctx360 || !stage360El) return;
+    const rect = stage360El.getBoundingClientRect();
+    const rw = Math.round(rect.width);
+    const rh = Math.round(rect.height);
+    if (rw < 20 || rh < 20) return;
+    const scale = Math.min(1, Math.sqrt(135000 / Math.max(1, rw * rh)));
+    const nextW = Math.max(160, Math.min(640, Math.round(rw * scale)));
+    const nextH = Math.max(120, Math.min(480, Math.round(rh * scale)));
+    if (canvas360.width !== nextW || canvas360.height !== nextH) {
+      canvas360.width = nextW;
+      canvas360.height = nextH;
+      out360ImgData = ctx360.createImageData(nextW, nextH);
+    }
+    if (srcPanoData) render360Projection();
+  }
+  if (stage360El && typeof ResizeObserver !== 'undefined') {
+    const stage360Ro = new ResizeObserver(() => {
+      if (resize360Raf) cancelAnimationFrame(resize360Raf);
+      resize360Raf = requestAnimationFrame(() => {
+        resize360Raf = 0;
+        sync360CanvasSize();
+      });
+    });
+    stage360Ro.observe(stage360El);
+  }
 
   function render360Projection() {
-    if (!ctx360 || !out360ImgData || !srcPanoData) return;
-    const W = 480;
-    const H = 270;
+    if (!ctx360 || !canvas360 || !srcPanoData) return;
+    const W = canvas360.width || 480;
+    const H = canvas360.height || 270;
+    if (!out360ImgData || out360ImgData.width !== W || out360ImgData.height !== H) {
+      out360ImgData = ctx360.createImageData(W, H);
+    }
     const out = out360ImgData.data;
     const yawRad = (panoYawDeg * Math.PI) / 180;
     const pitchRad = (panoPitchDeg * Math.PI) / 180;
-    const halfW = Math.tan(((panoFovDeg * 0.5) * Math.PI) / 180);
-    const halfH = halfW * (H / W);
+    let halfH = Math.tan(((panoFovDeg * 0.5) * Math.PI) / 180) * (9 / 16);
+    let halfW = halfH * (W / H);
+    const maxHalfW = Math.tan((67.5 * Math.PI) / 180);
+    if (halfW > maxHalfW) {
+      halfW = maxHalfW;
+      halfH = halfW * (H / W);
+    }
     const sinY = Math.sin(yawRad), cosY = Math.cos(yawRad);
     const sinP = Math.sin(pitchRad), cosP = Math.cos(pitchRad);
     const twoPiInv = 1 / (Math.PI * 2);
@@ -7102,12 +7226,15 @@ export function loadPflWindowFramework({ viewer }) {
       }
     }
 
+    sync360CanvasSize();
+    const cw = canvas360.width || 480;
+    const ch = canvas360.height || 270;
     ctx360.fillStyle = '#090e1a';
-    ctx360.fillRect(0, 0, 480, 270);
+    ctx360.fillRect(0, 0, cw, ch);
     ctx360.fillStyle = '#7dd3fc';
     ctx360.font = '700 13px "JetBrains Mono", monospace';
     ctx360.textAlign = 'center';
-    ctx360.fillText('Loading 5660×2830 360° sphere...', 240, 135);
+    ctx360.fillText('Loading 5660×2830 360° sphere...', cw / 2, ch / 2);
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -7126,10 +7253,12 @@ export function loadPflWindowFramework({ viewer }) {
     };
     img.onerror = () => {
       if (active360Item?.id !== item.id) return;
+      const ew = canvas360.width || 480;
+      const eh = canvas360.height || 270;
       ctx360.fillStyle = '#090e1a';
-      ctx360.fillRect(0, 0, 480, 270);
+      ctx360.fillRect(0, 0, ew, eh);
       ctx360.fillStyle = '#f87171';
-      ctx360.fillText('Failed to decode 360° image', 240, 135);
+      ctx360.fillText('Failed to decode 360° image', ew / 2, eh / 2);
     };
     img.src = item.file || item.url;
   }
@@ -7183,6 +7312,7 @@ export function loadPflWindowFramework({ viewer }) {
     const target = resolved || pool[9] || ALBUM_2018_ITEMS[9];
     if (!target) return;
     viewer360Win.box.style.display = 'flex';
+    sync360CanvasSize();
     viewer360Win.box.classList.remove('pfl-minimized');
     const mb = viewer360Win.box.querySelector('[data-act="min"]');
     if (mb) mb.textContent = '—';
@@ -7413,6 +7543,64 @@ export function loadPflWindowFramework({ viewer }) {
   });
   sync360SphereEntities();
 
+  // Prominent bottom-right Quick-Add (+) button right beside EN locale picker
+  const quickAddBtn = document.createElement('button');
+  quickAddBtn.type = 'button';
+  quickAddBtn.id = 'pfl-quick-add-btn';
+  quickAddBtn.title = 'Add .GLB 3D model, Photo / 360° sphere, or Pin';
+  quickAddBtn.setAttribute('aria-label', 'Add 3D model, photo, or pin');
+  quickAddBtn.style.cssText = 'position:fixed;right:98px;bottom:14px;z-index:9600;width:36px;height:36px;border-radius:999px;border:1.5px solid #22c55e;background:rgba(6,78,59,0.92);color:#4ade80;font-size:22px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.65);backdrop-filter:blur(8px)';
+  quickAddBtn.textContent = '+';
+
+  const quickAddMenu = document.createElement('div');
+  quickAddMenu.id = 'pfl-quick-add-menu';
+  quickAddMenu.style.cssText = 'position:fixed;right:98px;bottom:56px;z-index:9601;min-width:196px;padding:6px;border-radius:10px;background:rgba(9,14,26,0.96);border:1.5px solid rgba(34,197,94,0.6);box-shadow:0 10px 28px rgba(0,0,0,0.75);display:none;flex-direction:column;gap:5px;font-family:"Inter",system-ui,sans-serif';
+  quickAddMenu.innerHTML = `
+    <button type="button" class="pfl-std-cbtn" id="pfl-qadd-glb" style="text-align:left;padding:5px 8px;border-color:#22c55e;color:#86efac">📁 Add .GLB / .GLTF Model</button>
+    <button type="button" class="pfl-std-cbtn" id="pfl-qadd-photo" style="text-align:left;padding:5px 8px;border-color:#22d3ee;color:#67e8f9">📷 Add Photo / 360° Sphere</button>
+    <button type="button" class="pfl-std-cbtn" id="pfl-qadd-pin" style="text-align:left;padding:5px 8px;border-color:#facc15;color:#fde047">📌 Drop Navigation Pin</button>
+    <button type="button" class="pfl-std-cbtn" id="pfl-qadd-sf" style="text-align:left;padding:5px 8px;border-color:#a855f7;color:#e9d5ff">📦 Search Sketchfab 3D</button>
+  `;
+  document.body.append(quickAddBtn, quickAddMenu);
+  createdEls.push(quickAddBtn, quickAddMenu);
+
+  const setQuickAddOpen = (open) => {
+    quickAddMenu.style.display = open ? 'flex' : 'none';
+  };
+  quickAddBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setQuickAddOpen(quickAddMenu.style.display === 'none');
+  });
+  quickAddMenu.querySelector('#pfl-qadd-glb')?.addEventListener('click', () => {
+    setQuickAddOpen(false);
+    glbFileIn?.click();
+  });
+  quickAddMenu.querySelector('#pfl-qadd-photo')?.addEventListener('click', () => {
+    setQuickAddOpen(false);
+    compassWin.body.querySelector('#pfl-photo-file-input')?.click();
+  });
+  quickAddMenu.querySelector('#pfl-qadd-pin')?.addEventListener('click', () => {
+    setQuickAddOpen(false);
+    pinCameraCenter();
+  });
+  quickAddMenu.querySelector('#pfl-qadd-sf')?.addEventListener('click', () => {
+    setQuickAddOpen(false);
+    compassWin.box.style.display = 'flex';
+    compassWin.box.classList.remove('pfl-minimized');
+    const mb = compassWin.box.querySelector('[data-act="min"]');
+    if (mb) mb.textContent = '—';
+    bringBoxToFront(compassWin.box);
+    const sfBox = compassWin.body.querySelector('#pfl-sketchfab-box');
+    if (sfBox) sfBox.open = true;
+    sfQueryIn?.focus();
+  });
+  const onDocClickQuickAdd = (e) => {
+    if (quickAddMenu.style.display === 'none') return;
+    if (quickAddBtn.contains(e.target) || quickAddMenu.contains(e.target)) return;
+    setQuickAddOpen(false);
+  };
+  document.addEventListener('click', onDocClickQuickAdd);
+
   const onDragShiftDown = (e) => { if (e.key === 'Shift') dragShiftHeld = true; };
   const onDragShiftUp = (e) => { if (e.key === 'Shift') dragShiftHeld = false; };
   const onDragShiftBlur = () => { dragShiftHeld = false; clearAllPadRepeats(); };
@@ -7445,6 +7633,7 @@ export function loadPflWindowFramework({ viewer }) {
       window.removeEventListener('keydown', onDragShiftDown);
       window.removeEventListener('keyup', onDragShiftUp);
       window.removeEventListener('blur', onDragShiftBlur);
+      document.removeEventListener('click', onDocClickQuickAdd);
       window.removeEventListener('gev:search-pin', onGevSearchPin);
       window.removeEventListener('gev:map-stack-changed', onMapOrTilesSettled);
       window.removeEventListener('gev:google3d-settled', onMapOrTilesSettled);
