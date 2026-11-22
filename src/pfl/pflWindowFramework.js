@@ -505,6 +505,7 @@ export function loadPflWindowFramework({ viewer }) {
       <a href="/kalshi-paper.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-kalshi-tab" style="border-color:#38bdf8;color:#38bdf8;text-decoration:none;display:inline-flex;align-items:center">↗ Full TradingView &amp; Kalshi Tab</a>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-wyze-patrol" style="border-color:#f97316;color:#fdba74;font-weight:700">🎥 Live Wyze Patrol &amp; 4D Scrubber</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-balcony-front" style="border-color:#38bdf8;color:#7dd3fc;font-weight:700" title="Lock 3D view onto your 2nd-story Balcony looking across the stitched Front Yard, Neighbor's House &amp; Horizon">🏠 Balcony Front Splat</button>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-roof-tripod" style="border-color:#facc15;color:#fde047;font-weight:700" title="Snap to Paul's Roof Hero Tripod viewpoint over 417 Palm Dr, Rooftop Bed LiveWire &amp; 3v3 Stadium">🎯 Roof Tripod</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-flip-backyard" style="border-color:#2dd4bf;color:#5eead4;font-weight:700" title="180° flip over the roof to your Backyard Oaks, Boat Dock &amp; Chocolate Bayou">🔄 Flip 180° Backyard</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-live-restitch" style="border-color:#c084fc;color:#e9d5ff" title="Grab fresh frames from Cam1 + V4 right now and rebuild the live stitched ground splat">🧵 Rebuild Live Stitch</button>
       <button type="button" class="pfl-f15-btn active" id="pfl-btn-always3d" style="border-color:#22c55e;color:#4ade80;font-weight:700" title="Keep your Wyze cameras projected in 3D space 24/7 even when CCTV is turned OFF">👁️ Always-On 3D Cams: ON</button>
@@ -563,8 +564,24 @@ export function loadPflWindowFramework({ viewer }) {
         duration: 1.15,
       });
     }
+    function flyRoofTripod() {
+      unlockDroneCamera();
+      try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
+      try { window.__pflSetSoccerTimeline?.({ camMode: 'free' }); } catch {}
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(-95.2314, 29.2477, -11.0),
+        orientation: {
+          heading: Cesium.Math.toRadians(172),
+          pitch: Cesium.Math.toRadians(-15),
+          roll: 0,
+        },
+        duration: 1.0,
+      });
+    }
+    window.__pflFlyRoofTripod = flyRoofTripod;
     window.__pflFlyBalconyFront = flyBalconyFront;
     window.__pflFlyBackyard180 = flyBackyard180;
+    extraRow.querySelector('#pfl-btn-roof-tripod')?.addEventListener('click', flyRoofTripod);
     extraRow.querySelector('#pfl-btn-balcony-front')?.addEventListener('click', flyBalconyFront);
     extraRow.querySelector('#pfl-btn-flip-backyard')?.addEventListener('click', flyBackyard180);
     extraRow.querySelector('#pfl-btn-live-restitch')?.addEventListener('click', async (ev) => {
@@ -1358,6 +1375,7 @@ export function loadPflWindowFramework({ viewer }) {
     return { objects };
   }
 
+  const lastSavedObjectPoses = new Map();
   let isApplyingPublishedLayout = false;
   let adminAutoPublishTimer = null;
   function scheduleAdminAutoPublish() {
@@ -1395,6 +1413,15 @@ export function loadPflWindowFramework({ viewer }) {
           missing.push(k);
           continue;
         }
+        lastSavedObjectPoses.set(k, {
+          lat: Number(pose.lat),
+          lon: Number(pose.lon),
+          heading: Number(pose.heading ?? 0),
+          ...(Number.isFinite(Number(pose.tilt)) ? { tilt: Number(pose.tilt) } : {}),
+          lift: Number(pose.lift ?? 0),
+          scale: Number(pose.scale ?? 1) || 1,
+          opacity: Number.isFinite(Number(pose.opacity)) ? Number(pose.opacity) : 1,
+        });
         try {
           mov.update({
             lat: Number(pose.lat),
@@ -1444,6 +1471,9 @@ export function loadPflWindowFramework({ viewer }) {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data?.ok) {
+        for (const [k, pose] of Object.entries(snapshot.objects || {})) {
+          if (pose) lastSavedObjectPoses.set(k, { ...pose });
+        }
         try { localStorage.setItem(SCENE_LAYOUT_TS_KEY, String(data.layout?.updatedAtMs || Date.now())); } catch {}
         if (btnEl) {
           btnEl.textContent = '✅ Published!';
@@ -2184,7 +2214,8 @@ export function loadPflWindowFramework({ viewer }) {
 
   function applyActiveObjectPatch(patch) {
     if (!activeMovable) return false;
-    if (isGlobalEditAllowed()) {
+    const isDragging = typeof window !== 'undefined' && Boolean(window.__pflDraggingMovable);
+    if (!isDragging && isGlobalEditAllowed()) {
       try { localStorage.setItem(SCENE_LAYOUT_TS_KEY, String(Date.now())); } catch {}
     }
     activeMovable.update(patch);
@@ -2193,7 +2224,7 @@ export function loadPflWindowFramework({ viewer }) {
     if (droneOrbitState.active && (activeMovable.kind === droneOrbitState.targetKey || droneOrbitState.targetKey === 'selected')) {
       applyDroneOrbit();
     }
-    if (isGlobalEditAllowed()) scheduleAdminAutoPublish();
+    if (!isDragging && isGlobalEditAllowed()) scheduleAdminAutoPublish();
     return true;
   }
 
@@ -2249,6 +2280,7 @@ export function loadPflWindowFramework({ viewer }) {
     if (walkHouseBtn) walkHouseBtn.style.display = mov.kind === 'house' ? 'inline-block' : 'none';
     syncActiveMovableGizmo();
   }
+  if (typeof window !== 'undefined') window.__pflBindMovable = bindMovable;
 
   function clearActiveMovableSelection() {
     activeMovable = null;
@@ -2271,7 +2303,8 @@ export function loadPflWindowFramework({ viewer }) {
 
   compassWin.body.querySelector('#pfl-reset-selected-btn')?.addEventListener('click', () => {
     if (!activeMovable) return;
-    const k = String(activeMovable.kind || '');
+    const rawKind = String(activeMovable.kind || '');
+    const frameId = rawKind.startsWith('yardframe:') ? rawKind.slice(10) : rawKind;
     const SURVEY_DEFAULTS = {
       house: { ...HOUSE_DEFAULT_POSE },
       monaco: { ...MONACO_DEFAULT_POSE },
@@ -2279,16 +2312,23 @@ export function loadPflWindowFramework({ viewer }) {
       lisa: { lat: 29.247436, lon: -95.231445, heading: 192, lift: 0, scale: 1, opacity: 1 },
       chair: { lat: 29.247434, lon: -95.231426, heading: 192, lift: 0, scale: 1, opacity: 1 },
     };
+    const surveyFallback = rawKind.startsWith('yardframe:')
+      ? (window.__pflYardFrameSurveyDefault?.(frameId) || selectedInitialPose)
+      : (SURVEY_DEFAULTS[rawKind] || selectedInitialPose);
+    const savedAnchor = lastSavedObjectPoses.get(frameId) || lastSavedObjectPoses.get(rawKind) || selectedInitialPose;
     const cur = activeMovable.getState?.() || {};
-    const snapDiffers =
-      selectedInitialPose &&
-      (Math.abs((cur.lat || 0) - (selectedInitialPose.lat || 0)) > 1e-7 ||
-        Math.abs((cur.lon || 0) - (selectedInitialPose.lon || 0)) > 1e-7 ||
-        Math.abs((cur.heading || 0) - (selectedInitialPose.heading || 0)) > 0.5 ||
-        Math.abs((cur.lift || 0) - (selectedInitialPose.lift || 0)) > 0.01 ||
-        Math.abs((cur.scale || 1) - (selectedInitialPose.scale || 1)) > 0.01 ||
-        Math.abs((cur.opacity ?? 1) - (selectedInitialPose.opacity ?? 1)) > 0.01);
-    const targetPose = snapDiffers ? selectedInitialPose : SURVEY_DEFAULTS[k] || selectedInitialPose;
+    const differsFrom = (ref) =>
+      Boolean(
+        ref &&
+          (Math.abs((cur.lat || 0) - (ref.lat || 0)) > 1e-7 ||
+            Math.abs((cur.lon || 0) - (ref.lon || 0)) > 1e-7 ||
+            Math.abs((cur.heading || 0) - (ref.heading || 0)) > 0.5 ||
+            Math.abs(Number(cur.tilt || 0) - Number(ref.tilt || 0)) > 0.5 ||
+            Math.abs((cur.lift || 0) - (ref.lift || 0)) > 0.01 ||
+            Math.abs((cur.scale || 1) - (ref.scale || 1)) > 0.01 ||
+            Math.abs((cur.opacity ?? 1) - (ref.opacity ?? 1)) > 0.01),
+      );
+    const targetPose = differsFrom(savedAnchor) ? savedAnchor : (surveyFallback || savedAnchor);
     if (targetPose) applyActiveObjectPatch(targetPose);
   });
 
@@ -2714,6 +2754,10 @@ export function loadPflWindowFramework({ viewer }) {
     if (!dragMovableSession) return;
     const wasMoved = dragMovableSession.moved;
     dragMovableSession = null;
+    if (typeof window !== 'undefined') {
+      window.__pflDraggingMovable = false;
+      try { window.__pflFlushYardFramesLayout?.(); } catch {}
+    }
     releaseContinuousRender('pfl-drag-movable');
     if (wasMoved) {
       lastDragReleaseMs = Date.now();
@@ -2769,6 +2813,7 @@ export function loadPflWindowFramework({ viewer }) {
       camFwdY: rx,
       metersPerPx,
     };
+    if (typeof window !== 'undefined') window.__pflDraggingMovable = true;
     holdContinuousRender('pfl-drag-movable');
     const ctrl = viewer?.scene?.screenSpaceCameraController;
     if (ctrl) {

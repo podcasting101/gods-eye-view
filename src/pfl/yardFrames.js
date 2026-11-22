@@ -131,22 +131,28 @@ const DEFAULT_DISTANCE_M = 6.5;
  */
 const CALIBRATED_HOUSE_SURVEY = {
   'back-yard-cam1-plan': {
-    // East front driveway (RV, red van, white Tesla on left; Beaver solar arch on right; Palm Dr ahead)
-    // Landmark-solved to stitch directly onto the left edge of Yard Overview (Wyze V4) over the white RV & east driveway
-    camLat: 29.24756,
-    camLon: -95.23134,
-    camHeightM: 6.2,
-    headingDeg: 175,
-    pitchDeg: -36,
-    distanceM: 6.2,
-    widthScale: 0.85,
+    // Semantic-segmented & TPS-rectified front driveway (Red Van, White Tesla beside 3D Monaco RV; Sago Palm, Solar Arch, collinear Palm Dr; alpha=0 past South curb).
+    camLat: 29.2474239,
+    camLon: -95.2313516,
+    camHeightM: 0.24,
+    headingDeg: 195.0,
+    pitchDeg: -5,
+    distanceM: 15.0,
+    fovHDeg: 95.969,
+    fovVDeg: 73.74,
+    widthScale: 1.0,
+    sizeScale: 1.0,
     rollDeg: 0,
-    flat: false,
+    tiltDeg: 0,
+    flat: true,
     texRot: 0,
-    hiddenByStitch: true,
+    opacity: 0.94,
+    hiddenByStitch: false,
+    warpedYardCam1: true,
+    rayCastFade: 0.85,
   },
   'yard-overview-20261012': {
-    // Anchored to House West side (-95.231501) and pulled right/West so East edge (-95.231267) places the dark van cleanly BESIDE Monaco RV (-95.231255 West wall) without overlap
+    // Legacy stitched overlay hidden by default now that back-yard-cam1-plan renders the collinear Palm Dr + RV driveway warp cleanly without duplicate road angles.
     camLat: 29.247456,
     camLon: -95.231384,
     camHeightM: 0.20,
@@ -159,6 +165,7 @@ const CALIBRATED_HOUSE_SURVEY = {
     texRot: 0,
     stitchedPano: true,
     viewTiltCompensate: true,
+    hiddenByStitch: true,
   },
   'house-side-20261012': {
     hiddenByStitch: true,
@@ -328,6 +335,7 @@ function loadSavedLayout() {
         restoredYardTeslaV25: true,
         fixedSaveFlagsBugV26: true,
         restoredPaulGarageAndBedV27: true,
+        fixedBackYardCam1WarpV28: true,
         userEditedIds: [],
         savedAt: new Date().toISOString(),
         frames: { ...CALIBRATED_HOUSE_SURVEY },
@@ -427,6 +435,19 @@ function loadSavedLayout() {
       };
       parsed.fixedSaveFlagsBugV26 = true;
       parsed.restoredPaulGarageAndBedV27 = true;
+      parsed.frames = frames;
+      window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
+    }
+    if (parsed && !parsed.fixedBackYardCam1WarpV28) {
+      frames['back-yard-cam1-plan'] = {
+        ...(frames['back-yard-cam1-plan'] || {}),
+        ...CALIBRATED_HOUSE_SURVEY['back-yard-cam1-plan'],
+      };
+      frames['yard-overview-20261012'] = {
+        ...(frames['yard-overview-20261012'] || {}),
+        ...CALIBRATED_HOUSE_SURVEY['yard-overview-20261012'],
+      };
+      parsed.fixedBackYardCam1WarpV28 = true;
       parsed.frames = frames;
       window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(parsed));
     }
@@ -653,7 +674,191 @@ function scrubWyzeGreenBoxToCanvas(img) {
   return c;
 }
 
-function buildFrameQuadPrimitive(positions, texRot, imageSource, opacity, isTranslucent, pickEntity) {
+function resolveBaseAssetUrl(relPath) {
+  const clean = String(relPath || '').replace(/^\//, '');
+  let base = '/';
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env.BASE_URL === 'string') {
+      base = import.meta.env.BASE_URL;
+    }
+  } catch {}
+  if (!base.endsWith('/')) base += '/';
+  return base + clean;
+}
+
+function buildRayCastMaterial(imageSource, opacity, rayCastFade, projDirW) {
+  if (Number(rayCastFade || 0) > 0.01 && typeof Cesium.Material === 'function') {
+    try {
+      return new Cesium.Material({
+        fabric: {
+          type: 'PflRayCastPhoto',
+          uniforms: {
+            image: imageSource,
+            color: Cesium.Color.WHITE.withAlpha(opacity),
+            viewFade: Math.max(0, Math.min(1, Number(rayCastFade))),
+            projDirW: projDirW || new Cesium.Cartesian3(0, 0, 1),
+          },
+          source: `
+            uniform sampler2D image;
+            uniform vec4 color;
+            uniform float viewFade;
+            uniform vec3 projDirW;
+            czm_material czm_getMaterial(czm_materialInput materialInput) {
+              czm_material material = czm_getDefaultMaterial(materialInput);
+              vec4 tex = texture(image, materialInput.st);
+              vec3 nEC = normalize(materialInput.normalEC);
+              vec3 vEC = normalize(materialInput.positionToEyeEC);
+              float grazing = smoothstep(0.06, 0.42, abs(dot(nEC, vEC)));
+              vec3 pEC = normalize(czm_viewRotation * projDirW);
+              float cone = mix(0.32, 1.0, smoothstep(-0.35, 0.72, dot(vEC, pEC)));
+              float vis = mix(1.0, grazing * cone, clamp(viewFade, 0.0, 1.0));
+              material.diffuse = czm_gammaCorrect(tex.rgb * color.rgb);
+              material.alpha = tex.a * color.a * vis;
+              return material;
+            }
+          `,
+        },
+        translucent: true,
+      });
+    } catch {
+      /* fallback cleanly below */
+    }
+  }
+  return Cesium.Material.fromType('Image', {
+    image: imageSource,
+    repeat: new Cesium.Cartesian2(1, 1),
+    color: Cesium.Color.WHITE.withAlpha(opacity),
+  });
+}
+
+function semanticReliefHeightM(u, v) {
+  // v = 0 at house/yard edge (YA_NORTH), v = 1 at South curb (YA_SOUTH = -3.0m). Keep Palm Drive strictly flat at z = 0!
+  if (v >= 0.65) return 0.0;
+  const yardMask = Math.min(1.0, Math.max(0.0, (0.65 - v) / 0.14)) * Math.min(1.0, Math.max(0.0, (v - 0.04) / 0.08));
+  // East driveway Red Van / White Tesla subtle relief (u ~ 0.06..0.34)
+  const vehBell = Math.exp(-Math.pow((u - 0.21) / 0.11, 2) - Math.pow((v - 0.42) / 0.18, 2));
+  // West Solar Arch curved relief (u ~ 0.56..0.95)
+  const archBell = Math.exp(-Math.pow((u - 0.77) / 0.16, 2) - Math.pow((v - 0.36) / 0.18, 2));
+  return yardMask * (0.58 * vehBell + 1.10 * archBell);
+}
+
+function buildFrameRayCastMeshPrimitive(positions, texRot, imageSource, opacity, isTranslucent, pickEntity, opts = {}) {
+  const p0 = positions[0]; // BL (u=0, v=0)
+  const p1 = positions[1]; // BR (u=1, v=0)
+  const p2 = positions[2]; // TR (u=1, v=1)
+  const p3 = positions[3]; // TL (u=0, v=1)
+  const e1 = Cesium.Cartesian3.subtract(p1, p0, new Cesium.Cartesian3());
+  const e2 = Cesium.Cartesian3.subtract(p3, p0, new Cesium.Cartesian3());
+  const n = Cesium.Cartesian3.cross(e1, e2, new Cesium.Cartesian3());
+  if (Cesium.Cartesian3.magnitudeSquared(n) > 1e-12) Cesium.Cartesian3.normalize(n, n);
+  else { n.x = 0; n.y = 0; n.z = 1; }
+
+  const nx = 32;
+  const ny = 20;
+  const vCount = (nx + 1) * (ny + 1);
+  const posArr = new Float64Array(vCount * 3);
+  const normArr = new Float32Array(vCount * 3);
+  const stArr = new Float32Array(vCount * 2);
+  const steps = (((Math.round(Number(texRot || 0) / 90) % 4) + 4) % 4);
+  const rotSt = (u, v) => {
+    if (steps === 1) return [v, 1 - u];
+    if (steps === 2) return [1 - u, 1 - v];
+    if (steps === 3) return [1 - v, u];
+    return [u, v];
+  };
+
+  for (let iy = 0; iy <= ny; iy++) {
+    const v = iy / ny;
+    for (let ix = 0; ix <= nx; ix++) {
+      const u = ix / nx;
+      const w0 = (1 - u) * (1 - v);
+      const w1 = u * (1 - v);
+      const w2 = u * v;
+      const w3 = (1 - u) * v;
+      const dz = semanticReliefHeightM(u, v);
+      const idx = iy * (nx + 1) + ix;
+      posArr[idx * 3] = w0 * p0.x + w1 * p1.x + w2 * p2.x + w3 * p3.x + n.x * dz;
+      posArr[idx * 3 + 1] = w0 * p0.y + w1 * p1.y + w2 * p2.y + w3 * p3.y + n.y * dz;
+      posArr[idx * 3 + 2] = w0 * p0.z + w1 * p1.z + w2 * p2.z + w3 * p3.z + n.z * dz;
+      const [su, sv] = rotSt(u, v);
+      stArr[idx * 2] = su;
+      stArr[idx * 2 + 1] = sv;
+    }
+  }
+
+  for (let iy = 0; iy <= ny; iy++) {
+    for (let ix = 0; ix <= nx; ix++) {
+      const xm = Math.max(0, ix - 1);
+      const xp = Math.min(nx, ix + 1);
+      const ym = Math.max(0, iy - 1);
+      const yp = Math.min(ny, iy + 1);
+      const iXm = (iy * (nx + 1) + xm) * 3;
+      const iXp = (iy * (nx + 1) + xp) * 3;
+      const iYm = (ym * (nx + 1) + ix) * 3;
+      const iYp = (yp * (nx + 1) + ix) * 3;
+      const dxv = new Cesium.Cartesian3(posArr[iXp] - posArr[iXm], posArr[iXp + 1] - posArr[iXm + 1], posArr[iXp + 2] - posArr[iXm + 2]);
+      const dyv = new Cesium.Cartesian3(posArr[iYp] - posArr[iYm], posArr[iYp + 1] - posArr[iYm + 1], posArr[iYp + 2] - posArr[iYm + 2]);
+      const vn = Cesium.Cartesian3.cross(dxv, dyv, new Cesium.Cartesian3());
+      if (Cesium.Cartesian3.magnitudeSquared(vn) > 1e-12) Cesium.Cartesian3.normalize(vn, vn);
+      else Cesium.Cartesian3.clone(n, vn);
+      const outI = (iy * (nx + 1) + ix) * 3;
+      normArr[outI] = vn.x;
+      normArr[outI + 1] = vn.y;
+      normArr[outI + 2] = vn.z;
+    }
+  }
+
+  const indices = new Uint16Array(nx * ny * 6);
+  let k = 0;
+  for (let iy = 0; iy < ny; iy++) {
+    for (let ix = 0; ix < nx; ix++) {
+      const a = iy * (nx + 1) + ix;
+      const b = a + 1;
+      const c = a + (nx + 1) + 1;
+      const d = a + (nx + 1);
+      indices[k++] = a; indices[k++] = b; indices[k++] = c;
+      indices[k++] = a; indices[k++] = c; indices[k++] = d;
+    }
+  }
+
+  const geometry = new Cesium.Geometry({
+    attributes: {
+      position: new Cesium.GeometryAttribute({
+        componentDatatype: Cesium.ComponentDatatype.DOUBLE,
+        componentsPerAttribute: 3,
+        values: posArr,
+      }),
+      normal: new Cesium.GeometryAttribute({
+        componentDatatype: Cesium.ComponentDatatype.FLOAT,
+        componentsPerAttribute: 3,
+        values: normArr,
+      }),
+      st: new Cesium.GeometryAttribute({
+        componentDatatype: Cesium.ComponentDatatype.FLOAT,
+        componentsPerAttribute: 2,
+        values: stArr,
+      }),
+    },
+    indices,
+    primitiveType: Cesium.PrimitiveType.TRIANGLES,
+    boundingSphere: Cesium.BoundingSphere.fromVertices(posArr),
+  });
+  const material = buildRayCastMaterial(imageSource, opacity, opts.rayCastFade, n);
+  return new Cesium.Primitive({
+    geometryInstances: new Cesium.GeometryInstance({ geometry, id: pickEntity }),
+    appearance: new Cesium.MaterialAppearance({
+      flat: true,
+      faceForward: true,
+      closed: false,
+      translucent: true,
+      materialSupport: Cesium.MaterialAppearance.MaterialSupport.TEXTURED,
+      material,
+    }),
+    asynchronous: false,
+  });
+}
+
+function buildFrameQuadPrimitive(positions, texRot, imageSource, opacity, isTranslucent, pickEntity, opts = {}) {
   const p0 = positions[0];
   const p1 = positions[1];
   const p2 = positions[2];
@@ -709,18 +914,20 @@ function buildFrameQuadPrimitive(positions, texRot, imageSource, opacity, isTran
     primitiveType: Cesium.PrimitiveType.TRIANGLES,
     boundingSphere: Cesium.BoundingSphere.fromVertices(posArr),
   });
-  const material = Cesium.Material.fromType('Image', {
-    image: imageSource,
-    repeat: new Cesium.Cartesian2(1, 1),
-    color: Cesium.Color.WHITE.withAlpha(opacity),
-  });
+  const material = opts.rayCastFade && typeof imageSource === 'string'
+    ? buildRayCastMaterial(imageSource, opacity, opts.rayCastFade, n)
+    : Cesium.Material.fromType('Image', {
+        image: imageSource,
+        repeat: new Cesium.Cartesian2(1, 1),
+        color: Cesium.Color.WHITE.withAlpha(opacity),
+      });
   return new Cesium.Primitive({
     geometryInstances: new Cesium.GeometryInstance({ geometry, id: pickEntity }),
     appearance: new Cesium.MaterialAppearance({
       flat: true,
       faceForward: true,
       closed: false,
-      translucent: isTranslucent || opacity < 0.99,
+      translucent: isTranslucent || opacity < 0.99 || Number(opts.rayCastFade || 0) > 0.01,
       materialSupport: Cesium.MaterialAppearance.MaterialSupport.TEXTURED,
       material,
     }),
@@ -744,12 +951,15 @@ function syncQuadEntityShow(ent, visible) {
 }
 
 const BED_LIVEWIRE_KEY = 'pfl_bed_livewire_overlay_v1';
+const ROOFTOP_LISA_ENTITY_ID = 'pfl-rooftop-lisa-glb';
+const _yardFrameImgCache = new Map();
 let _bedBaseImg = null;
 let _bedBaseImgLoading = false;
 let _bedLiveBufs = null;
 let _bedLiveBufIdx = 0;
 let _bedLiveCurrentCanvas = null;
 let _bedLivePollTimer = null;
+let _bedPlaybackTimer = null;
 let _bedLiveInFlight = false;
 let _bedLiveOverlayOn = (() => {
   try {
@@ -761,6 +971,13 @@ let _bedLiveOverlayOn = (() => {
   }
 })();
 const _bedSmoothPaul = {};
+const _bedSmoothHands = { left: null, right: null, mode: null };
+const _bedPoseQueue = []; // entries: { ts, joints, breathHz, hands }
+let _bedLastEnqueuedTs = 0;
+let _bedPlayheadTs = 0;
+let _bedLastTickWallMs = 0;
+let _bedBreathHz = 0.28;
+let _bedBreathRecoil = 0;
 let _bedLastPayload = null;
 const _bedLiveStats = {
   framesDrawn: 0,
@@ -768,7 +985,19 @@ const _bedLiveStats = {
   lastAgeSec: null,
   fps: 0,
   goLive: false,
+  queueLen: 0,
+  handMode: 'none',
+  breathHz: 0.28,
+  lisaGlbActive: false,
 };
+
+const HAND21_CHAINS = [
+  [0, 1, 2, 3, 4],
+  [0, 5, 6, 7, 8],
+  [0, 9, 10, 11, 12],
+  [0, 13, 14, 15, 16],
+  [0, 17, 18, 19, 20],
+];
 
 function smoothJointMap(target, srcMap, alpha = 0.48) {
   if (!srcMap || typeof srcMap !== 'object') return;
@@ -784,6 +1013,68 @@ function smoothJointMap(target, srcMap, alpha = 0.48) {
       target[k][1] += (ny - target[k][1]) * alpha;
     }
   }
+}
+
+function interpolateJointMaps(mA, mB, t) {
+  if (!mA) return mB || {};
+  if (!mB || t <= 0.001) return mA;
+  if (t >= 0.999) return mB;
+  const out = {};
+  for (const [k, pA] of Object.entries(mA)) {
+    const pB = mB[k];
+    if (Array.isArray(pA) && pA.length >= 2) {
+      if (Array.isArray(pB) && pB.length >= 2 && Math.hypot(pB[0] - pA[0], pB[1] - pA[1]) < 120) {
+        out[k] = [pA[0] + (pB[0] - pA[0]) * t, pA[1] + (pB[1] - pA[1]) * t];
+      } else {
+        out[k] = pA;
+      }
+    }
+  }
+  for (const [k, pB] of Object.entries(mB)) {
+    if (!out[k] && Array.isArray(pB) && pB.length >= 2) out[k] = pB;
+  }
+  return out;
+}
+
+function interpolateHandArray(arrA, arrB, t) {
+  if (!Array.isArray(arrA) || arrA.length === 0) return Array.isArray(arrB) ? arrB : null;
+  if (!Array.isArray(arrB) || arrB.length !== arrA.length || t <= 0.001) return arrA;
+  if (t >= 0.999) return arrB;
+  return arrA.map((pA, i) => {
+    const pB = arrB[i];
+    if (Array.isArray(pA) && Array.isArray(pB) && pA.length >= 2 && pB.length >= 2 && Math.hypot(pB[0] - pA[0], pB[1] - pA[1]) < 85) {
+      return [pA[0] + (pB[0] - pA[0]) * t, pA[1] + (pB[1] - pA[1]) * t];
+    }
+    return pA || pB || null;
+  });
+}
+
+function smoothHandArray(sideKey, srcArr, alpha = 0.55) {
+  if (!Array.isArray(srcArr) || srcArr.length === 0) {
+    _bedSmoothHands[sideKey] = null;
+    return null;
+  }
+  const cur = _bedSmoothHands[sideKey];
+  if (!Array.isArray(cur) || cur.length !== srcArr.length) {
+    _bedSmoothHands[sideKey] = srcArr.map((p) => (Array.isArray(p) ? [Number(p[0]), Number(p[1])] : null));
+    return _bedSmoothHands[sideKey];
+  }
+  for (let i = 0; i < srcArr.length; i++) {
+    const np = srcArr[i];
+    if (!Array.isArray(np) || np.length < 2) {
+      cur[i] = null;
+      continue;
+    }
+    const nx = Number(np[0]);
+    const ny = Number(np[1]);
+    if (!Number.isFinite(nx) || !Number.isFinite(ny)) continue;
+    if (!cur[i]) cur[i] = [nx, ny];
+    else {
+      cur[i][0] += (nx - cur[i][0]) * alpha;
+      cur[i][1] += (ny - cur[i][1]) * alpha;
+    }
+  }
+  return cur;
 }
 
 function drawGlowLimbs(ctx, joints, pairs, sx, sy, color, glowColor, widthPx = 4.2) {
@@ -819,13 +1110,219 @@ function drawGlowLimbs(ctx, joints, pairs, sx, sy, color, glowColor, widthPx = 4
   ctx.restore();
 }
 
+function drawArticulatedHand(ctx, pts, wristFallback, mode, sx, sy, strokeCol, glowCol) {
+  if (!Array.isArray(pts) || pts.length === 0) return;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.shadowBlur = 6;
+  ctx.shadowColor = glowCol;
+  ctx.strokeStyle = strokeCol;
+  if (mode === 'hand21' && pts.length >= 21) {
+    ctx.lineWidth = 1.9;
+    for (const chain of HAND21_CHAINS) {
+      let started = false;
+      ctx.beginPath();
+      for (const idx of chain) {
+        const pt = pts[idx];
+        if (!Array.isArray(pt) || pt.length < 2) { started = false; continue; }
+        const px = pt[0] * sx;
+        const py = pt[1] * sy;
+        if (!started) { ctx.moveTo(px, py); started = true; }
+        else ctx.lineTo(px, py);
+      }
+      if (started) ctx.stroke();
+    }
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let palmStarted = false;
+    for (const idx of [5, 9, 13, 17]) {
+      const pt = pts[idx];
+      if (!Array.isArray(pt)) { palmStarted = false; continue; }
+      if (!palmStarted) { ctx.moveTo(pt[0] * sx, pt[1] * sy); palmStarted = true; }
+      else ctx.lineTo(pt[0] * sx, pt[1] * sy);
+    }
+    if (palmStarted) ctx.stroke();
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const pt = pts[i];
+      if (!Array.isArray(pt)) continue;
+      const isTip = i === 4 || i === 8 || i === 12 || i === 16 || i === 20;
+      ctx.fillStyle = isTip ? '#fde047' : '#e0f2fe';
+      ctx.beginPath();
+      ctx.arc(pt[0] * sx, pt[1] * sy, isTip ? 2.8 : 1.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.lineWidth = 2.0;
+    if (Array.isArray(wristFallback) && wristFallback.length >= 2) {
+      for (const pt of pts) {
+        if (!Array.isArray(pt) || pt.length < 2) continue;
+        ctx.beginPath();
+        ctx.moveTo(wristFallback[0] * sx, wristFallback[1] * sy);
+        ctx.lineTo(pt[0] * sx, pt[1] * sy);
+        ctx.stroke();
+      }
+    }
+    ctx.shadowBlur = 0;
+    for (const pt of pts) {
+      if (!Array.isArray(pt) || pt.length < 2) continue;
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath();
+      ctx.arc(pt[0] * sx, pt[1] * sy, 2.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function sampleBufferedPoseAt(targetTs) {
+  if (_bedPoseQueue.length === 0) return null;
+  if (_bedPoseQueue.length === 1 || targetTs <= _bedPoseQueue[0].ts) return _bedPoseQueue[0];
+  const last = _bedPoseQueue[_bedPoseQueue.length - 1];
+  if (targetTs >= last.ts) return last;
+  for (let i = 0; i < _bedPoseQueue.length - 1; i++) {
+    const a = _bedPoseQueue[i];
+    const b = _bedPoseQueue[i + 1];
+    if (targetTs >= a.ts && targetTs <= b.ts) {
+      const span = Math.max(1, b.ts - a.ts);
+      const t = Math.max(0, Math.min(1, (targetTs - a.ts) / span));
+      const mode = b.hands?.mode || a.hands?.mode || null;
+      return {
+        ts: targetTs,
+        joints: interpolateJointMaps(a.joints, b.joints, t),
+        breathHz: a.breathHz + (b.breathHz - a.breathHz) * t,
+        hands: {
+          mode,
+          left: interpolateHandArray(a.hands?.left, b.hands?.left, t),
+          right: interpolateHandArray(a.hands?.right, b.hands?.right, t),
+        },
+      };
+    }
+  }
+  return last;
+}
+
+function syncRooftopLisaGlb(viewer, params, corners) {
+  if (!viewer?.entities || typeof Cesium.NodeTransformationProperty !== 'function' || !Array.isArray(corners) || corners.length < 4) {
+    return;
+  }
+  const hidden = Boolean(params?.hiddenByStitch) || !yardFramesVisible;
+  const p0 = corners[0]; // BL
+  const p1 = corners[1]; // BR
+  const p3 = corners[3]; // TL
+  const rightVec = Cesium.Cartesian3.subtract(p1, p0, new Cesium.Cartesian3());
+  const upVec = Cesium.Cartesian3.subtract(p3, p0, new Cesium.Cartesian3());
+  const wM = Cesium.Cartesian3.magnitude(rightVec);
+  const hM = Cesium.Cartesian3.magnitude(upVec);
+  if (wM < 0.2 || hM < 0.2) return;
+
+  const rightAxis = Cesium.Cartesian3.normalize(rightVec, new Cesium.Cartesian3());
+  const upImgAxis = Cesium.Cartesian3.normalize(upVec, new Cesium.Cartesian3());
+  const normalAxis = Cesium.Cartesian3.normalize(
+    Cesium.Cartesian3.cross(rightAxis, upImgAxis, new Cesium.Cartesian3()),
+    new Cesium.Cartesian3(),
+  );
+
+  // Align Lisa directly onto her torso/legs in bed-station-solar-2026-11-17.jpg (u=0.515,v=0.635 -> head u=0.523,v=0.949, +6 deg toward +u)
+  const inPlaneAngle = Cesium.Math.toRadians(6);
+  const cA = Math.cos(inPlaneAngle);
+  const sA = Math.sin(inPlaneAngle);
+  const rightRot = new Cesium.Cartesian3(
+    rightAxis.x * cA - upImgAxis.x * sA,
+    rightAxis.y * cA - upImgAxis.y * sA,
+    rightAxis.z * cA - upImgAxis.z * sA,
+  );
+  const upRot = new Cesium.Cartesian3(
+    rightAxis.x * sA + upImgAxis.x * cA,
+    rightAxis.y * sA + upImgAxis.y * cA,
+    rightAxis.z * sA + upImgAxis.z * cA,
+  );
+
+  const anchorU = 0.515;
+  const anchorV = 0.635;
+  const liftN = 0.05;
+  const pos = new Cesium.Cartesian3(
+    p0.x + rightVec.x * anchorU + upVec.x * anchorV + normalAxis.x * liftN,
+    p0.y + rightVec.y * anchorU + upVec.y * anchorV + normalAxis.y * liftN,
+    p0.z + rightVec.z * anchorU + upVec.z * anchorV + normalAxis.z * liftN,
+  );
+
+  // Entity local (+X=forward/chest -> normalAxis, +Y=modelLeft -> rightRot, +Z=feet->head -> upRot)
+  const rotMat = new Cesium.Matrix3(
+    normalAxis.x, rightRot.x, upRot.x,
+    normalAxis.y, rightRot.y, upRot.y,
+    normalAxis.z, rightRot.z, upRot.z,
+  );
+  const ori = Cesium.Quaternion.fromRotationMatrix(rotMat);
+  const glbScale = Math.max(0.25, Math.min(2.2, (hM * 0.41) / 1.79));
+  const glbUri = resolveBaseAssetUrl('models/lisa_holmes_bed.glb');
+
+  const existing = viewer.entities.getById(ROOFTOP_LISA_ENTITY_ID);
+  if (existing?.model) {
+    existing.show = !hidden;
+    existing.position = pos;
+    existing.orientation = ori;
+    existing.model.scale = glbScale;
+    _bedLiveStats.lisaGlbActive = true;
+    return;
+  }
+
+  const startMs = Date.now();
+  const breathFactor = () => {
+    const elapsedS = (Date.now() - startMs) * 0.001;
+    const hz = Math.max(0.14, Math.min(0.9, _bedBreathHz || 0.28));
+    const wave = 0.5 + 0.5 * Math.sin(2 * Math.PI * hz * elapsedS);
+    const recoilBoost = Math.min(0.03, (_bedBreathRecoil || 0) * 0.004);
+    return wave + recoilBoost;
+  };
+
+  const makeBreathNodeProp = (chestAmp, pitchAmpDeg) =>
+    new Cesium.NodeTransformationProperty({
+      scale: new Cesium.CallbackProperty(() => {
+        const b = breathFactor();
+        return new Cesium.Cartesian3(1 + chestAmp * 0.45 * b, 1 + chestAmp * 0.25 * b, 1 + chestAmp * b);
+      }, false),
+      rotation: new Cesium.CallbackProperty(() => {
+        const b = breathFactor();
+        return Cesium.Quaternion.fromAxisAngle(
+          Cesium.Cartesian3.UNIT_X,
+          Cesium.Math.toRadians(pitchAmpDeg * (b - 0.5)),
+        );
+      }, false),
+    });
+
+  viewer.entities.add({
+    id: ROOFTOP_LISA_ENTITY_ID,
+    name: '👩 Lisa Holmes 3D (Rooftop Bed Live)',
+    show: !hidden,
+    position: pos,
+    orientation: ori,
+    model: {
+      uri: glbUri,
+      scale: glbScale,
+      minimumPixelSize: 0,
+      maximumScale: 12,
+      lightColor: new Cesium.Color(1.85, 1.80, 1.72, 1.0),
+      imageBasedLightingFactor: new Cesium.Cartesian2(1.2, 0.85),
+      shadows: Cesium.ShadowMode.DISABLED,
+      nodeTransformations: {
+        Spine1: makeBreathNodeProp(0.045, 1.4),
+        Spine2: makeBreathNodeProp(0.065, 2.0),
+        Neck: makeBreathNodeProp(0.015, -1.6),
+      },
+    },
+  });
+  _bedLiveStats.lisaGlbActive = true;
+}
+
 function compositeBedLiveWireFrame(viewer) {
   if (typeof document === 'undefined' || !_bedBaseImg || !_bedBaseImg.naturalWidth) return false;
   if (!_bedLiveBufs) {
     const mk = () => {
       const c = document.createElement('canvas');
-      c.width = 1024;
-      c.height = 578;
+      c.width = 768;
+      c.height = 432;
       return c;
     };
     _bedLiveBufs = [mk(), mk()];
@@ -840,20 +1337,44 @@ function compositeBedLiveWireFrame(viewer) {
   ctx.clearRect(0, 0, W, H);
   ctx.drawImage(_bedBaseImg, 0, 0, W, H);
 
-  if (_bedLiveOverlayOn && _bedLastPayload) {
+  if (_bedLiveOverlayOn && (_bedLastPayload || _bedPoseQueue.length > 0)) {
     const sx = W / 910;
     const sy = H / 512;
-    const sp = _bedLastPayload.sparse_pose || {};
-    const tel = _bedLastPayload.telemetry || {};
-    smoothJointMap(_bedSmoothPaul, sp.paul_joints_2d || {}, 0.48);
+    const sp = _bedLastPayload?.sparse_pose || {};
+    const tel = _bedLastPayload?.telemetry || {};
 
-    // Paul DWPose Skeleton Overlay (translucent cyan/emerald rig matching real body pose & crossed ankles)
+    let jointsSrc = sp.paul_joints_2d || {};
+    let handsSrc = sp.paul_hands_2d || {};
+    if (_bedPoseQueue.length > 0) {
+      const nowWall = performance.now ? performance.now() : Date.now();
+      const dtMs = _bedLastTickWallMs > 0 ? Math.min(120, Math.max(0, nowWall - _bedLastTickWallMs)) : 50;
+      _bedLastTickWallMs = nowWall;
+      const latestTs = _bedPoseQueue[_bedPoseQueue.length - 1].ts;
+      const oldestTs = _bedPoseQueue[0].ts;
+      const targetLagTs = Math.max(oldestTs, latestTs - 2200);
+      if (_bedPlayheadTs <= 0 || _bedPlayheadTs < oldestTs || _bedPlayheadTs > latestTs + 400) {
+        _bedPlayheadTs = targetLagTs;
+      } else {
+        // Drift speed gently to track live 2.2s replay cushion without snapping
+        const err = targetLagTs - _bedPlayheadTs;
+        const speed = 1.0 + Math.max(-0.35, Math.min(0.65, err / 1800));
+        _bedPlayheadTs = Math.min(latestTs, _bedPlayheadTs + dtMs * speed);
+      }
+      const samp = sampleBufferedPoseAt(_bedPlayheadTs);
+      if (samp) {
+        jointsSrc = samp.joints || jointsSrc;
+        if (samp.hands && (samp.hands.left || samp.hands.right)) handsSrc = samp.hands;
+        if (Number.isFinite(samp.breathHz)) _bedBreathHz = samp.breathHz;
+      }
+    }
+
+    smoothJointMap(_bedSmoothPaul, jointsSrc, 0.58);
     const pj = _bedSmoothPaul;
     if (Object.keys(pj).length > 0) {
       const polyIds = ['2', '5', '11', '8'];
       if (polyIds.every((k) => pj[k])) {
         ctx.save();
-        ctx.fillStyle = 'rgba(56, 189, 248, 0.22)';
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.20)';
         ctx.beginPath();
         polyIds.forEach((k, idx) => {
           const x = pj[k][0] * sx;
@@ -865,11 +1386,11 @@ function compositeBedLiveWireFrame(viewer) {
         ctx.fill();
         ctx.restore();
       }
-      drawGlowLimbs(ctx, pj, [[0, 1], [0, 14], [0, 15], [14, 16], [15, 17]], sx, sy, '#e0f2fe', 'rgba(56,189,248,0.85)', 3.2);
-      drawGlowLimbs(ctx, pj, [[1, 2], [1, 5], [2, 8], [5, 11], [8, 11]], sx, sy, '#7dd3fc', 'rgba(14,165,233,0.9)', 4.4);
-      drawGlowLimbs(ctx, pj, [[2, 3], [3, 4], [5, 6], [6, 7]], sx, sy, '#38bdf8', 'rgba(56,189,248,0.9)', 4.2);
-      drawGlowLimbs(ctx, pj, [[8, 9], [9, 10]], sx, sy, '#22d3ee', 'rgba(6,182,212,0.92)', 4.8);
-      drawGlowLimbs(ctx, pj, [[11, 12], [12, 13]], sx, sy, '#34d399', 'rgba(16,185,129,0.92)', 4.8);
+      drawGlowLimbs(ctx, pj, [[0, 1], [0, 14], [0, 15], [14, 16], [15, 17]], sx, sy, '#e0f2fe', 'rgba(56,189,248,0.85)', 2.8);
+      drawGlowLimbs(ctx, pj, [[1, 2], [1, 5], [2, 8], [5, 11], [8, 11]], sx, sy, '#7dd3fc', 'rgba(14,165,233,0.9)', 3.6);
+      drawGlowLimbs(ctx, pj, [[2, 3], [3, 4], [5, 6], [6, 7]], sx, sy, '#38bdf8', 'rgba(56,189,248,0.9)', 3.4);
+      drawGlowLimbs(ctx, pj, [[8, 9], [9, 10]], sx, sy, '#22d3ee', 'rgba(6,182,212,0.92)', 3.8);
+      drawGlowLimbs(ctx, pj, [[11, 12], [12, 13]], sx, sy, '#34d399', 'rgba(16,185,129,0.92)', 3.8);
 
       ctx.save();
       for (const [k, pt] of Object.entries(pj)) {
@@ -877,75 +1398,51 @@ function compositeBedLiveWireFrame(viewer) {
         const py = pt[1] * sy;
         ctx.fillStyle = k === '0' ? '#fde047' : '#ffffff';
         ctx.strokeStyle = '#0284c7';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
-        ctx.arc(px, py, k === '0' ? 6.5 : 4.2, 0, Math.PI * 2);
+        ctx.arc(px, py, k === '0' ? 5.2 : 3.3, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       }
       if (pj['0']) {
-        ctx.strokeStyle = 'rgba(250, 204, 21, 0.8)';
-        ctx.lineWidth = 2.4;
+        ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
+        ctx.lineWidth = 2.0;
         ctx.beginPath();
-        ctx.arc(pj['0'][0] * sx, pj['0'][1] * sy, 18, 0, Math.PI * 2);
+        ctx.arc(pj['0'][0] * sx, pj['0'][1] * sy, 14, 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.restore();
     }
 
-    // Lisa Rig Zone Overlay (luminous magenta/rose)
-    const dz = sp.doll_zones_2d || {};
-    if (Object.keys(dz).length > 0) {
-      drawGlowLimbs(
-        ctx,
-        dz,
-        [
-          ['lips_face', 'neck_collar'],
-          ['right_shoulder', 'neck_collar'],
-          ['neck_collar', 'left_shoulder'],
-          ['right_shoulder', 'pussy_pelvis'],
-          ['left_shoulder', 'pussy_pelvis'],
-          ['waist_hip', 'pussy_pelvis'],
-          ['pussy_pelvis', 'knee_leg'],
-          ['knee_leg', 'feet_toes'],
-        ],
-        sx,
-        sy,
-        '#f472b6',
-        'rgba(236, 72, 153, 0.85)',
-        3.8,
-      );
-      ctx.save();
-      for (const pt of Object.values(dz)) {
-        if (!Array.isArray(pt) || pt.length < 2) continue;
-        ctx.fillStyle = '#fdf2f8';
-        ctx.strokeStyle = '#ec4899';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(pt[0] * sx, pt[1] * sy, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
+    // Articulated Left & Right Hands + 21-point Finger Bones
+    const hMode = handsSrc?.mode || 'tips';
+    _bedSmoothHands.mode = hMode;
+    _bedLiveStats.handMode = (handsSrc?.left || handsSrc?.right) ? hMode : 'none';
+    const smLeft = smoothHandArray('left', handsSrc?.left, 0.62);
+    const smRight = smoothHandArray('right', handsSrc?.right, 0.62);
+    if (smLeft) drawArticulatedHand(ctx, smLeft, pj['7'], hMode, sx, sy, '#67e8f9', 'rgba(34,211,238,0.9)');
+    if (smRight) drawArticulatedHand(ctx, smRight, pj['4'], hMode, sx, sy, '#fde047', 'rgba(250,204,21,0.9)');
 
-    // Sleek compact LiveWire status badge in upper-left corner
-    const badgeLabel = `● LIVEWIRE POSE · ${tel.paul_present ? 'PAUL LIVE' : 'STANDBY'} · ${Number(tel.fps || 0).toFixed(1)} FPS · ${String(tel.lisa_mood || 'WATCHING').slice(0, 20)}`;
+    // Compact LiveWire status badge (top-left)
+    const handTxt = _bedLiveStats.handMode === 'hand21' ? '21-PT HANDS' : _bedLiveStats.handMode === 'tips' ? 'FINGERTIPS' : 'HANDS STANDBY';
+    const badgeLabel = `● LIVEWIRE BED · ${tel.paul_present ? 'PAUL LIVE' : 'STANDBY'} · ${handTxt} · ${Number(tel.fps || 0).toFixed(1)} FPS · LISA 3D ${_bedBreathHz.toFixed(2)}Hz`;
     ctx.save();
     ctx.fillStyle = 'rgba(4, 9, 22, 0.78)';
     ctx.strokeStyle = tel.paul_present ? 'rgba(56, 189, 248, 0.85)' : 'rgba(148, 163, 184, 0.6)';
-    ctx.lineWidth = 2;
-    ctx.fillRect(14, 14, 520, 32);
-    ctx.strokeRect(14, 14, 520, 32);
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(10, 10, 560, 24);
+    ctx.strokeRect(10, 10, 560, 24);
     ctx.fillStyle = tel.paul_present ? '#7dd3fc' : '#cbd5e1';
-    ctx.font = '700 14px "JetBrains Mono", monospace';
+    ctx.font = '700 11px "JetBrains Mono", monospace';
     ctx.textBaseline = 'middle';
-    ctx.fillText(badgeLabel, 24, 30);
+    ctx.fillText(badgeLabel, 18, 22);
     ctx.restore();
   }
 
   _bedLiveCurrentCanvas = canv;
   _bedLiveStats.framesDrawn += 1;
+  _bedLiveStats.queueLen = _bedPoseQueue.length;
+  _bedLiveStats.breathHz = _bedBreathHz;
 
   const cur = viewer?.entities?.getById?.(ENTITY_PREFIX + 'bed-station-20261012');
   if (cur?._pflQuadPrimitive?.appearance?.material?.uniforms) {
@@ -956,7 +1453,7 @@ function compositeBedLiveWireFrame(viewer) {
 }
 
 function startBedLiveWireLoop(viewer) {
-  if (typeof window === 'undefined' || typeof fetch !== 'function') return;
+  if (typeof window === 'undefined') return;
   if (!_bedBaseImg && !_bedBaseImgLoading && typeof Image !== 'undefined') {
     _bedBaseImgLoading = true;
     const img = new Image();
@@ -967,7 +1464,7 @@ function startBedLiveWireLoop(viewer) {
       compositeBedLiveWireFrame(viewer);
     };
     img.onerror = () => { _bedBaseImgLoading = false; };
-    img.src = '/yard-frames/bed-station-solar-2026-11-17.jpg';
+    img.src = resolveBaseAssetUrl('yard-frames/bed-station-solar-2026-11-17.jpg');
   }
   window.__pflGetBedLiveWireState = () => ({ enabled: _bedLiveOverlayOn, ..._bedLiveStats });
   window.__pflSetBedLiveWireOverlay = (on) => {
@@ -976,6 +1473,15 @@ function startBedLiveWireLoop(viewer) {
     compositeBedLiveWireFrame(viewer);
     return _bedLiveOverlayOn;
   };
+  if (!_bedPlaybackTimer) {
+    _bedPlaybackTimer = setInterval(() => {
+      if (!_bedLiveOverlayOn || !yardFramesVisible || window.__pflDraggingMovable) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      if (_bedPoseQueue.length > 0 || _bedLastPayload) {
+        compositeBedLiveWireFrame(viewer);
+      }
+    }, 50);
+  }
   if (_bedLivePollTimer) return;
   const pollOnce = async () => {
     if (_bedLiveInFlight || !_bedLiveOverlayOn || !yardFramesVisible) return;
@@ -989,19 +1495,51 @@ function startBedLiveWireLoop(viewer) {
       const d = await r.json();
       if (!d || typeof d !== 'object') return;
       _bedLastPayload = d;
-      _bedLiveStats.paulDetected = Boolean(d.telemetry?.paul_present || d.sparse_pose?.paul_joints_2d);
+      const sp = d.sparse_pose || {};
+      const tel = d.telemetry || {};
+      _bedBreathHz = Number(tel.doll_breath_hz || 0.28);
+      _bedBreathRecoil = Number(tel.doll_recoil_px || 0);
+      _bedLiveStats.paulDetected = Boolean(tel.paul_present || sp.paul_joints_2d);
       _bedLiveStats.lastAgeSec = d.age_sec ?? null;
-      _bedLiveStats.fps = Number(d.telemetry?.fps || 0);
+      _bedLiveStats.fps = Number(tel.fps || 0);
       _bedLiveStats.goLive = Boolean(d.go_live);
-      compositeBedLiveWireFrame(viewer);
+
+      const burst = Array.isArray(sp.pose_burst) ? sp.pose_burst : [];
+      if (burst.length > 0) {
+        for (const item of burst) {
+          if (!Array.isArray(item) || item.length < 2) continue;
+          const tsMs = Number(item[0]);
+          const joints = item[1];
+          const bHz = Number(item[2] || _bedBreathHz);
+          const hands = item[3] || sp.paul_hands_2d || {};
+          if (Number.isFinite(tsMs) && tsMs > _bedLastEnqueuedTs && joints && typeof joints === 'object') {
+            _bedLastEnqueuedTs = tsMs;
+            _bedPoseQueue.push({ ts: tsMs, joints, breathHz: bHz, hands });
+          }
+        }
+        if (_bedPoseQueue.length > 90) _bedPoseQueue.splice(0, _bedPoseQueue.length - 90);
+      } else if (sp.paul_joints_2d && Object.keys(sp.paul_joints_2d).length > 0) {
+        const nowTs = Date.now();
+        if (nowTs > _bedLastEnqueuedTs) {
+          _bedLastEnqueuedTs = nowTs;
+          _bedPoseQueue.push({
+            ts: nowTs,
+            joints: sp.paul_joints_2d,
+            breathHz: _bedBreathHz,
+            hands: sp.paul_hands_2d || {},
+          });
+          if (_bedPoseQueue.length > 90) _bedPoseQueue.splice(0, _bedPoseQueue.length - 90);
+        }
+      }
+      if (_bedPoseQueue.length === 0) compositeBedLiveWireFrame(viewer);
     } catch {
       /* ignore transient offline */
     } finally {
       _bedLiveInFlight = false;
     }
   };
-  setTimeout(pollOnce, 400);
-  _bedLivePollTimer = setInterval(pollOnce, 600);
+  setTimeout(pollOnce, 350);
+  _bedLivePollTimer = setInterval(pollOnce, 1000);
 }
 
 /** Build (or rebuild) the Cesium entity (and true-3D quad primitive when tilted/oblique) for one frame. */
@@ -1016,21 +1554,28 @@ function buildFrameEntity(viewer, def, params) {
   const opacity = typeof params.opacity === 'number' ? params.opacity : 1.0;
   const isCleanGarage = def.id === 'garage-carport-20261117';
   const isBedLive = def.id === 'bed-station-20261012';
-  const imgUrl =
-    def.id === 'yard-overview-20261012' && params.stitchedPano
-      ? (window.__pflLiveStitchUrl || '/yard-frames/front-yard-stitched-live.png?v=18')
+  const isWarpedCam1 = def.id === 'back-yard-cam1-plan' && Boolean(params.warpedYardCam1);
+  const imgUrl = isWarpedCam1
+    ? resolveBaseAssetUrl('yard-frames/back-yard-cam1-warped-2026-11-22.png')
+    : def.id === 'yard-overview-20261012' && params.stitchedPano
+      ? (window.__pflLiveStitchUrl || resolveBaseAssetUrl('yard-frames/front-yard-stitched-live.png?v=18'))
       : def.id === 'back-yard-cam2-water' && params.stitchedWaterPano
-        ? '/yard-frames/back-yard-cam2-stitched-2026-10-26.png'
-        : def.image;
+        ? resolveBaseAssetUrl('yard-frames/back-yard-cam2-stitched-2026-10-26.png')
+        : resolveBaseAssetUrl(def.image);
   const initialImageSource =
     isCleanGarage && _cleanGarageCanvas
       ? _cleanGarageCanvas
       : isBedLive && _bedLiveOverlayOn && _bedLiveCurrentCanvas
         ? _bedLiveCurrentCanvas
         : imgUrl;
-  const isTranslucent = opacity < 0.99 || Boolean(params.stitchedPano) || Boolean(params.stitchedWaterPano);
+  const isTranslucent =
+    opacity < 0.99 ||
+    isWarpedCam1 ||
+    Number(params.rayCastFade || 0) > 0.01 ||
+    Boolean(params.stitchedPano) ||
+    Boolean(params.stitchedWaterPano);
   const useTrue3dQuad =
-    (isBedLive || !params.flat || Math.abs(Number(params.tiltDeg || 0)) >= 0.5) &&
+    (isBedLive || isWarpedCam1 || Number(params.rayCastFade || 0) > 0.01 || !params.flat || Math.abs(Number(params.tiltDeg || 0)) >= 0.5) &&
     typeof Cesium.Primitive === 'function' &&
     typeof Cesium.Geometry === 'function' &&
     Boolean(viewer?.scene?.primitives);
@@ -1043,7 +1588,10 @@ function buildFrameEntity(viewer, def, params) {
       name: 'Yard frame: ' + def.id,
       show: showNow,
     });
-    const prim = buildFrameQuadPrimitive(positions, params.texRot, initialImageSource, opacity, isTranslucent, entity);
+    const opts = { rayCastFade: Number(params.rayCastFade || 0) };
+    const prim = isWarpedCam1
+      ? buildFrameRayCastMeshPrimitive(positions, params.texRot, initialImageSource, opacity, isTranslucent, entity, opts)
+      : buildFrameQuadPrimitive(positions, params.texRot, initialImageSource, opacity, isTranslucent, entity, opts);
     prim.show = showNow;
     viewer.scene.primitives.add(prim);
     entity._pflQuadPrimitive = prim;
@@ -1107,8 +1655,9 @@ function buildFrameEntity(viewer, def, params) {
         gImg.onerror = () => { _cleanGarageLoading = false; };
         gImg.src = imgUrl;
       }
-    } else if (!isCleanGarage && !(isBedLive && _bedLiveCurrentCanvas)) {
+    } else if (!isCleanGarage && !(isBedLive && _bedLiveCurrentCanvas) && !_yardFrameImgCache.has(imgUrl)) {
       const pre = new Image();
+      _yardFrameImgCache.set(imgUrl, pre);
       pre.onload = () => {
         governorRequestRender('yardframe-tex-ready');
         setTimeout(() => governorRequestRender('yardframe-tex-ready-2'), 120);
@@ -1116,21 +1665,26 @@ function buildFrameEntity(viewer, def, params) {
       pre.src = imgUrl;
     }
   }
-  console.info(
-    '[YardFrames] ' +
-      def.id +
-      ' quad ' +
-      widthM.toFixed(1) +
-      'x' +
-      heightM.toFixed(1) +
-      ' m at ' +
-      distanceM.toFixed(1) +
-      ' m from cam ' +
-      params.camLat.toFixed(6) +
-      ', ' +
-      params.camLon.toFixed(6) +
-      (params.flat ? ' (lying flat, face to the sky)' : ''),
-  );
+  if (isBedLive) {
+    syncRooftopLisaGlb(viewer, params, positions);
+  }
+  if (!(typeof window !== 'undefined' && window.__pflDraggingMovable)) {
+    console.info(
+      '[YardFrames] ' +
+        def.id +
+        ' quad ' +
+        widthM.toFixed(1) +
+        'x' +
+        heightM.toFixed(1) +
+        ' m at ' +
+        distanceM.toFixed(1) +
+        ' m from cam ' +
+        params.camLat.toFixed(6) +
+        ', ' +
+        params.camLon.toFixed(6) +
+        (params.flat ? ' (lying flat, face to the sky)' : ''),
+    );
+  }
   governorRequestRender('yardframes-build');
   if (viewer.scene && viewer.scene.requestRender) viewer.scene.requestRender();
   return entity;
@@ -1177,7 +1731,20 @@ function rebuildFrame(viewer, id) {
   return st.entity;
 }
 
+let _saveLayoutTimer = null;
 function saveLayout(editedId = null) {
+  if (typeof window !== 'undefined' && window.__pflDraggingMovable) {
+    if (_saveLayoutTimer) clearTimeout(_saveLayoutTimer);
+    _saveLayoutTimer = setTimeout(() => {
+      _saveLayoutTimer = null;
+      saveLayoutNow(editedId);
+    }, 180);
+    return;
+  }
+  saveLayoutNow(editedId);
+}
+
+function saveLayoutNow(editedId = null) {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return;
     let prev = {};
@@ -1214,6 +1781,7 @@ function saveLayout(editedId = null) {
         restoredYardTeslaV25: true,
         fixedSaveFlagsBugV26: true,
         restoredPaulGarageAndBedV27: true,
+        fixedBackYardCam1WarpV28: true,
         userEditedIds: Array.from(userEditedSet),
         savedAt: new Date().toISOString(),
         frames,
@@ -1245,10 +1813,14 @@ export function setYardFramesVisible(viewer, visible) {
       localStorage.setItem(YARD_FRAMES_VIS_KEY, yardFramesVisible ? '1' : '0');
     }
   } catch {}
-  for (const [, st] of frameState) {
+  for (const [id, st] of frameState) {
     if (st.entity) {
       const hiddenStitch = Boolean(st.params?.hiddenByStitch) && !(editor && editor.on);
       syncQuadEntityShow(st.entity, yardFramesVisible && !hiddenStitch);
+      if (id === 'bed-station-20261012') {
+        const lisaEnt = viewer?.entities?.getById?.(ROOFTOP_LISA_ENTITY_ID);
+        if (lisaEnt) lisaEnt.show = yardFramesVisible && !hiddenStitch;
+      }
     }
   }
   if (!yardFramesVisible) clearOutline(viewer);
@@ -1321,8 +1893,27 @@ export function loadYardFrames({ viewer }) {
   if (typeof window !== 'undefined') {
     window.__pflSetYardFramesVisible = (v) => setYardFramesVisible(viewer, v);
     window.__pflGetYardFramesVisible = () => yardFramesVisible;
+    window.__pflFlushYardFramesLayout = () => saveLayoutNow(null);
+    window.__pflYardFrameSurveyDefault = (frameId) => {
+      const def = YARD_FRAMES.find((f) => f.id === frameId);
+      const sv = CALIBRATED_HOUSE_SURVEY[frameId];
+      if (!def && !sv) return null;
+      const p = { ...(def ? defaultParams(def) : {}), ...(sv || {}) };
+      const ctr = getFrameCenterGeo(p);
+      return {
+        lat: ctr.lat,
+        lon: ctr.lon,
+        heading: p.headingDeg || 0,
+        tilt: p.flat ? Number(p.tiltDeg || 0) : Number(p.pitchDeg || 0),
+        lift: ctr.heightM || 0,
+        scale: typeof p.sizeScale === 'number' && p.sizeScale > 0 ? p.sizeScale : 1,
+        opacity: typeof p.opacity === 'number' ? p.opacity : 1.0,
+      };
+    };
     window.__pflReloadLiveStitchedYard = (bustUrl) => {
-      window.__pflLiveStitchUrl = bustUrl || ('/yard-frames/front-yard-stitched-live.png?t=' + Date.now());
+      const yo = frameState.get('yard-overview-20261012');
+      if (yo) yo.params.hiddenByStitch = false;
+      window.__pflLiveStitchUrl = bustUrl || resolveBaseAssetUrl('yard-frames/front-yard-stitched-live.png?t=' + Date.now());
       if (!yardFramesVisible) setYardFramesVisible(viewer, true);
       else rebuildFrame(viewer, 'yard-overview-20261012');
     };
@@ -1331,7 +1922,7 @@ export function loadYardFrames({ viewer }) {
     try {
       if (!yardFramesVisible || (typeof editor !== 'undefined' && editor?.on)) return;
       const yo = frameState.get('yard-overview-20261012');
-      if (!yo?.entity?.polygon) return;
+      if (!yo?.entity?.polygon || yo.params?.hiddenByStitch) return;
       const c = viewer?.camera?.positionCartographic;
       if (!c) return;
       const pitchDeg = Cesium.Math.toDegrees(viewer.camera.pitch || 0);
@@ -1415,6 +2006,15 @@ export function destroyYardFrames(viewer) {
     clearInterval(_bedLivePollTimer);
     _bedLivePollTimer = null;
   }
+  if (_bedPlaybackTimer) {
+    clearInterval(_bedPlaybackTimer);
+    _bedPlaybackTimer = null;
+  }
+  if (_saveLayoutTimer) {
+    clearTimeout(_saveLayoutTimer);
+    _saveLayoutTimer = null;
+  }
+  try { viewer?.entities?.removeById?.(ROOFTOP_LISA_ENTITY_ID); } catch {}
   if (typeof yardDatumCleanup === 'function') {
     try {
       yardDatumCleanup();

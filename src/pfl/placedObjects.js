@@ -50,15 +50,22 @@ export function isFlatEllipsoidGlobe(viewer) {
 
 /** Resolve local terrain altitude in meters, avoiding bogus 0.0 m ellipsoid fallbacks while CWT tiles load. */
 export function resolveTerrainGroundM(viewer, lon, lat, fallbackM = STORED_GROUND_HEIGHT_M) {
+  const nearLiverpoolYard =
+    Math.hypot(Number(lat) - 29.24755, Number(lon) - -95.23140) < 0.05;
   if (viewer?.scene?.globe?.show) {
     const gh = viewer.scene.globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
-    if (isFlatEllipsoidGlobe(viewer)) {
-      return Number.isFinite(gh) ? gh : 0.0;
+    if (nearLiverpoolYard) {
+      // Keep 417 Palm Dr pinned at surveyed -26.19 m grade even before World Terrain swaps in over EllipsoidTerrainProvider (0.0 m) or during coarse -14935 m LOD transitions.
+      if (Number.isFinite(gh) && gh >= -32.0 && gh <= -16.0) return gh;
+      return STORED_GROUND_HEIGHT_M;
     }
-    if (Number.isFinite(gh) && Math.abs(gh) > 0.05) return gh;
+    if (isFlatEllipsoidGlobe(viewer)) {
+      return Number.isFinite(gh) && gh > -500 && gh < 9000 ? gh : 0.0;
+    }
+    if (Number.isFinite(gh) && gh > -500 && gh < 9000 && Math.abs(gh) > 0.05) return gh;
     return fallbackM;
   }
-  return fallbackM;
+  return nearLiverpoolYard ? STORED_GROUND_HEIGHT_M : fallbackM;
 }
 
 // Paul's front-yard Gaussian splat (built 2026-10-02 from his front two Wyze

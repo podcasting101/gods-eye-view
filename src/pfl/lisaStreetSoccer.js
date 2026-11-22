@@ -657,7 +657,10 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
   let speedMult = 1.0;
   let trackMode = 'field';
   let camMode = 'free';
-  let pendingDefaultWide = true;
+  const hasExplicitShareCoords =
+    typeof window !== 'undefined' &&
+    /[?&#](?:lat|lon)=/i.test(`${window.location?.hash || ''}${window.location?.search || ''}`);
+  let pendingDefaultWide = !hasExplicitShareCoords;
   let nearYardSettledAtMs = 0;
   let lightMode = 'bright';
   let destroyed = false;
