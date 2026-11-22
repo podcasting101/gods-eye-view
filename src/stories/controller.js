@@ -706,7 +706,7 @@ export function createStoriesController({
       // title of the person's own stays.
       title:
         (untitled(shot.title, i) && story.places?.[i]) || shot.title || null,
-      caption: '',
+      caption: story.captions?.[i] ?? '',
     }));
     const last = shots.at(-1);
     story.durationMs = Math.round((last.startSec + last.durationSec) * 1000);

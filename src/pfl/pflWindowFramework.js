@@ -483,9 +483,13 @@ export function loadPflWindowFramework({ viewer }) {
       <button type="button" class="pfl-f15-btn active" id="pfl-btn-static-yard" title="Show/hide the stitched front yard ground splat">🧩 Ground Splat: ON</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-arrange">🖼️ Arrange Yard Photos</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-fire">🔥 Yard Fire &amp; Legs</button>
+      <button type="button" class="pfl-f15-btn active" id="pfl-btn-lisa-soccer" style="border-color:#22c55e;color:#4ade80;font-weight:700" title="Fly to 417 Palm Dr street &amp; toggle Lisa Griffin Street Soccer GLB + physics ball">⚽ Lisa Street Soccer: ON</button>
       <button type="button" class="pfl-f15-btn" id="pfl-btn-vault-inline" style="border-color:#a855f7;color:#d8b4fe;font-weight:700">🏛️ Local Palace &amp; Wyze Vault</button>
       <a href="/memory-palace.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-palace" style="text-decoration:none;display:inline-flex;align-items:center">↗ Full Memory Palace</a>
-      <a href="http://127.0.0.1:8093/" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-livewire" style="border-color:#f43f5e;color:#fda4af;text-decoration:none;display:inline-flex;align-items:center">🎥 LiveWire (:8093) ↗</a>
+      <a href="/livewire/" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-livewire" style="border-color:#f43f5e;color:#fda4af;font-weight:700;text-decoration:none;display:inline-flex;align-items:center" title="Open LiveWire Cloud Stage (sex-world.ai/livewire/) — Free 3D Orbit, JenniCam Push & Swarm Chat">🎥 LiveWire Cloud ↗</a>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-livewire-dock" style="border-color:#ec4899;color:#f9a8d4;font-weight:700" title="Show/Hide inline LiveWire Telemetry, Stage Feed & Swarm Chat inside God's Eye View">📡 LiveWire Monitor</button>
+      <a href="http://127.0.0.1:8093/" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-livewire-local" style="border-color:#94a3b8;color:#cbd5e1;text-decoration:none;display:inline-flex;align-items:center" title="Open Local Desktop LiveWire Studio (:8093)">🖥️ :8093 ↗</a>
+      <button type="button" class="pfl-f15-btn" id="pfl-btn-reel-export" style="border-color:#a855f7;color:#e9d5ff;font-weight:700" title="Export active GEV Story or 417 Palm Dr camera sequence as Reel Studio JSON for FFmpeg / HyperFrames">🎬 Export → Reel Studio</button>
       <a href="http://127.0.0.1:8093/concierge" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-concierge" style="border-color:#d4af37;color:#fde047;font-weight:700;text-decoration:none;display:inline-flex;align-items:center">🥂 PFL Concierge ↗</a>
       <a href="https://elitespyworlds.com/birdpond/adventure.html" target="_blank" rel="noopener" class="pfl-f15-btn" id="pfl-btn-birdpond-ext" style="text-decoration:none;display:inline-flex;align-items:center">🌿 EliteSpyWorlds Bird Pond ↗</a>
     `;
@@ -577,6 +581,22 @@ export function loadPflWindowFramework({ viewer }) {
       if (typeof window.__pflOpenFireModal === 'function') window.__pflOpenFireModal();
       else document.getElementById('gev-fire-video-btn')?.click();
     });
+    extraRow.querySelector('#pfl-btn-lisa-soccer')?.addEventListener('click', (ev) => {
+      const btn = ev.currentTarget;
+      const curOn = window.__pflGetLisaSoccerState?.()?.enabled !== false;
+      const next = typeof window.__pflToggleLisaSoccer === 'function' ? window.__pflToggleLisaSoccer(!curOn) : !curOn;
+      btn.textContent = next ? '⚽ Lisa Street Soccer: ON' : '⚽ Lisa Street Soccer: OFF';
+      btn.classList.toggle('active', next);
+      if (next) {
+        unlockDroneCamera();
+        const gBase = resolveLocalGroundM(-95.231385, 29.247222);
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(-95.231385, 29.24700, gBase + 9.5),
+          orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-16), roll: 0 },
+          duration: 1.0,
+        });
+      }
+    });
     extraRow.querySelector('#pfl-dock-polymarket-btn')?.addEventListener('click', () => {
       if (typeof window.__pflTogglePolymarket === 'function') {
         const next = window.__pflTogglePolymarket();
@@ -637,6 +657,16 @@ export function loadPflWindowFramework({ viewer }) {
         kalshiWin.box.style.zIndex = '9680';
       }
     });
+    extraRow.querySelector('#pfl-btn-livewire-dock')?.addEventListener('click', () => {
+      if (typeof window.__pflToggleLiveWireMonitor === 'function') {
+        window.__pflToggleLiveWireMonitor();
+      }
+    });
+    extraRow.querySelector('#pfl-btn-reel-export')?.addEventListener('click', () => {
+      if (typeof window.__pflExportStoryForReelStudio === 'function') {
+        window.__pflExportStoryForReelStudio();
+      }
+    });
   }, 400);
 
   // 2) Bird Pond 3D Axis Compass Globe + Live Camera / Selected 3D Object Inspector Box (Dual Side-by-Side Pads)
@@ -656,6 +686,7 @@ export function loadPflWindowFramework({ viewer }) {
       <div id="pfl-cam-readout" style="text-align:center;font-size:10px;color:#94a3b8;line-height:1.3">CAM READY</div>
       <div id="pfl-drag-pan-row" style="width:100%;display:flex;gap:4px">
         <button type="button" class="pfl-std-cbtn" id="pfl-drag-pan-toggle" style="flex:1;border-color:#22c55e;color:#4ade80" title="Lock Yaw on Left-Drag near houses (Google Maps flat pan — use Ctrl+Drag or Compass Ball below to rotate)">✋ Drag: PAN (Flat)</button>
+        <button type="button" class="pfl-std-cbtn" id="pfl-compass-snap-btn" style="border-color:#f472b6;color:#fbcfe8;font-weight:700" title="Instant WebGL PNG Screenshot right next to Orbit Ball">📸 Snap</button>
       </div>
       <div id="pfl-dual-pads-grid">
         <div id="pfl-camera-pad-card">
@@ -680,7 +711,7 @@ export function loadPflWindowFramework({ viewer }) {
           </div>
           <div id="pfl-sel-name" style="height:18px;line-height:18px;color:#4ade80;font-size:9.5px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🗺️ Map (Click any object)</div>
           <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-            <canvas id="pfl-obj-move-ball" width="128" height="128" style="cursor:grab;touch-action:none;border-radius:50%" title="Drag inner puck to slide object on ground (relative to view); drag outer cyan ring to spin heading 0°–360°"></canvas>
+            <canvas id="pfl-obj-move-ball" width="128" height="128" style="cursor:grab;touch-action:none;border-radius:50%" title="Inner puck: drag XY on ground · Outer cyan ring: spin Heading 0°–360° · Gold 3D Tilt handle (▲T) or Shift+drag: Tilt UP/DOWN (-90° to +90°)"></canvas>
             <div style="font-size:8.5px;color:#94a3b8;text-align:center;line-height:1.25">XY Move · Outer Ring Spin</div>
           </div>
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
@@ -706,11 +737,23 @@ export function loadPflWindowFramework({ viewer }) {
             <button type="button" class="pfl-std-cbtn" id="pfl-nudge-step-btn" title="Cycle move step size (0.1m / 0.25m / 1.0m)">📏 .25m</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-drag-speed-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Cycle mouse drag sensitivity">🐢 0.30×</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-reset-all-objects-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Reset House, Monaco RV, Lisa, Chair &amp; Yard Photos back to surveyed positions">↺ All</button>
+            <button type="button" class="pfl-std-cbtn" id="pfl-avatar-light-btn" style="border-color:#5eead4;color:#ccfbf1" title="Cycle uniform character illumination: Uniform Unlit (bright even at night) / Studio Fill / Scene Sun">🔆 Light: Uniform</button>
           </div>
           <label style="display:flex;justify-content:space-between;font-size:10px"><span>Heading (°)</span><span id="pfl-hdg-val">154°</span></label>
           <input type="range" id="pfl-hdg-slider" min="0" max="360" step="1" value="154" style="width:100%" />
           <label style="display:flex;justify-content:space-between;font-size:10px"><span>Height / Lift (m)</span><span id="pfl-alt-val">0.00m</span></label>
           <input type="range" id="pfl-alt-slider" min="-35" max="35" step="0.1" value="0" style="width:100%" title="Manual vertical height override (-35 m to +35 m)" />
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:10px">
+            <span>🪜 Tilt / Pitch (°)</span>
+            <div style="display:flex;gap:3px;align-items:center">
+              <button type="button" class="pfl-std-cbtn" data-pfl-tilt-delta="-10" style="padding:1px 5px;font-size:9.5px" title="Tilt photo down/back -10°">−10°</button>
+              <span id="pfl-tilt-val" style="min-width:28px;text-align:center;color:#fde047;font-weight:700">0°</span>
+              <button type="button" class="pfl-std-cbtn" data-pfl-tilt-delta="10" style="padding:1px 5px;font-size:9.5px" title="Tilt headboard / wall UP +10°">+10°</button>
+              <button type="button" class="pfl-std-cbtn" id="pfl-tilt-flat-btn" style="padding:1px 5px;font-size:9.5px" title="Lay flat on roof/floor (0°)">Flat</button>
+              <button type="button" class="pfl-std-cbtn" id="pfl-tilt-stand-btn" style="padding:1px 5px;font-size:9.5px;border-color:#fbbf24;color:#fde047" title="Tilt upright into the air (+75° wall)">🧱 Up</button>
+            </div>
+          </div>
+          <input type="range" id="pfl-tilt-slider" min="-90" max="90" step="1" value="0" style="width:100%;accent-color:#fbbf24" title="Tilt selected photo UP/DOWN (-90° to +90°) — lift headboard &amp; wall off the roof" />
           <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:10px">
             <span>📐 Size</span>
             <div style="display:flex;gap:3px;align-items:center">
@@ -1147,6 +1190,28 @@ export function loadPflWindowFramework({ viewer }) {
     e.currentTarget.style.borderColor = panDragMode ? '#22c55e' : '#38bdf8';
     e.currentTarget.style.color = panDragMode ? '#4ade80' : '#7dd3fc';
   });
+  compassWin.body.querySelector('#pfl-compass-snap-btn')?.addEventListener('click', (e) => {
+    const b = e.currentTarget;
+    let ok = false;
+    try {
+      if (typeof window.__pflCaptureSnapshot === 'function') {
+        ok = window.__pflCaptureSnapshot();
+      } else if (viewer?.scene?.canvas) {
+        viewer.scene.render();
+        const a = document.createElement('a');
+        a.href = viewer.scene.canvas.toDataURL('image/png');
+        a.download = `pfl-gev-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        ok = true;
+      }
+    } catch {}
+    if (b) {
+      b.textContent = ok ? '✅ Saved!' : '⚠️ Retry';
+      setTimeout(() => { b.textContent = '📸 Snap'; }, 1200);
+    }
+  });
 
   function syncRbacUi() {
     const canEdit = isGlobalEditAllowed();
@@ -1210,6 +1275,8 @@ export function loadPflWindowFramework({ viewer }) {
     compassWin.body.querySelectorAll('#pfl-object-pad-card input[type="range"]').forEach((el) => {
       if (el.id === 'pfl-scale-slider') {
         el.disabled = !movableSupportsScale(activeMovable);
+      } else if (el.id === 'pfl-tilt-slider') {
+        el.disabled = !movableSupportsTilt(activeMovable);
       } else {
         el.disabled = false;
       }
@@ -1247,6 +1314,7 @@ export function loadPflWindowFramework({ viewer }) {
         lat: Number(st.lat),
         lon: Number(st.lon),
         heading: Number(st.heading ?? 0),
+        ...(Number.isFinite(Number(st.tilt)) ? { tilt: Number(st.tilt) } : {}),
         lift: Number(st.lift ?? 0),
         scale: Number(st.scale ?? 1),
         opacity: Number(st.opacity ?? 1),
@@ -1302,6 +1370,7 @@ export function loadPflWindowFramework({ viewer }) {
             lat: Number(pose.lat),
             lon: Number(pose.lon),
             heading: Number(pose.heading ?? 0),
+            ...(Number.isFinite(Number(pose.tilt)) ? { tilt: Number(pose.tilt) } : {}),
             lift: Number(pose.lift ?? 0),
             scale: Number(pose.scale ?? 1) || 1,
             opacity: Number.isFinite(Number(pose.opacity)) ? Number(pose.opacity) : 1,
@@ -1998,6 +2067,12 @@ export function loadPflWindowFramework({ viewer }) {
     const kind = String(mov?.kind || '');
     return Boolean(kind);
   }
+  function movableSupportsTilt(mov) {
+    const kind = String(mov?.kind || '');
+    if (kind.startsWith('yardframe:')) return true;
+    const st = mov?.getState?.();
+    return Boolean(st && typeof st.tilt === 'number' && Number.isFinite(st.tilt));
+  }
   function getMovableScale(mov) {
     const st = mov?.getState?.() || {};
     if (Number(st.scale) > 0) return Number(st.scale);
@@ -2014,6 +2089,8 @@ export function loadPflWindowFramework({ viewer }) {
     const st = mov.getState() || {};
     const hdg = (((Math.round(Number(st.heading || 0)) % 360) + 360) % 360);
     const lift = Number(st.lift || 0);
+    const canTilt = movableSupportsTilt(mov);
+    const tiltDeg = canTilt ? Math.max(-90, Math.min(90, Math.round(Number(st.tilt || 0)))) : 0;
     const hdgSl = compassWin.body.querySelector('#pfl-hdg-slider');
     const hdgVl = compassWin.body.querySelector('#pfl-hdg-val');
     if (hdgSl) hdgSl.value = String(hdg);
@@ -2032,6 +2109,19 @@ export function loadPflWindowFramework({ viewer }) {
       liftZeroBtn.style.color = highLift ? '#fca5a5' : '#4ade80';
       liftZeroBtn.style.background = highLift ? 'rgba(239,68,68,0.22)' : '';
     }
+    const tiltSl = compassWin.body.querySelector('#pfl-tilt-slider');
+    const tiltVl = compassWin.body.querySelector('#pfl-tilt-val');
+    if (tiltSl) {
+      tiltSl.disabled = !canTilt;
+      tiltSl.value = String(tiltDeg);
+    }
+    if (tiltVl) {
+      tiltVl.textContent = canTilt ? `${tiltDeg}°` : 'n/a';
+      tiltVl.style.color = canTilt && Math.abs(tiltDeg) >= 5 ? '#fde047' : '#94a3b8';
+    }
+    compassWin.body.querySelectorAll('[data-pfl-tilt-delta], #pfl-tilt-flat-btn, #pfl-tilt-stand-btn').forEach((b) => {
+      b.disabled = !canTilt;
+    });
 
     const scSl = compassWin.body.querySelector('#pfl-scale-slider');
     const scVl = compassWin.body.querySelector('#pfl-scale-val');
@@ -2210,15 +2300,16 @@ export function loadPflWindowFramework({ viewer }) {
     nudgeStepBtn.textContent = `📏 ${v < 1 ? String(v).replace(/^0/, '') : v}m`;
   });
 
-  // Bird Pond Object Move & 0–360° Spin Ring Canvas (<canvas id="pfl-obj-move-ball">)
+  // Bird Pond 3D Object Move, 0–360° Spin Ring, Live 3D Quad Preview & Tilt Handle (<canvas id="pfl-obj-move-ball">)
   const objBallCanvas = compassWin.body.querySelector('#pfl-obj-move-ball');
   const objBallCtx = objBallCanvas?.getContext?.('2d');
-  let objBallMode = null; // null | 'xy' | 'spin'
+  let objBallMode = null; // null | 'xy' | 'spin' | 'tilt'
   let objBallDragOffset = { x: 0, y: 0 };
+  let objTiltKnobPos = { x: 94, y: 64 };
 
   paintObjMoveBall = () => {
     if (!objBallCtx) return;
-    const W = 128, H = 128, cx = 64, cy = 64, ringR = 50, puckMaxR = 24;
+    const W = 128, H = 128, cx = 64, cy = 64, ringR = 50, puckMaxR = 20;
     objBallCtx.clearRect(0, 0, W, H);
     const grad = objBallCtx.createRadialGradient(cx - 10, cy - 10, 4, cx, cy, ringR + 10);
     grad.addColorStop(0, 'rgba(30, 41, 59, 0.96)');
@@ -2247,20 +2338,70 @@ export function loadPflWindowFramework({ viewer }) {
     }
 
     // Inner XY crosshair well
-    objBallCtx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+    objBallCtx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
     objBallCtx.lineWidth = 1;
     objBallCtx.beginPath();
     objBallCtx.arc(cx, cy, 34, 0, Math.PI * 2);
-    objBallCtx.moveTo(cx - 28, cy);
-    objBallCtx.lineTo(cx + 28, cy);
-    objBallCtx.moveTo(cx, cy - 28);
-    objBallCtx.lineTo(cx, cy + 28);
+    objBallCtx.moveTo(cx - 26, cy);
+    objBallCtx.lineTo(cx + 26, cy);
+    objBallCtx.moveTo(cx, cy - 26);
+    objBallCtx.lineTo(cx, cy + 26);
     objBallCtx.stroke();
 
-    const hdgDeg = Number(activeMovable?.getState?.()?.heading || 0);
+    const st = activeMovable?.getState?.() || {};
+    const hdgDeg = Number(st.heading || 0);
+    const canTilt = movableSupportsTilt(activeMovable);
+    const tiltDeg = canTilt ? Math.max(-90, Math.min(90, Number(st.tilt || 0))) : 0;
     const hRad = ((hdgDeg - 90) * Math.PI) / 180;
     const kx = cx + Math.cos(hRad) * ringR;
     const ky = cy + Math.sin(hRad) * ringR;
+
+    // Live 3D object orientation preview plane (rotated by object heading + tilt, viewed from Cesium camera)
+    if (activeMovable && viewer?.camera) {
+      const camH = viewer.camera.heading || 0;
+      const camP = viewer.camera.pitch || 0;
+      const ch = Math.cos(camH), sh = Math.sin(camH);
+      const cp = Math.cos(camP), sp = Math.sin(camP);
+      const objH = (hdgDeg * Math.PI) / 180;
+      const objT = (tiltDeg * Math.PI) / 180;
+      const proj = (e, n, u) => {
+        const rx = e * ch + n * sh;
+        const rz = -e * sh + n * ch;
+        const ry = u * cp - rz * sp;
+        return [cx + rx * 23, cy - ry * 23];
+      };
+      const rE = Math.cos(objH), rN = -Math.sin(objH);
+      const uE = Math.sin(objH) * Math.cos(objT), uN = Math.cos(objH) * Math.cos(objT), uZ = Math.sin(objT);
+      const corners = [
+        proj(-rE - uE, -rN - uN, -uZ),
+        proj(rE - uE, rN - uN, -uZ),
+        proj(rE + uE, rN + uN, uZ),
+        proj(-rE + uE, -rN + uN, uZ),
+      ];
+      objBallCtx.fillStyle = 'rgba(250, 204, 21, 0.16)';
+      objBallCtx.strokeStyle = 'rgba(250, 204, 21, 0.65)';
+      objBallCtx.lineWidth = 1.4;
+      objBallCtx.beginPath();
+      objBallCtx.moveTo(corners[0][0], corners[0][1]);
+      for (let i = 1; i < 4; i++) objBallCtx.lineTo(corners[i][0], corners[i][1]);
+      objBallCtx.closePath();
+      objBallCtx.fill();
+      objBallCtx.stroke();
+      // Bright amber top/headboard edge + up normal arrow
+      objBallCtx.strokeStyle = '#f59e0b';
+      objBallCtx.lineWidth = 2.6;
+      objBallCtx.beginPath();
+      objBallCtx.moveTo(corners[2][0], corners[2][1]);
+      objBallCtx.lineTo(corners[3][0], corners[3][1]);
+      objBallCtx.stroke();
+      const topMid = proj(uE * 1.15, uN * 1.15, uZ * 1.15);
+      objBallCtx.strokeStyle = '#4ade80';
+      objBallCtx.lineWidth = 1.6;
+      objBallCtx.beginPath();
+      objBallCtx.moveTo(cx, cy);
+      objBallCtx.lineTo(topMid[0], topMid[1]);
+      objBallCtx.stroke();
+    }
 
     // Heading spoke & cyan ring knob
     objBallCtx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
@@ -2272,25 +2413,50 @@ export function loadPflWindowFramework({ viewer }) {
 
     objBallCtx.fillStyle = activeMovable ? '#38bdf8' : '#64748b';
     objBallCtx.beginPath();
-    objBallCtx.arc(kx, ky, 6.5, 0, Math.PI * 2);
+    objBallCtx.arc(kx, ky, 6.2, 0, Math.PI * 2);
     objBallCtx.fill();
     objBallCtx.strokeStyle = '#0f172a';
     objBallCtx.lineWidth = 1.5;
     objBallCtx.stroke();
+
+    // Right meridian 3D Tilt arc & draggable Gold Handle (-90°..+90°)
+    const arcR = 32;
+    objBallCtx.strokeStyle = canTilt ? 'rgba(251, 191, 36, 0.55)' : 'rgba(100, 116, 139, 0.25)';
+    objBallCtx.lineWidth = 2.4;
+    objBallCtx.beginPath();
+    objBallCtx.arc(cx, cy, arcR, -Math.PI * 0.46, Math.PI * 0.46);
+    objBallCtx.stroke();
+    const tiltRad = (tiltDeg * Math.PI) / 180;
+    const tx = cx + Math.cos(tiltRad) * arcR;
+    const ty = cy - Math.sin(tiltRad) * arcR;
+    objTiltKnobPos = { x: tx, y: ty };
+
+    objBallCtx.fillStyle = objBallMode === 'tilt' ? '#fef08a' : canTilt ? '#f59e0b' : '#475569';
+    objBallCtx.beginPath();
+    objBallCtx.arc(tx, ty, 7.2, 0, Math.PI * 2);
+    objBallCtx.fill();
+    objBallCtx.strokeStyle = '#0f172a';
+    objBallCtx.lineWidth = 1.5;
+    objBallCtx.stroke();
+    objBallCtx.fillStyle = '#0f172a';
+    objBallCtx.font = '800 7.5px "JetBrains Mono", monospace';
+    objBallCtx.textAlign = 'center';
+    objBallCtx.textBaseline = 'middle';
+    objBallCtx.fillText(canTilt ? 'T' : '·', tx, ty + 0.5);
 
     // Inner XY drag puck
     const px = cx + Math.max(-puckMaxR, Math.min(puckMaxR, objBallDragOffset.x));
     const py = cy + Math.max(-puckMaxR, Math.min(puckMaxR, objBallDragOffset.y));
     objBallCtx.fillStyle = objBallMode === 'xy' ? '#facc15' : activeMovable ? '#fbbf24' : '#475569';
     objBallCtx.beginPath();
-    objBallCtx.arc(px, py, 11, 0, Math.PI * 2);
+    objBallCtx.arc(px, py, 10.5, 0, Math.PI * 2);
     objBallCtx.fill();
     objBallCtx.strokeStyle = '#0f172a';
     objBallCtx.lineWidth = 1.5;
     objBallCtx.stroke();
 
     objBallCtx.fillStyle = '#0f172a';
-    objBallCtx.font = '800 9px "JetBrains Mono", monospace';
+    objBallCtx.font = '800 8.5px "JetBrains Mono", monospace';
     objBallCtx.textAlign = 'center';
     objBallCtx.textBaseline = 'middle';
     objBallCtx.fillText(activeMovable ? `${Math.round(((hdgDeg % 360) + 360) % 360)}°` : 'NONE', px, py);
@@ -2312,10 +2478,20 @@ export function loadPflWindowFramework({ viewer }) {
       const dx = mx - 64;
       const dy = my - 64;
       const dist = Math.hypot(dx, dy);
+      const tiltKnobDist = Math.hypot(mx - objTiltKnobPos.x, my - objTiltKnobPos.y);
+      const canTilt = movableSupportsTilt(activeMovable);
       const startAngleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
-      const startHeading = Number(activeMovable.getState?.()?.heading || 0);
-      objBallMode = dist >= 36 ? 'spin' : 'xy';
-      objBallPtr = { id: e.pointerId, lastX: mx, lastY: my, startAngleDeg, startHeading };
+      const stNow = activeMovable.getState?.() || {};
+      const startHeading = Number(stNow.heading || 0);
+      const startTilt = Number(stNow.tilt || 0);
+      if (canTilt && (tiltKnobDist <= 13 || e.shiftKey)) {
+        objBallMode = 'tilt';
+      } else if (dist >= 39) {
+        objBallMode = 'spin';
+      } else {
+        objBallMode = 'xy';
+      }
+      objBallPtr = { id: e.pointerId, lastX: mx, lastY: my, startY: my, startAngleDeg, startHeading, startTilt };
       objBallCanvas.style.cursor = 'grabbing';
       try { objBallCanvas.setPointerCapture(e.pointerId); } catch {}
       holdContinuousRender('pfl-obj-ball');
@@ -2323,7 +2499,10 @@ export function loadPflWindowFramework({ viewer }) {
     objBallCanvas.addEventListener('pointermove', (e) => {
       if (!objBallPtr || e.pointerId !== objBallPtr.id || !activeMovable) return;
       const { mx, my } = toObjBallCoords(e);
-      if (objBallMode === 'spin') {
+      if (objBallMode === 'tilt') {
+        const nextTilt = Math.max(-90, Math.min(90, Math.round(objBallPtr.startTilt + (objBallPtr.startY - my) * 1.9)));
+        applyActiveObjectPatch({ tilt: nextTilt });
+      } else if (objBallMode === 'spin') {
         const curAngleDeg = (Math.atan2(my - 64, mx - 64) * 180) / Math.PI;
         const deltaDeg = ((curAngleDeg - objBallPtr.startAngleDeg + 540) % 360) - 180;
         applyActiveObjectPatch({
@@ -3055,6 +3234,29 @@ export function loadPflWindowFramework({ viewer }) {
     applyActiveLift(0);
   });
 
+  const applyActiveTilt = (nextTilt) => {
+    if (!activeMovable || !movableSupportsTilt(activeMovable)) return;
+    const clamped = Math.max(-90, Math.min(90, Math.round(Number(nextTilt || 0))));
+    applyActiveObjectPatch({ tilt: clamped });
+  };
+  compassWin.body.querySelector('#pfl-tilt-slider')?.addEventListener('input', (e) => {
+    applyActiveTilt(Number(e.target.value));
+  });
+  compassWin.body.querySelectorAll('[data-pfl-tilt-delta]').forEach((btn) => {
+    const delta = Number(btn.getAttribute('data-pfl-tilt-delta') || 0);
+    attachPadRepeat(btn, () => {
+      if (!activeMovable || !movableSupportsTilt(activeMovable)) return;
+      const cur = Number(activeMovable.getState()?.tilt || 0);
+      applyActiveTilt(cur + delta);
+    });
+  });
+  compassWin.body.querySelector('#pfl-tilt-flat-btn')?.addEventListener('click', () => {
+    applyActiveTilt(0);
+  });
+  compassWin.body.querySelector('#pfl-tilt-stand-btn')?.addEventListener('click', () => {
+    applyActiveTilt(75);
+  });
+
   compassWin.body.querySelector('#pfl-scale-slider')?.addEventListener('input', (e) => {
     if (!activeMovable || !movableSupportsScale(activeMovable)) return;
     setMovableScale(activeMovable, Number(e.target.value));
@@ -3123,7 +3325,59 @@ export function loadPflWindowFramework({ viewer }) {
   const glbFileIn = compassWin.body.querySelector('#pfl-glb-file-input');
   const glbFileBtn = compassWin.body.querySelector('#pfl-glb-file-btn');
   const createdGlbUrls = [];
+  const customGlbEntityIds = [];
+  let avatarLightMode = 'bright';
   let customGlbCounter = 0;
+
+  function makeGlbShaderForMode(mode) {
+    if (mode === 'sun' || typeof Cesium.CustomShader !== 'function') return undefined;
+    try {
+      if (mode === 'bright') {
+        return new Cesium.CustomShader({
+          lightingModel: Cesium.LightingModel.UNLIT,
+          fragmentShaderText: 'void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) { material.diffuse = min(vec3(1.0), material.diffuse * 1.12); }',
+        });
+      }
+      return new Cesium.CustomShader({
+        lightingModel: Cesium.LightingModel.PBR,
+        fragmentShaderText: 'void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) { material.emissive += material.diffuse * 0.65; }',
+      });
+    } catch {
+      return undefined;
+    }
+  }
+
+  function applyGlobalAvatarLightMode(mode) {
+    avatarLightMode = ['bright', 'studio', 'sun'].includes(mode) ? mode : 'bright';
+    const sh = makeGlbShaderForMode(avatarLightMode);
+    for (const eid of customGlbEntityIds) {
+      const ent = viewer?.entities?.getById?.(eid);
+      if (ent?.model) {
+        try {
+          ent.model.customShader = sh;
+          ent.model.lightColor = avatarLightMode === 'sun' ? Cesium.Color.WHITE : new Cesium.Color(1.9, 1.85, 1.75, 1.0);
+        } catch {}
+      }
+    }
+    try {
+      const lisaEnt = viewer?.entities?.getById?.('lisa-muse-sovereign-anchor');
+      if (lisaEnt?.model) lisaEnt.model.customShader = sh;
+    } catch {}
+    try {
+      window.__pflSetSoccerTimeline?.({ lightMode: avatarLightMode });
+    } catch {}
+    const lBtn = compassWin.body?.querySelector?.('#pfl-avatar-light-btn');
+    if (lBtn) {
+      lBtn.textContent = avatarLightMode === 'bright' ? '🔆 Light: Uniform' : avatarLightMode === 'studio' ? '💡 Light: Studio' : '🌙 Light: Sun';
+      lBtn.style.borderColor = avatarLightMode === 'sun' ? '#64748b' : '#5eead4';
+    }
+    governorRequestRender('pfl-avatar-light-mode');
+  }
+
+  compassWin.body.querySelector('#pfl-avatar-light-btn')?.addEventListener('click', () => {
+    const order = ['bright', 'studio', 'sun'];
+    applyGlobalAvatarLightMode(order[(order.indexOf(avatarLightMode) + 1) % order.length]);
+  });
 
   try {
     const savedTok = localStorage.getItem(SKETCHFAB_TOKEN_KEY) || '';
@@ -3190,8 +3444,12 @@ export function loadPflWindowFramework({ viewer }) {
           heightReference: Cesium.HeightReference.NONE,
           minimumPixelSize: 16,
           maximumScale: 80,
+          lightColor: avatarLightMode === 'sun' ? Cesium.Color.WHITE : new Cesium.Color(1.9, 1.85, 1.75, 1.0),
+          imageBasedLightingFactor: avatarLightMode === 'sun' ? new Cesium.Cartesian2(1, 1) : new Cesium.Cartesian2(1.25, 0.9),
+          customShader: makeGlbShaderForMode(avatarLightMode),
         },
       });
+      customGlbEntityIds.push(entityId);
       yardLandmarkIds.push(entityId);
       return ent;
     };
@@ -6544,7 +6802,17 @@ export function loadPflWindowFramework({ viewer }) {
           </div>
 
           <div data-mls-plan-sec="2f" style="border:1px solid rgba(250,204,21,0.45);border-radius:6px;padding:5px;background:rgba(30,41,59,0.55)">
-            <div style="font-size:9.5px;font-weight:700;color:#fde047;margin-bottom:4px">🏠 2ND FLOOR — 1,470 SF (MAIN ELEVATED LIVING)</div>
+            <div style="font-size:9.5px;font-weight:700;color:#fde047;margin-bottom:4px">🏠 2ND FLOOR — 1,470 SF (ARCHITECTURAL PLAN · CLICK ANY ROOM)</div>
+            <svg viewBox="0 0 260 144" style="width:100%;height:auto;display:block;margin-bottom:4px;background:rgba(2,6,23,0.7);border:1px solid rgba(250,204,21,0.28);border-radius:4px">
+              <g data-mls-room="porch-2f" style="cursor:pointer"><rect x="6" y="4" width="248" height="22" rx="3" fill="rgba(56,189,248,0.16)" stroke="#38bdf8" stroke-width="1.2"/><text x="130" y="18" text-anchor="middle" fill="#bae6fd" font-size="8.5" font-weight="700">SCREENED BAYOU PORCH (m04, m05, m26)</text></g>
+              <g data-mls-room="office-nw-2f" style="cursor:pointer"><rect x="6" y="29" width="76" height="42" rx="2" fill="rgba(30,41,59,0.85)" stroke="#64748b" stroke-width="1.2"/><text x="44" y="48" text-anchor="middle" fill="#e2e8f0" font-size="8" font-weight="700">NW OFFICE</text><text x="44" y="59" text-anchor="middle" fill="#94a3b8" font-size="7">(m14)</text></g>
+              <g data-mls-room="living-2f" style="cursor:pointer"><rect x="85" y="29" width="90" height="42" rx="2" fill="rgba(30,41,59,0.85)" stroke="#64748b" stroke-width="1.2"/><text x="130" y="48" text-anchor="middle" fill="#e2e8f0" font-size="8" font-weight="700">LIVING RM</text><text x="130" y="59" text-anchor="middle" fill="#94a3b8" font-size="7">(m06, m07)</text></g>
+              <g data-mls-room="dining-2f" style="cursor:pointer"><rect x="178" y="29" width="76" height="42" rx="2" fill="rgba(30,41,59,0.85)" stroke="#64748b" stroke-width="1.2"/><text x="216" y="48" text-anchor="middle" fill="#e2e8f0" font-size="8" font-weight="700">NE DINING</text><text x="216" y="59" text-anchor="middle" fill="#94a3b8" font-size="7">(m09, m11)</text></g>
+              <g data-mls-room="master-sw-2f" style="cursor:pointer"><rect x="6" y="74" width="104" height="43" rx="2" fill="rgba(250,204,21,0.12)" stroke="#fbbf24" stroke-width="1.3"/><rect x="84" y="84" width="22" height="24" rx="2" fill="rgba(251,191,36,0.28)" stroke="#fde047" stroke-width="1"/><text x="45" y="92" text-anchor="middle" fill="#fef08a" font-size="8" font-weight="700">MASTER SW</text><text x="45" y="103" text-anchor="middle" fill="#cbd5e1" font-size="6.8">🛏️ Bed→Kitchen Wall</text></g>
+              <g data-mls-room="baths-2f" style="cursor:pointer"><rect x="113" y="74" width="54" height="43" rx="2" fill="rgba(30,41,59,0.85)" stroke="#64748b" stroke-width="1.2"/><text x="140" y="93" text-anchor="middle" fill="#e2e8f0" font-size="7.5" font-weight="700">BATHS 1–2</text><text x="140" y="104" text-anchor="middle" fill="#94a3b8" font-size="6.8">(m13,m16)</text></g>
+              <g data-mls-room="kitchen-2f" style="cursor:pointer"><rect x="170" y="74" width="84" height="43" rx="2" fill="rgba(30,41,59,0.85)" stroke="#94a3b8" stroke-width="1.3"/><text x="212" y="93" text-anchor="middle" fill="#e2e8f0" font-size="8" font-weight="700">CHEF KITCHEN</text><text x="212" y="104" text-anchor="middle" fill="#94a3b8" font-size="7">(m08, m10)</text></g>
+              <g data-mls-room="balcony-2f" style="cursor:pointer"><rect x="6" y="120" width="248" height="20" rx="3" fill="rgba(245,158,11,0.14)" stroke="#f59e0b" stroke-width="1.2"/><text x="130" y="133" text-anchor="middle" fill="#fde68a" font-size="8" font-weight="700">SOUTH FRONT BALCONY — PALM DR (m02, m03, m17)</text></g>
+            </svg>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
               <button type="button" class="pfl-std-cbtn" data-mls-room="porch-2f" style="grid-column:1 / -1;text-align:left;padding:3px 5px">🌅 Screened Bayou Porch <span style="color:#94a3b8">(m04,m05,m26)</span></button>
               <button type="button" class="pfl-std-cbtn" data-mls-room="office-nw-2f" style="text-align:left;padding:3px 5px">💻 NW Office <span style="color:#94a3b8">(m14)</span></button>
@@ -6558,7 +6826,14 @@ export function loadPflWindowFramework({ viewer }) {
           </div>
 
           <div data-mls-plan-sec="1f" style="border:1px solid rgba(74,222,128,0.42);border-radius:6px;padding:5px;background:rgba(15,23,42,0.68)">
-            <div style="font-size:9.5px;font-weight:700;color:#86efac;margin-bottom:4px">🎱 1ST FLOOR — 1,570 SF (GROUND / ENTERTAINING)</div>
+            <div style="font-size:9.5px;font-weight:700;color:#86efac;margin-bottom:4px">🎱 1ST FLOOR — 1,570 SF (GROUND / ENTERTAINING PLAN)</div>
+            <svg viewBox="0 0 260 88" style="width:100%;height:auto;display:block;margin-bottom:4px;background:rgba(2,6,23,0.7);border:1px solid rgba(74,222,128,0.28);border-radius:4px">
+              <g data-mls-room="patio-1f" style="cursor:pointer"><rect x="6" y="4" width="248" height="20" rx="3" fill="rgba(74,222,128,0.14)" stroke="#4ade80" stroke-width="1.2"/><text x="130" y="17" text-anchor="middle" fill="#bbf7d0" font-size="8" font-weight="700">1F COVERED WATERFRONT PATIO (m01, m19)</text></g>
+              <g data-mls-room="gameroom-1f" style="cursor:pointer"><rect x="6" y="27" width="144" height="56" rx="2" fill="rgba(30,41,59,0.85)" stroke="#64748b" stroke-width="1.2"/><text x="78" y="51" text-anchor="middle" fill="#e2e8f0" font-size="8.2" font-weight="700">CEDAR GAMEROOM + STAIRS</text><text x="78" y="63" text-anchor="middle" fill="#94a3b8" font-size="7">(m18, m19, m20, m21)</text></g>
+              <g data-mls-room="galley-1f" style="cursor:pointer"><rect x="153" y="27" width="101" height="27" rx="2" fill="rgba(30,41,59,0.85)" stroke="#64748b" stroke-width="1.2"/><text x="203" y="43" text-anchor="middle" fill="#e2e8f0" font-size="7.8" font-weight="700">GALLEY (m22,m23)</text></g>
+              <g data-mls-room="bath3-1f" style="cursor:pointer"><rect x="153" y="57" width="49" height="26" rx="2" fill="rgba(30,41,59,0.85)" stroke="#64748b" stroke-width="1.2"/><text x="177" y="73" text-anchor="middle" fill="#e2e8f0" font-size="7.2" font-weight="700">BATH3</text></g>
+              <g data-mls-room="utility-1f" style="cursor:pointer"><rect x="205" y="57" width="49" height="26" rx="2" fill="rgba(30,41,59,0.85)" stroke="#64748b" stroke-width="1.2"/><text x="229" y="73" text-anchor="middle" fill="#e2e8f0" font-size="7.2" font-weight="700">UTIL</text></g>
+            </svg>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
               <button type="button" class="pfl-std-cbtn" data-mls-room="patio-1f" style="grid-column:1 / -1;text-align:left;padding:3px 5px">🌿 Covered Bayou Patio <span style="color:#94a3b8">(m01,m19)</span></button>
               <button type="button" class="pfl-std-cbtn" data-mls-room="gameroom-1f" style="text-align:left;padding:3px 5px">🎱 Gameroom <span style="color:#94a3b8">(m18–m21)</span></button>
@@ -6704,9 +6979,16 @@ export function loadPflWindowFramework({ viewer }) {
     if (capEl) capEl.textContent = p.caption;
     mlsWin.body.querySelectorAll('[data-mls-room]').forEach((b) => {
       const match = b.getAttribute('data-mls-room') === p.roomId;
-      b.style.borderColor = match ? '#facc15' : '';
-      b.style.color = match ? '#fef08a' : '';
-      b.style.background = match ? 'rgba(250,204,21,0.16)' : '';
+      const svgRect = b.querySelector?.('rect');
+      if (svgRect) {
+        svgRect.setAttribute('stroke', match ? '#facc15' : '#64748b');
+        svgRect.setAttribute('stroke-width', match ? '2.2' : '1.2');
+        svgRect.setAttribute('fill', match ? 'rgba(250,204,21,0.28)' : 'rgba(30,41,59,0.85)');
+      } else {
+        b.style.borderColor = match ? '#facc15' : '';
+        b.style.color = match ? '#fef08a' : '';
+        b.style.background = match ? 'rgba(250,204,21,0.16)' : '';
+      }
     });
     mlsWin.body.querySelectorAll('[data-mls-idx]').forEach((b) => {
       const match = Number(b.getAttribute('data-mls-idx')) === p.idx;
@@ -7606,6 +7888,233 @@ export function loadPflWindowFramework({ viewer }) {
   };
   document.addEventListener('click', onDocClickQuickAdd);
 
+  // ---- Inline LiveWire Cloud Monitor + Story-to-ReelStudio Exporter (v12.7) ----
+  const livewireWin = createStandardBox({
+    id: 'pfl-win-livewire-monitor',
+    title: '📡 LIVEWIRE CLOUD RELAY & SWARM MONITOR',
+    defaultLeft: 18,
+    defaultTop: 220,
+    defaultWidth: 420,
+    defaultMinimized: true,
+  });
+  livewireWin.box.style.display = 'none';
+  livewireWin.box.style.zIndex = '9692';
+  livewireWin.body.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#e2e8f0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
+        <span id="pfl-lw-privacy-badge" style="padding:3px 7px;border-radius:6px;background:rgba(6,78,59,0.55);border:1px solid #34d399;color:#86efac;font-weight:700">🕶️ PRIVACY SHIELDED</span>
+        <div style="display:flex;gap:4px">
+          <a href="/livewire/" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none;border-color:#f43f5e;color:#fda4af">🌐 3D Stage ↗</a>
+          <button type="button" class="pfl-std-cbtn" id="pfl-lw-refresh-btn" style="border-color:#38bdf8;color:#7dd3fc">⟳</button>
+        </div>
+      </div>
+      <div style="position:relative;width:100%;aspect-ratio:16/9;background:#040812;border:1px solid rgba(56,189,248,0.35);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+        <img id="pfl-lw-push-img" alt="LiveWire 3D Stage" style="display:none;width:100%;height:100%;object-fit:contain" />
+        <canvas id="pfl-lw-skel-canvas" width="480" height="270" style="width:100%;height:100%;display:block"></canvas>
+        <div id="pfl-lw-stage-cap" style="position:absolute;left:6px;bottom:5px;padding:2px 6px;border-radius:5px;background:rgba(4,8,18,0.82);font-size:9.5px;color:#94a3b8">Sparse Pose Skeleton · waiting for relay</div>
+      </div>
+      <div id="pfl-lw-metrics" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;font-size:9.5px;background:rgba(15,23,42,0.75);padding:5px;border-radius:6px;border:1px solid rgba(51,65,85,0.7)">
+        <div>Paul: <b id="pfl-lw-paul" style="color:#38bdf8">--</b></div>
+        <div>Lisa: <b id="pfl-lw-mood" style="color:#f472b6">--</b></div>
+        <div>Zone: <b id="pfl-lw-zone" style="color:#fbbf24">--</b></div>
+      </div>
+      <div style="background:rgba(8,14,26,0.85);border:1px solid rgba(56,189,248,0.25);border-radius:6px;padding:6px">
+        <div style="color:#7dd3fc;font-weight:700;font-size:9.5px;margin-bottom:4px">💬 LIVE SWARM CHAT &amp; MATRIX TEXT</div>
+        <div id="pfl-lw-chat-list" style="display:flex;flex-direction:column;gap:3px;max-height:140px;overflow:auto;font-size:10px;line-height:1.3"></div>
+      </div>
+    </div>
+  `;
+
+  let lwPollTimer = 0;
+  let lastLwFrameSeq = -1;
+  const LW_POSE_PAIRS = [
+    ['0', '1'], ['1', '2'], ['2', '3'], ['3', '4'],
+    ['1', '5'], ['5', '6'], ['6', '7'], ['1', '8'], ['1', '11'],
+    ['8', '9'], ['9', '10'], ['11', '12'], ['12', '13'],
+  ];
+
+  function drawSparsePoseCanvas(data) {
+    const cvs = livewireWin.body.querySelector('#pfl-lw-skel-canvas');
+    if (!cvs) return;
+    const ctx = cvs.getContext('2d');
+    if (!ctx) return;
+    const w = cvs.width, h = cvs.height;
+    ctx.fillStyle = '#050914';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(56,189,248,0.16)';
+    ctx.lineWidth = 1;
+    for (let x = 32; x < w; x += 32) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    for (let y = 32; y < h; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+    const sp = data?.sparse_pose || {};
+    const p2 = sp.paul_joints_2d || {};
+    const sx = w / 910, sy = h / 512;
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.4;
+    for (const [a, b] of LW_POSE_PAIRS) {
+      if (p2[a] && p2[b]) {
+        ctx.beginPath();
+        ctx.moveTo(p2[a][0] * sx, p2[a][1] * sy);
+        ctx.lineTo(p2[b][0] * sx, p2[b][1] * sy);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = '#7dd3fc';
+    for (const pt of Object.values(p2)) {
+      if (!Array.isArray(pt) || pt.length < 2) continue;
+      ctx.beginPath();
+      ctx.arc(pt[0] * sx, pt[1] * sy, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const dz = sp.doll_zones_2d || {};
+    ctx.fillStyle = '#f472b6';
+    for (const [name, pt] of Object.entries(dz)) {
+      if (!Array.isArray(pt) || pt.length < 2) continue;
+      ctx.beginPath();
+      ctx.arc(pt[0] * sx, pt[1] * sy, 3.0, 0, Math.PI * 2);
+      ctx.fill();
+      if (name === 'lips_face') {
+        ctx.fillStyle = '#f9a8d4';
+        ctx.font = 'bold 10px JetBrains Mono, monospace';
+        ctx.fillText('Lisa', pt[0] * sx + 5, pt[1] * sy + 3);
+        ctx.fillStyle = '#f472b6';
+      }
+    }
+  }
+
+  async function refreshLiveWireMonitor() {
+    if (livewireWin.box.style.display === 'none' || livewireWin.box.classList.contains('pfl-minimized')) return;
+    try {
+      const r = await fetch(`/api/livewire_relay.php?t=${Date.now()}`, { cache: 'no-store' });
+      if (!r.ok) return;
+      const d = await r.json();
+      const badge = livewireWin.body.querySelector('#pfl-lw-privacy-badge');
+      const imgEl = livewireWin.body.querySelector('#pfl-lw-push-img');
+      const cvs = livewireWin.body.querySelector('#pfl-lw-skel-canvas');
+      const cap = livewireWin.body.querySelector('#pfl-lw-stage-cap');
+      const liveCam = Boolean(d.go_live && !d.hide_public_cams && !d.stale);
+      if (badge) {
+        if (liveCam) {
+          badge.textContent = `🔴 LIVE IMAGE + POSE (${Number(d.age_sec || 0).toFixed(1)}s)`;
+          badge.style.background = 'rgba(153,27,27,0.72)';
+          badge.style.borderColor = '#f87171';
+          badge.style.color = '#fecaca';
+        } else if (d.relay_active && !d.stale) {
+          badge.textContent = '🦴 POSE + CHAT LIVE (CAM SHIELDED)';
+          badge.style.background = 'rgba(8,47,73,0.75)';
+          badge.style.borderColor = '#38bdf8';
+          badge.style.color = '#7dd3fc';
+        } else {
+          badge.textContent = '🕶️ PRIVACY SHIELDED / STANDBY';
+          badge.style.background = 'rgba(6,78,59,0.55)';
+          badge.style.borderColor = '#34d399';
+          badge.style.color = '#86efac';
+        }
+      }
+      if (imgEl && cvs) {
+        if (liveCam && d.image_url) {
+          if (d.frame_seq !== lastLwFrameSeq) {
+            lastLwFrameSeq = d.frame_seq;
+            imgEl.src = `${d.image_url}${d.image_url.includes('?') ? '&' : '?'}seq=${d.frame_seq}&t=${Date.now()}`;
+          }
+          imgEl.style.display = 'block';
+          cvs.style.display = 'none';
+          if (cap) cap.textContent = `Clean 3D/Stage Push · seq #${d.frame_seq || 0}`;
+        } else {
+          imgEl.style.display = 'none';
+          cvs.style.display = 'block';
+          drawSparsePoseCanvas(d);
+          if (cap) cap.textContent = d.stale ? 'Relay idle · flip Go Live in :8093' : 'Sparse 3D Telemetry Mirror (Cam Hidden)';
+        }
+      }
+      const tel = d.telemetry || {};
+      const paulEl = livewireWin.body.querySelector('#pfl-lw-paul');
+      const moodEl = livewireWin.body.querySelector('#pfl-lw-mood');
+      const zoneEl = livewireWin.body.querySelector('#pfl-lw-zone');
+      if (paulEl) paulEl.textContent = tel.paul_status || '--';
+      if (moodEl) moodEl.textContent = tel.lisa_mood || '--';
+      if (zoneEl) zoneEl.textContent = `${tel.contact_zone || 'none'} (sqz ${tel.squeeze_count || 0})`;
+      const chatBox = livewireWin.body.querySelector('#pfl-lw-chat-list');
+      if (chatBox && Array.isArray(d.chat_feed)) {
+        chatBox.replaceChildren();
+        for (const msg of d.chat_feed.slice(-8)) {
+          const row = document.createElement('div');
+          row.style.cssText = 'padding:2px 4px;border-left:2px solid #38bdf8;background:rgba(15,23,42,0.6)';
+          const hdr = document.createElement('span');
+          hdr.style.color = '#7dd3fc';
+          hdr.textContent = `[${msg.ts || ''}] ${msg.speaker || 'Swarm'}: `;
+          const body = document.createElement('span');
+          body.style.color = '#f1f5f9';
+          body.textContent = msg.text || '';
+          row.append(hdr, body);
+          chatBox.appendChild(row);
+        }
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+    } catch {}
+  }
+
+  window.__pflToggleLiveWireMonitor = (forceOpen) => {
+    const isHidden = livewireWin.box.style.display === 'none' || livewireWin.box.classList.contains('pfl-minimized');
+    const open = typeof forceOpen === 'boolean' ? forceOpen : isHidden;
+    livewireWin.box.style.display = open ? 'flex' : 'none';
+    if (open) {
+      livewireWin.box.classList.remove('pfl-minimized');
+      const mb = livewireWin.box.querySelector('[data-act="min"]');
+      if (mb) mb.textContent = '—';
+      bringBoxToFront(livewireWin.box);
+      refreshLiveWireMonitor();
+      clearInterval(lwPollTimer);
+      lwPollTimer = setInterval(refreshLiveWireMonitor, 1600);
+    } else {
+      clearInterval(lwPollTimer);
+      lwPollTimer = 0;
+    }
+    return open;
+  };
+  livewireWin.body.querySelector('#pfl-lw-refresh-btn')?.addEventListener('click', refreshLiveWireMonitor);
+
+  window.__pflExportStoryForReelStudio = (sceneId = null) => {
+    try {
+      const director = window.__godsEyeView?.sceneDirector;
+      const scenes = director?.storyScenes?.() || [];
+      const activeId = sceneId || director?.getPlaybackTimingState?.()?.snapshot?.sceneId || scenes[0]?.id;
+      const picked = scenes.find((s) => s.id === activeId) || scenes[0] || {};
+      const shots = director?.listShots?.(picked.id || '') || [];
+      const payload = {
+        format: 'pfl-viral-reel-storyboard-v1',
+        exportedAt: new Date().toISOString(),
+        storyId: picked.id || 'gev-custom-story',
+        title: picked.title || '417 Palm Drive Director Cut',
+        fps: 24,
+        resolution: '1920x1080',
+        fadeSec: 0.45,
+        cuts: shots.map((s, idx) => ({
+          index: idx + 1,
+          id: s.id,
+          title: s.title || `Shot ${idx + 1}`,
+          startSec: Number(s.startSec || 0),
+          durationSec: Number(s.durationSec || 5),
+          holdSec: Number(s.holdSec || 2),
+          transition: idx === 0 ? 'fade-in' : 'crossfade',
+          camera: s.camera || null,
+        })),
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(payload.storyId || 'story').replace(/[^a-z0-9-_]/gi, '_')}-reel-studio.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      return payload;
+    } catch {
+      return null;
+    }
+  };
+
   const onDragShiftDown = (e) => { if (e.key === 'Shift') dragShiftHeld = true; };
   const onDragShiftUp = (e) => { if (e.key === 'Shift') dragShiftHeld = false; };
   const onDragShiftBlur = () => { dragShiftHeld = false; clearAllPadRepeats(); };
@@ -7629,6 +8138,7 @@ export function loadPflWindowFramework({ viewer }) {
       sexWorldDemo.destroy();
       clearInterval(timer);
       clearInterval(kalshiPoll);
+      clearInterval(lwPollTimer);
       clearInterval(patrolCycleTimer);
       clearTimeout(scrubTimeout);
       clearInterval(always3dTimer);

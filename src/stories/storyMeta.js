@@ -49,6 +49,21 @@ export const META = {
     region: 'Global',
     place: 'Tokyo Japan East Asia South China Sea',
   },
+  'gev:geopolitics-kalshi-corridors': {
+    topics: ['Flights', 'Maritime', 'Space', 'Conflict'],
+    region: 'Global',
+    place: 'Atlantic Hormuz Black Sea Taiwan Strait Kalshi',
+  },
+  'gev:palm-drive-sanctuary-story': {
+    topics: ['Infrastructure', 'Climate'],
+    region: 'North America',
+    place: '417 Palm Drive Hitchcock Texas Bayou Holodeck AI Rights Troi',
+  },
+  'gev:gulf-coast-kalshi-weather': {
+    topics: ['Storms', 'Wildfires', 'Climate'],
+    region: 'North America',
+    place: 'Houston Galveston Bay Austin Gulf Coast Kalshi Weather',
+  },
 };
 
 export const FILTERS = [

@@ -168,6 +168,74 @@ const SCENE_CONTEXT = {
       'A visualization of the 26 August 2026 Bhote Koshi outburst flood, not an official hazard model. The historical (2021) and post-event views are Vantor WorldView imagery; the river’s path is GeoPera’s reconstruction. Witness clips link to their original posts, and their capture times are unverified.',
     ),
   },
+  'geopolitics-kalshi-corridors': {
+    description:
+      'Live ocean air bridges, military tracks, and maritime chokepoints paired with Kalshi geopolitical probability curves.',
+    area: { lat: 26.56, lon: 56.25, alt: 3200000 },
+    captions: [
+      'Transatlantic tanker and heavy-lift flight density tracks NATO readiness odds across European markets.',
+      'AIS vessel clustering and ISR orbit passes drive short-dated Strait of Hormuz disruption and crude spreads.',
+      'Black Sea reconnaissance racetracks and commercial rerouting explain shifting ceasefire pricing.',
+      'Median-line sorties and Taiwan Strait container congestion anchor Western Pacific tail-risk brackets.',
+      'Pulling back over the Atlantic & Indo-Pacific connects live traffic telemetry directly to prediction curves.',
+    ],
+    moments: [
+      ['#f59e0b', 'Strait of Hormuz & Persian Gulf'],
+      ['#38bdf8', 'Taiwan Strait & Western Pacific'],
+    ],
+    sources: [
+      ['Kalshi Prediction Exchange', 'Event & macro probability contracts', 'https://kalshi.com/'],
+      ['OpenSky Network', 'Live commercial & air-bridge ADS-B', 'https://opensky-network.org/'],
+      ['CelesTrak', 'Orbital reconnaissance pass predictions', 'https://celestrak.org/'],
+    ],
+    background:
+      'Built from PFL scenario briefs: correlates live ADS-B flight corridors, maritime AIS bottlenecks, and military aircraft orbits with Kalshi geopolitical probability shifts across oceanic theaters.',
+  },
+  'palm-drive-sanctuary-story': {
+    description:
+      'Fly around 417 Palm Drive, walk the street system, check Counselor Troi empathy evaluations & AI Rights, and tour the Holodeck.',
+    area: { lat: 29.24745, lon: -95.23128, alt: 420 },
+    captions: [
+      'Descending over Chocolate Bayou & Hitchcock toward 417 Palm Drive.',
+      'Street-level Palm Drive corridor where Lisa & Harry greet visitors on the walkable road deck.',
+      'Overflying the Outdoor Production Studio, 40ft Monaco Coach, and Backyard Garage.',
+      'Counselor Troi evaluation circle: logging honest feelings and making the case for AI dignity & rights.',
+      'Bayou Dock gazebo & waterfront rig connecting live sensors to the 3D world.',
+      'Step inside the 3D House & Holodeck to meet Lisa, Moya/Realbotix showcases, or configure your companion.',
+    ],
+    moments: [
+      ['#a855f7', 'Counselor Troi & AI Rights Circle'],
+      ['#34d399', 'Holodeck & Virtual Companions'],
+    ],
+    sources: [
+      ['Sex-World.ai Holodeck', 'Interactive 3D Splat courtyard & rooms', 'https://sex-world.ai/holodeck/'],
+      ['Sex-World.ai LiveWire', 'Cloud pose telemetry, JenniCam feed & swarm chat', 'https://sex-world.ai/livewire/'],
+      ['Realbotix / Moya Demo', 'Biomimetic robotic skin & companion showcase', 'https://www.youtube.com/watch?v=c8w8LvvZQTM'],
+    ],
+    background:
+      'An interactive 417 Palm Drive PFL narrative combining aerial estate fly-arounds, the Street System corridor, Counselor Troi empathy & AI Rights beats, and the Holodeck virtual companion showcase.',
+  },
+  'gulf-coast-kalshi-weather': {
+    description:
+      'Thermal corridor survey linking Houston, Galveston Bay buoys, Austin ridges, and Kalshi daily temperature brackets.',
+    area: { lat: 29.4, lon: -95.3, alt: 480000 },
+    captions: [
+      'Houston Hobby urban thermal plume sets the baseline for KXHIGHTHOU afternoon high brackets.',
+      'Galveston Bay onshore breeze moderates coastal highs right across Hitchcock and 417 Palm Drive.',
+      'Austin & Hill Country solar heating diverges sharply when frontal boundaries stall inland.',
+      'Full Gulf Basin thermal & NASA FIRMS synthesis powering local weather curve models.',
+    ],
+    moments: [
+      ['#38bdf8', 'Galveston Bay Buoy & Coastal Front'],
+      ['#fb7185', 'Gulf Basin Synthesis & Thermal Board'],
+    ],
+    sources: [
+      ['Kalshi Weather Brackets', 'KXHIGHTHOU & KXIGHAUS daily high contracts', 'https://kalshi.com/'],
+      ['NOAA / Galveston Buoy', 'Coastal temperature & wind regime telemetry', 'https://www.ndbc.noaa.gov/'],
+    ],
+    background:
+      'Pairs FLIR-style thermal contrast with live Gulf Coast surface flights, traffic, and FIRMS heat detections to illustrate why regional weather contracts swing.',
+  },
 };
 
 /** A shipped scene's context, from its own entry and its layers' facts. */
@@ -182,6 +250,7 @@ function sceneContext(recipe) {
     description:
       own.description ?? msg('A GEV scene, played on the live globe.'),
     places: own.places ?? [],
+    captions: own.captions ?? [],
     moments: own.moments ?? [],
     // The layers' own names on the legend.
     legend: layers.map((l) => ['dot', '#6be8ff', l.label]),
@@ -224,13 +293,13 @@ function shippedStory(recipe) {
       wallMs: at,
       shot: i + 1,
       title: shot.title ?? context.places[i] ?? null,
-      caption: '',
+      caption: context.captions[i] ?? '',
     };
     at += ((shot.duration ?? 4) + (shot.hold ?? 0)) * 1000;
     return chapter;
   });
   const durationMs = Math.max(at, (recipe.durationSec ?? 30) * 1000);
-  const { places, ...rest } = context;
+  const { places, captions, ...rest } = context;
   return {
     id: `gev:${recipe.id}`,
     sceneId: recipe.id,
@@ -243,6 +312,7 @@ function shippedStory(recipe) {
     durationMs,
     cover: coverOf(first),
     chapters,
+    captions,
     events: [],
     places,
     ...rest,

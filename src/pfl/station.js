@@ -13,6 +13,7 @@ import { loadNeo4jPersonalLayer } from './neo4jPersonalLayer.js';
 import { loadStarshipEventTheater } from './starshipEventTheater.js';
 import { loadPolymarketPlugin } from './polymarketPlugin.js';
 import { loadPflWindowFramework } from './pflWindowFramework.js';
+import { loadLisaStreetSoccer } from './lisaStreetSoccer.js';
 
 export const SOVEREIGN_ANCHOR = Object.freeze({
   id: 'lisa-muse-sovereign-anchor',
@@ -168,6 +169,7 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
   let neo4j = null;
   let starship = null;
   let polymarket = null;
+  let lisaSoccer = null;
   let winFramework = null;
   let destroyed = false;
   let lisaSyncTimer = null;
@@ -182,6 +184,7 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
     try { lisaSyncCleanup?.(); } catch {}
     lisaSyncCleanup = null;
     winFramework?.destroy?.();
+    lisaSoccer?.destroy?.();
     polymarket?.destroy?.();
     starship?.destroy?.();
     neo4j?.destroy?.();
@@ -297,13 +300,19 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
       }
     }
     try {
+      lisaSoccer = await loadLisaStreetSoccer({ viewer, signal });
+    } catch (error) {
+      rethrowAbort(signal, error);
+      console.warn('[PFL Station] Lisa street soccer unavailable:', error);
+    }
+    try {
       winFramework = loadPflWindowFramework({ viewer });
     } catch (error) {
       console.warn('[PFL Station] window framework unavailable:', error);
     }
     signal?.throwIfAborted();
     governorRequestRender('pfl-station-load');
-    return { anchor, placed, frames, cad, realtor, neo4j, starship, polymarket, destroy };
+    return { anchor, placed, frames, cad, realtor, neo4j, starship, polymarket, lisaSoccer, destroy };
   } catch (error) {
     destroy();
     throw error;

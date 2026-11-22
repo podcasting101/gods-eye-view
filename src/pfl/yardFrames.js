@@ -192,18 +192,19 @@ const CALIBRATED_HOUSE_SURVEY = {
   },
   'bed-station-20261012': {
     hiddenByStitch: false,
-    camLat: 29.247582,
-    camLon: -95.231355,
-    camHeightM: 7.95,
-    // Photo space: headboard at upper-right, bed axis (head -> feet) rotated so feet face Due East.
-    headingDeg: 240,
+    camLat: 29.2475739,
+    camLon: -95.2313169,
+    camHeightM: 8.45,
+    // Paul manual alignment 2026-11-21: headboard flush against kitchen wall at 98°, 1.25× scale.
+    headingDeg: 98,
     pitchDeg: -5,
     distanceM: 2.5,
     fovHDeg: 68,
     fovVDeg: 38,
     widthScale: 1.0,
     rollDeg: 0,
-    sizeScale: 1.65,
+    tiltDeg: 0,
+    sizeScale: 1.25,
     flat: true,
     texRot: 0,
   },
@@ -519,8 +520,13 @@ export function computeCorners(p, viewer = null) {
   let center;
   if (p.flat) {
     const H = toRad((p.headingDeg || 0) + (p.rollDeg || 0));
+    const rawTilt = Number(p.tiltDeg || 0);
+    const effTilt = Math.max(-90, Math.min(90, Number.isFinite(rawTilt) ? rawTilt : 0));
+    const T = toRad(effTilt);
+    const cT = Math.cos(T);
+    const sT = Math.sin(T);
     right = new Cesium.Cartesian3(Math.cos(H), -Math.sin(H), 0);
-    up = new Cesium.Cartesian3(Math.sin(H), Math.cos(H), 0);
+    up = new Cesium.Cartesian3(Math.sin(H) * cT, Math.cos(H) * cT, sT);
     center = new Cesium.Cartesian3(0, 0, 0);
   } else {
     const H = toRad(p.headingDeg);
@@ -647,12 +653,105 @@ function scrubWyzeGreenBoxToCanvas(img) {
   return c;
 }
 
-/** Build (or rebuild) the Cesium entity for one frame. */
+function buildFrameQuadPrimitive(positions, texRot, imageSource, opacity, isTranslucent, pickEntity) {
+  const p0 = positions[0];
+  const p1 = positions[1];
+  const p2 = positions[2];
+  const p3 = positions[3];
+  const e1 = Cesium.Cartesian3.subtract(p1, p0, new Cesium.Cartesian3());
+  const e2 = Cesium.Cartesian3.subtract(p3, p0, new Cesium.Cartesian3());
+  const n = Cesium.Cartesian3.cross(e1, e2, new Cesium.Cartesian3());
+  if (Cesium.Cartesian3.magnitudeSquared(n) > 1e-12) {
+    Cesium.Cartesian3.normalize(n, n);
+  } else {
+    n.x = 0;
+    n.y = 0;
+    n.z = 1;
+  }
+  const posArr = new Float64Array([
+    p0.x, p0.y, p0.z,
+    p1.x, p1.y, p1.z,
+    p2.x, p2.y, p2.z,
+    p3.x, p3.y, p3.z,
+  ]);
+  const normArr = new Float32Array([
+    n.x, n.y, n.z,
+    n.x, n.y, n.z,
+    n.x, n.y, n.z,
+    n.x, n.y, n.z,
+  ]);
+  const steps = (((Math.round(Number(texRot || 0) / 90) % 4) + 4) % 4);
+  const stArr = new Float32Array(8);
+  for (let i = 0; i < 4; i++) {
+    const [u, v] = FRAME_TEXTURE_COORDINATES[(i + steps) % 4];
+    stArr[i * 2] = u;
+    stArr[i * 2 + 1] = v;
+  }
+  const geometry = new Cesium.Geometry({
+    attributes: {
+      position: new Cesium.GeometryAttribute({
+        componentDatatype: Cesium.ComponentDatatype.DOUBLE,
+        componentsPerAttribute: 3,
+        values: posArr,
+      }),
+      normal: new Cesium.GeometryAttribute({
+        componentDatatype: Cesium.ComponentDatatype.FLOAT,
+        componentsPerAttribute: 3,
+        values: normArr,
+      }),
+      st: new Cesium.GeometryAttribute({
+        componentDatatype: Cesium.ComponentDatatype.FLOAT,
+        componentsPerAttribute: 2,
+        values: stArr,
+      }),
+    },
+    indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
+    primitiveType: Cesium.PrimitiveType.TRIANGLES,
+    boundingSphere: Cesium.BoundingSphere.fromVertices(posArr),
+  });
+  const material = Cesium.Material.fromType('Image', {
+    image: imageSource,
+    repeat: new Cesium.Cartesian2(1, 1),
+    color: Cesium.Color.WHITE.withAlpha(opacity),
+  });
+  return new Cesium.Primitive({
+    geometryInstances: new Cesium.GeometryInstance({ geometry, id: pickEntity }),
+    appearance: new Cesium.MaterialAppearance({
+      flat: true,
+      faceForward: true,
+      closed: false,
+      translucent: isTranslucent || opacity < 0.99,
+      materialSupport: Cesium.MaterialAppearance.MaterialSupport.TEXTURED,
+      material,
+    }),
+    asynchronous: false,
+  });
+}
+
+function removeQuadPrimitive(viewer, ent) {
+  if (ent?._pflQuadPrimitive) {
+    try { viewer?.scene?.primitives?.remove?.(ent._pflQuadPrimitive); } catch {}
+    ent._pflQuadPrimitive = null;
+  }
+}
+
+function syncQuadEntityShow(ent, visible) {
+  if (!ent) return;
+  ent.show = Boolean(visible);
+  if (ent._pflQuadPrimitive) {
+    ent._pflQuadPrimitive.show = Boolean(visible);
+  }
+}
+
+/** Build (or rebuild) the Cesium entity (and true-3D quad primitive when tilted/oblique) for one frame. */
 function buildFrameEntity(viewer, def, params) {
   const { positions, widthM, heightM, distanceM } = computeCorners(params, viewer);
   const entityId = ENTITY_PREFIX + def.id;
   const stale = viewer.entities.getById(entityId);
-  if (stale) viewer.entities.remove(stale);
+  if (stale) {
+    removeQuadPrimitive(viewer, stale);
+    viewer.entities.remove(stale);
+  }
   const opacity = typeof params.opacity === 'number' ? params.opacity : 1.0;
   const isCleanGarage = def.id === 'garage-carport-20261117';
   const imgUrl =
@@ -662,40 +761,62 @@ function buildFrameEntity(viewer, def, params) {
         ? '/yard-frames/back-yard-cam2-stitched-2026-10-26.png'
         : def.image;
   const initialImageSource = isCleanGarage && _cleanGarageCanvas ? _cleanGarageCanvas : imgUrl;
-  const matProps = { image: initialImageSource };
-  if (opacity < 0.99 || params.stitchedPano || params.stitchedWaterPano) {
-    matProps.color = Cesium.Color.WHITE.withAlpha(opacity);
-    matProps.transparent = true;
+  const isTranslucent = opacity < 0.99 || Boolean(params.stitchedPano) || Boolean(params.stitchedWaterPano);
+  const useTrue3dQuad =
+    (!params.flat || Math.abs(Number(params.tiltDeg || 0)) >= 0.5) &&
+    typeof Cesium.Primitive === 'function' &&
+    typeof Cesium.Geometry === 'function' &&
+    Boolean(viewer?.scene?.primitives);
+  const showNow = !Boolean(params.hiddenByStitch);
+
+  let entity;
+  if (useTrue3dQuad) {
+    entity = viewer.entities.add({
+      id: entityId,
+      name: 'Yard frame: ' + def.id,
+      show: showNow,
+    });
+    const prim = buildFrameQuadPrimitive(positions, params.texRot, initialImageSource, opacity, isTranslucent, entity);
+    prim.show = showNow;
+    viewer.scene.primitives.add(prim);
+    entity._pflQuadPrimitive = prim;
+  } else {
+    const matProps = { image: initialImageSource };
+    if (isTranslucent) {
+      matProps.color = Cesium.Color.WHITE.withAlpha(opacity);
+      matProps.transparent = true;
+    }
+    const polygon = {
+      show: showNow,
+      hierarchy: new Cesium.PolygonHierarchy(positions),
+      material: new Cesium.ImageMaterialProperty(matProps),
+      perPositionHeight: true,
+      // Pin every image to BL, BR, TR, TL.
+      textureCoordinates: new Cesium.PolygonHierarchy(
+        (() => {
+          const steps = (((Math.round(Number(params.texRot || 0) / 90) % 4) + 4) % 4);
+          return FRAME_TEXTURE_COORDINATES.map((_, i) => {
+            const [x, y] = FRAME_TEXTURE_COORDINATES[(i + steps) % 4];
+            return new Cesium.Cartesian2(x, y);
+          });
+        })(),
+      ),
+    };
+    entity = viewer.entities.add({
+      id: entityId,
+      name: 'Yard frame: ' + def.id,
+      polygon,
+    });
   }
-  const polygon = {
-    show: !Boolean(params.hiddenByStitch),
-    hierarchy: new Cesium.PolygonHierarchy(positions),
-    material: new Cesium.ImageMaterialProperty(matProps),
-    perPositionHeight: true,
-    // Pin every image to BL, BR, TR, TL. Cesium's automatic planar
-    // projection may rotate an oblique quad as its dominant axis changes;
-    // explicit coordinates keep the road line and the bed frame registered.
-    textureCoordinates: new Cesium.PolygonHierarchy(
-      (() => {
-        const steps = (((Math.round(Number(params.texRot || 0) / 90) % 4) + 4) % 4);
-        return FRAME_TEXTURE_COORDINATES.map((_, i) => {
-          const [x, y] = FRAME_TEXTURE_COORDINATES[(i + steps) % 4];
-          return new Cesium.Cartesian2(x, y);
-        });
-      })(),
-    ),
-  };
-  const entity = viewer.entities.add({
-    id: entityId,
-    name: 'Yard frame: ' + def.id,
-    polygon,
-  });
   entity._pflSourceImageUrl = imgUrl;
   if (typeof Image !== 'undefined' && typeof imgUrl === 'string') {
     if (isCleanGarage && !_cleanGarageCanvas && typeof document !== 'undefined') {
       _cleanGarageCallbacks.push((cleanCanvas) => {
         const cur = viewer?.entities?.getById?.(entityId);
-        if (cur?.polygon) {
+        if (cur?._pflQuadPrimitive?.appearance?.material?.uniforms) {
+          cur._pflQuadPrimitive.appearance.material.uniforms.image = cleanCanvas;
+          governorRequestRender('yardframe-garage-clean');
+        } else if (cur?.polygon) {
           const nextProps = { image: cleanCanvas };
           if (opacity < 0.99) {
             nextProps.color = Cesium.Color.WHITE.withAlpha(opacity);
@@ -779,7 +900,7 @@ function rebuildFrame(viewer, id) {
   st.entity = buildFrameEntity(viewer, st.def, st.params);
   if (st.entity) {
     const hiddenStitch = Boolean(st.params?.hiddenByStitch) && !(editor && editor.on);
-    st.entity.show = yardFramesVisible && !hiddenStitch;
+    syncQuadEntityShow(st.entity, yardFramesVisible && !hiddenStitch);
     if (st.mov) st.entity._pflMovable = st.mov;
   }
   if (editor && editor.viewer === viewer && editor.selectedId === id) {
@@ -860,7 +981,7 @@ export function setYardFramesVisible(viewer, visible) {
   for (const [, st] of frameState) {
     if (st.entity) {
       const hiddenStitch = Boolean(st.params?.hiddenByStitch) && !(editor && editor.on);
-      st.entity.show = yardFramesVisible && !hiddenStitch;
+      syncQuadEntityShow(st.entity, yardFramesVisible && !hiddenStitch);
     }
   }
   if (!yardFramesVisible) clearOutline(viewer);
@@ -877,7 +998,7 @@ export function loadYardFrames({ viewer }) {
     const entity = buildFrameEntity(viewer, f, params);
     if (entity) {
       const hiddenStitch = Boolean(params.hiddenByStitch);
-      entity.show = yardFramesVisible && !hiddenStitch;
+      syncQuadEntityShow(entity, yardFramesVisible && !hiddenStitch);
     }
     const stEntry = { def: f, params, entity, mov: null };
     frameState.set(f.id, stEntry);
@@ -891,6 +1012,7 @@ export function loadYardFrames({ viewer }) {
             lat: ctr.lat,
             lon: ctr.lon,
             heading: params.headingDeg || 0,
+            tilt: params.flat ? Number(params.tiltDeg || 0) : Number(params.pitchDeg || 0),
             lift: ctr.heightM || 0,
             scale: typeof params.sizeScale === 'number' && params.sizeScale > 0 ? params.sizeScale : 1,
             opacity: typeof params.opacity === 'number' ? params.opacity : 1.0,
@@ -902,6 +1024,11 @@ export function loadYardFrames({ viewer }) {
           if (typeof patch.lon === 'number') ctr.lon = patch.lon;
           if (typeof patch.lift === 'number') ctr.heightM = patch.lift;
           if (typeof patch.heading === 'number') params.headingDeg = patch.heading;
+          if (typeof patch.tilt === 'number' && Number.isFinite(patch.tilt)) {
+            const clampedTilt = Math.max(-90, Math.min(90, patch.tilt));
+            if (params.flat) params.tiltDeg = clampedTilt;
+            else params.pitchDeg = clampedTilt;
+          }
           if (typeof patch.scale === 'number' && patch.scale > 0) {
             params.sizeScale = Math.max(0.25, Math.min(3.5, patch.scale));
           }
@@ -1039,7 +1166,12 @@ export function destroyYardFrames(viewer) {
     editor = null;
   }
   viewer?.entities?.removeById?.(OUTLINE_ID);
+  for (const [, st] of frameState) {
+    if (st.entity) removeQuadPrimitive(viewer, st.entity);
+  }
   for (const id of frameState.keys()) {
+    const existing = viewer?.entities?.getById?.(ENTITY_PREFIX + id);
+    if (existing) removeQuadPrimitive(viewer, existing);
     viewer?.entities?.removeById?.(ENTITY_PREFIX + id);
   }
   frameState.clear();
