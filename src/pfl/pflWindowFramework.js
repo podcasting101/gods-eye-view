@@ -4,7 +4,7 @@ import {
   releaseContinuousRender,
   governorRequestRender,
 } from '../renderGovernor.js';
-import { activeYardDatumM } from './yardFrames.js';
+import { activeYardDatumM, BED_PAUL_AVATAR_CATALOG } from './yardFrames.js';
 import {
   resolveTerrainGroundM,
   isFlatEllipsoidGlobe,
@@ -468,7 +468,42 @@ export function loadPflWindowFramework({ viewer }) {
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
       window.location.reload();
     });
-    ctrlsEl?.prepend(hdrHolodeckBtn, rbacPill, gatherBtn, resetBtn);
+    const bedAvatarSelect = document.createElement('select');
+    bedAvatarSelect.id = 'pfl-paul-bed-avatar-select';
+    bedAvatarSelect.className = 'pfl-std-cbtn';
+    bedAvatarSelect.title = 'Choose 3D avatar mapped onto Paul\'s Bed LiveWire wireframe (defaults to Wireframe)';
+    bedAvatarSelect.style.cssText = 'border-color:#38bdf8;color:#7dd3fc;background:rgba(9,14,26,0.95);font-family:"JetBrains Mono",monospace;font-size:10px;max-width:158px;flex-shrink:0';
+    const avatarCatalog = window.__pflGetBedPaulAvatarCatalog?.() || BED_PAUL_AVATAR_CATALOG;
+    for (const item of avatarCatalog) {
+      const opt = document.createElement('option');
+      opt.value = item.id;
+      opt.textContent = item.label;
+      bedAvatarSelect.appendChild(opt);
+    }
+    const curBedAv = window.__pflGetBedPaulAvatar?.() || 'wireframe';
+    bedAvatarSelect.value = curBedAv;
+    const syncAllBedAvatarSelects = (val) => {
+      document.querySelectorAll('#pfl-paul-bed-avatar-select, #pfl-compass-paul-avatar-select').forEach((sel) => {
+        if (sel.value !== val) sel.value = val;
+      });
+    };
+    window.__pflSyncBedPaulAvatarUi = syncAllBedAvatarSelects;
+    for (const ev of ['mousedown', 'pointerdown', 'click']) {
+      bedAvatarSelect.addEventListener(ev, (e) => e.stopPropagation());
+    }
+    bedAvatarSelect.addEventListener('change', () => {
+      const chosen = window.__pflSetBedPaulAvatar ? window.__pflSetBedPaulAvatar(bedAvatarSelect.value) : bedAvatarSelect.value;
+      syncAllBedAvatarSelects(chosen);
+      const compassBedBtn = compassWin?.body?.querySelector?.('#pfl-bed-livewire-btn');
+      if (compassBedBtn && window.__pflGetBedLiveWireState?.()?.enabled !== false) {
+        compassBedBtn.textContent = '🛏️ Bed LiveWire: ON';
+        compassBedBtn.style.borderColor = '#38bdf8';
+        compassBedBtn.style.color = '#7dd3fc';
+      }
+      governorRequestRender('pfl-bed-paul-avatar');
+    });
+
+    ctrlsEl?.prepend(hdrHolodeckBtn, bedAvatarSelect, rbacPill, gatherBtn, resetBtn);
   }
 
   setTimeout(() => {
@@ -784,6 +819,7 @@ export function loadPflWindowFramework({ viewer }) {
             <button type="button" class="pfl-std-cbtn" id="pfl-reset-all-objects-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Reset House, Monaco RV, Lisa, Chair &amp; Yard Photos back to surveyed positions">↺ All</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-avatar-light-btn" style="border-color:#5eead4;color:#ccfbf1" title="Cycle uniform character illumination: Uniform Unlit (bright even at night) / Studio Fill / Scene Sun">🔆 Light: Uniform</button>
             <button type="button" class="pfl-std-cbtn" id="pfl-bed-livewire-btn" style="border-color:#38bdf8;color:#7dd3fc" title="Overlay live LiveWire DWPose skeleton &amp; rig onto Paul &amp; Lisa's rooftop Bed Photo">🛏️ Bed LiveWire: ON</button>
+            <select class="pfl-std-cbtn" id="pfl-compass-paul-avatar-select" style="border-color:#38bdf8;color:#7dd3fc;background:rgba(9,14,26,0.95);max-width:165px" title="Map a 3D GLB outfit onto Paul's live bed wireframe"></select>
           </div>
           <label style="display:flex;justify-content:space-between;font-size:10px"><span>Heading (°)</span><span id="pfl-hdg-val">154°</span></label>
           <input type="range" id="pfl-hdg-slider" min="0" max="360" step="1" value="154" style="width:100%" />
@@ -3477,6 +3513,24 @@ export function loadPflWindowFramework({ viewer }) {
     const next = window.__pflSetBedLiveWireOverlay ? window.__pflSetBedLiveWireOverlay(!cur) : !cur;
     syncBedLwBtn(Boolean(next));
   });
+
+  const compassBedSel = compassWin.body.querySelector('#pfl-compass-paul-avatar-select');
+  if (compassBedSel) {
+    const cat = window.__pflGetBedPaulAvatarCatalog?.() || BED_PAUL_AVATAR_CATALOG;
+    for (const item of cat) {
+      const opt = document.createElement('option');
+      opt.value = item.id;
+      opt.textContent = item.label;
+      compassBedSel.appendChild(opt);
+    }
+    compassBedSel.value = window.__pflGetBedPaulAvatar?.() || 'wireframe';
+    compassBedSel.addEventListener('change', () => {
+      const chosen = window.__pflSetBedPaulAvatar ? window.__pflSetBedPaulAvatar(compassBedSel.value) : compassBedSel.value;
+      if (typeof window.__pflSyncBedPaulAvatarUi === 'function') window.__pflSyncBedPaulAvatarUi(chosen);
+      syncBedLwBtn(window.__pflGetBedLiveWireState?.()?.enabled !== false);
+      governorRequestRender('pfl-bed-paul-avatar');
+    });
+  }
 
   try {
     const savedTok = localStorage.getItem(SKETCHFAB_TOKEN_KEY) || '';

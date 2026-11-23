@@ -951,7 +951,18 @@ function syncQuadEntityShow(ent, visible) {
 }
 
 const BED_LIVEWIRE_KEY = 'pfl_bed_livewire_overlay_v1';
+export const BED_PAUL_AVATAR_KEY = 'pfl_bed_paul_avatar_v1';
+export const BED_PAUL_AVATAR_CATALOG = Object.freeze([
+  Object.freeze({ id: 'wireframe', label: '🦴 Wireframe (Default)', shortLabel: 'WIREFRAME', uri: null }),
+  Object.freeze({ id: 'paul-nasa', label: '🧑‍🚀 Paul · NASA Outfit', shortLabel: 'NASA GLB', uri: 'models/paul-soccer.glb' }),
+  Object.freeze({ id: 'paul-shorts', label: '🩳 Paul · Shorts', shortLabel: 'SHORTS GLB', uri: 'models/paul-shorts.glb' }),
+  Object.freeze({ id: 'paul-suit', label: '🤵 Paul · Full Suit', shortLabel: 'SUIT GLB', uri: 'models/paul-suit.glb' }),
+  Object.freeze({ id: 'paul-vest', label: '👔 Paul · Vest & Tie', shortLabel: 'VEST GLB', uri: 'models/paul-vest.glb' }),
+  Object.freeze({ id: 'paul-casual', label: '👕 Paul · Casual', shortLabel: 'CASUAL GLB', uri: 'models/paul-casual.glb' }),
+  Object.freeze({ id: 'paul-medieval', label: '⚔️ Paul · Medieval', shortLabel: 'MEDIEVAL GLB', uri: 'models/paul-medieval.glb' }),
+]);
 const ROOFTOP_LISA_ENTITY_ID = 'pfl-rooftop-lisa-glb';
+const ROOFTOP_PAUL_ENTITY_ID = 'pfl-rooftop-paul-glb';
 const _yardFrameImgCache = new Map();
 let _bedBaseImg = null;
 let _bedBaseImgLoading = false;
@@ -961,6 +972,45 @@ let _bedLiveCurrentCanvas = null;
 let _bedLivePollTimer = null;
 let _bedPlaybackTimer = null;
 let _bedLiveInFlight = false;
+let _bedActiveViewer = null;
+let _bedLastCorners = null;
+let _bedLastParams = null;
+let _bedPaulAvatarId = (() => {
+  try {
+    if (typeof localStorage === 'undefined') return 'wireframe';
+    const raw = localStorage.getItem(BED_PAUL_AVATAR_KEY);
+    return BED_PAUL_AVATAR_CATALOG.some((item) => item.id === raw) ? raw : 'wireframe';
+  } catch {
+    return 'wireframe';
+  }
+})();
+let _bedPaulEntityUri = null;
+let _bedPaulLastFrameDrawMs = 0;
+let _bedPaulLiveRigState = {
+  pos: Cesium.Cartesian3.fromDegrees(-95.2313169, 29.2475739, -17.74),
+  ori: new Cesium.Quaternion(0, 0, 0, 1),
+  scale: 0.72,
+  angles: {
+    headZ: 0,
+    neckX: 0,
+    leftArmX: 1.25,
+    leftArmZ: 0,
+    leftForeArmX: -0.25,
+    leftForeArmZ: 0,
+    rightArmX: 1.25,
+    rightArmZ: 0,
+    rightForeArmX: -0.25,
+    rightForeArmZ: 0,
+    leftUpLegZ: 0,
+    leftUpLegLiftX: 0,
+    leftLegZ: 0,
+    leftLegBendX: 0,
+    rightUpLegZ: 0,
+    rightUpLegLiftX: 0,
+    rightLegZ: 0,
+    rightLegBendX: 0,
+  },
+};
 let _bedLiveOverlayOn = (() => {
   try {
     if (typeof localStorage === 'undefined') return true;
@@ -989,7 +1039,180 @@ const _bedLiveStats = {
   handMode: 'none',
   breathHz: 0.28,
   lisaGlbActive: false,
+  paulAvatarId: _bedPaulAvatarId,
+  paulGlbActive: false,
 };
+
+function clampVal(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function wrapPi(a) {
+  let x = a;
+  while (x > Math.PI) x -= Math.PI * 2;
+  while (x < -Math.PI) x += Math.PI * 2;
+  return x;
+}
+
+/**
+ * Compute deterministic body-frame retargeting parameters & 52-bone Avaturn/Mixamo
+ * delta rotations from Paul's OpenPose 18-point 2D joints in the 910x512 LiveWire bed feed.
+ */
+export function computeBedPaulRetargetPose(pj, wM = 3.0, hM = 1.69) {
+  const joints = pj && typeof pj === 'object' ? pj : {};
+  const ptOf = (idx) => {
+    const p = joints[String(idx)];
+    return Array.isArray(p) && p.length >= 2 && Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1]))
+      ? [Number(p[0]), Number(p[1])]
+      : null;
+  };
+  const rHip = ptOf(8);
+  const lHip = ptOf(11);
+  const hipPx =
+    rHip && lHip
+      ? [(rHip[0] + lHip[0]) * 0.5, (rHip[1] + lHip[1]) * 0.5]
+      : rHip || lHip || [642, 236];
+
+  const neck0 = ptOf(1);
+  const rSh = ptOf(2);
+  const lSh = ptOf(5);
+  const neckPx = neck0 || (rSh && lSh ? [(rSh[0] + lSh[0]) * 0.5, (rSh[1] + lSh[1]) * 0.5] : [630, 118]);
+
+  const toQuadM = (a, b) => [((b[0] - a[0]) / 910) * wM, ((a[1] - b[1]) / 512) * hM];
+  const [dxM, dyM] = toQuadM(hipPx, neckPx);
+  const rawTorsoM = Math.hypot(dxM, dyM);
+  const torsoM = clampVal(rawTorsoM > 0.05 ? rawTorsoM : hM * 0.25, hM * 0.14, hM * 0.36);
+  const ux = rawTorsoM > 0.05 ? dxM / rawTorsoM : 0;
+  const uy = rawTorsoM > 0.05 ? dyM / rawTorsoM : 1;
+  // Body-local basis in bed quad plane: u = hip->neck (+Y head), r = (uy, -ux) (+X Paul's left)
+  const projBody = (a, b) => {
+    const [mx, my] = toQuadM(a, b);
+    const len = Math.hypot(mx, my);
+    if (len < 0.015) return null;
+    const bx = mx * uy - my * ux;
+    const by = mx * ux + my * uy;
+    return { bx, by, len };
+  };
+
+  // Left arm (5 -> 6 -> 7)
+  let leftArmX = 1.25;
+  let leftForeArmX = -0.25;
+  let leftForeArmZ = 0;
+  const nose = ptOf(0);
+  const lElb = ptOf(6);
+  const lWri = ptOf(7);
+  const lUpper = lSh && lElb ? projBody(lSh, lElb) : lSh && lWri ? projBody(lSh, lWri) : null;
+  if (lUpper) {
+    leftArmX = clampVal(Math.atan2(-lUpper.by, lUpper.bx), -1.35, 1.75);
+    const lFore = lElb && lWri ? projBody(lElb, lWri) : null;
+    if (lFore) {
+      const phiFore = Math.atan2(-lFore.by, lFore.bx);
+      leftForeArmX = clampVal(wrapPi(phiFore - leftArmX), -2.35, 0.35);
+    }
+  }
+  if (nose && lWri && Math.hypot(lWri[0] - nose[0], lWri[1] - nose[1]) < 95) {
+    leftForeArmZ = 0.35;
+  }
+
+  // Right arm (2 -> 3 -> 4)
+  let rightArmX = 1.25;
+  let rightForeArmX = -0.25;
+  let rightForeArmZ = 0;
+  const rElb = ptOf(3);
+  const rWri = ptOf(4);
+  const rUpper = rSh && rElb ? projBody(rSh, rElb) : rSh && rWri ? projBody(rSh, rWri) : null;
+  if (rUpper) {
+    rightArmX = clampVal(Math.atan2(-rUpper.by, -rUpper.bx), -1.35, 1.75);
+    const rFore = rElb && rWri ? projBody(rElb, rWri) : null;
+    if (rFore) {
+      const phiFore = Math.atan2(-rFore.by, -rFore.bx);
+      rightForeArmX = clampVal(wrapPi(phiFore - rightArmX), -2.35, 0.35);
+    }
+  }
+  if (nose && rWri && Math.hypot(rWri[0] - nose[0], rWri[1] - nose[1]) < 95) {
+    rightForeArmZ = -0.35;
+  }
+
+  // Right leg (8 -> 9 -> 10, falling back to 8 -> 10 when knee 9 is occluded)
+  let rightUpLegZ = 0;
+  let rightUpLegLiftX = 0;
+  let rightLegZ = 0;
+  let rightLegBendX = 0;
+  const rKnee = ptOf(9);
+  const rAnk = ptOf(10);
+  const rThigh = rHip && rKnee ? projBody(rHip, rKnee) : rHip && rAnk ? projBody(rHip, rAnk) : null;
+  if (rThigh) {
+    rightUpLegZ = clampVal(Math.atan2(rThigh.bx, -rThigh.by), -0.62, 0.85);
+    if (rightUpLegZ > 0.16) {
+      rightUpLegLiftX = 0.32;
+      rightLegBendX = -0.28;
+    }
+    if (rKnee && rAnk) {
+      const rShin = projBody(rKnee, rAnk);
+      if (rShin) {
+        const phiShin = Math.atan2(rShin.bx, -rShin.by);
+        rightLegZ = clampVal(wrapPi(phiShin - rightUpLegZ), -0.7, 0.7);
+      }
+    }
+  }
+
+  // Left leg (11 -> 12 -> 13, falling back to 11 -> 13 if knee 12 is occluded)
+  let leftUpLegZ = 0;
+  let leftUpLegLiftX = 0;
+  let leftLegZ = 0;
+  let leftLegBendX = 0;
+  const lKnee = ptOf(12);
+  const lAnk = ptOf(13);
+  const lThigh = lHip && lKnee ? projBody(lHip, lKnee) : lHip && lAnk ? projBody(lHip, lAnk) : null;
+  if (lThigh) {
+    leftUpLegZ = clampVal(Math.atan2(lThigh.bx, -lThigh.by), -0.85, 0.62);
+    if (leftUpLegZ < -0.16) {
+      leftUpLegLiftX = 0.32;
+      leftLegBendX = -0.28;
+    }
+    if (lKnee && lAnk) {
+      const lShin = projBody(lKnee, lAnk);
+      if (lShin) {
+        const phiShin = Math.atan2(lShin.bx, -lShin.by);
+        leftLegZ = clampVal(wrapPi(phiShin - leftUpLegZ), -0.7, 0.7);
+      }
+    }
+  }
+
+  let headZ = 0;
+  const hVec = neck0 && nose ? projBody(neck0, nose) : null;
+  if (hVec) {
+    headZ = clampVal(Math.atan2(-hVec.bx, hVec.by), -0.48, 0.48);
+  }
+
+  return {
+    hipU: clampVal(hipPx[0] / 910, 0.1, 0.95),
+    hipV: clampVal(1 - hipPx[1] / 512, 0.08, 0.92),
+    ux,
+    uy,
+    glbScale: clampVal(torsoM / 0.574, 0.25, 2.2),
+    angles: {
+      headZ,
+      neckX: 0.08,
+      leftArmX,
+      leftArmZ: 0,
+      leftForeArmX,
+      leftForeArmZ,
+      rightArmX,
+      rightArmZ: 0,
+      rightForeArmX,
+      rightForeArmZ,
+      leftUpLegZ,
+      leftUpLegLiftX,
+      leftLegZ,
+      leftLegBendX,
+      rightUpLegZ,
+      rightUpLegLiftX,
+      rightLegZ,
+      rightLegBendX,
+    },
+  };
+}
 
 const HAND21_CHAINS = [
   [0, 1, 2, 3, 4],
@@ -1203,7 +1426,143 @@ function sampleBufferedPoseAt(targetTs) {
   return last;
 }
 
+function updateBedPaulLiveRigState(pj, corners) {
+  if (!Array.isArray(corners) || corners.length < 4) return false;
+  const p0 = corners[0];
+  const p1 = corners[1];
+  const p3 = corners[3];
+  const rightVec = Cesium.Cartesian3.subtract(p1, p0, new Cesium.Cartesian3());
+  const upVec = Cesium.Cartesian3.subtract(p3, p0, new Cesium.Cartesian3());
+  const wM = Cesium.Cartesian3.magnitude(rightVec);
+  const hM = Cesium.Cartesian3.magnitude(upVec);
+  if (wM < 0.2 || hM < 0.2) return false;
+
+  const ret = computeBedPaulRetargetPose(pj, wM, hM);
+  const rightAxis = Cesium.Cartesian3.normalize(rightVec, new Cesium.Cartesian3());
+  const upImgAxis = Cesium.Cartesian3.normalize(upVec, new Cesium.Cartesian3());
+  const normalAxis = Cesium.Cartesian3.normalize(
+    Cesium.Cartesian3.cross(rightAxis, upImgAxis, new Cesium.Cartesian3()),
+    new Cesium.Cartesian3(),
+  );
+  const upRaw = new Cesium.Cartesian3(
+    rightAxis.x * ret.ux + upImgAxis.x * ret.uy,
+    rightAxis.y * ret.ux + upImgAxis.y * ret.uy,
+    rightAxis.z * ret.ux + upImgAxis.z * ret.uy,
+  );
+  const upRot = Cesium.Cartesian3.normalize(upRaw, new Cesium.Cartesian3());
+  const rightRot = Cesium.Cartesian3.normalize(
+    Cesium.Cartesian3.cross(upRot, normalAxis, new Cesium.Cartesian3()),
+    new Cesium.Cartesian3(),
+  );
+  const rotMat = new Cesium.Matrix3(
+    normalAxis.x, rightRot.x, upRot.x,
+    normalAxis.y, rightRot.y, upRot.y,
+    normalAxis.z, rightRot.z, upRot.z,
+  );
+  const ori = Cesium.Quaternion.fromRotationMatrix(rotMat);
+  // Anchor GLB Hips (model local y = 0.949 * glbScale) dead-center on Paul's wireframe hips
+  const hipOffsetM = 0.949 * ret.glbScale;
+  const liftN = 0.11;
+  const pos = new Cesium.Cartesian3(
+    p0.x + rightVec.x * ret.hipU + upVec.x * ret.hipV + normalAxis.x * liftN - upRot.x * hipOffsetM,
+    p0.y + rightVec.y * ret.hipU + upVec.y * ret.hipV + normalAxis.y * liftN - upRot.y * hipOffsetM,
+    p0.z + rightVec.z * ret.hipU + upVec.z * ret.hipV + normalAxis.z * liftN - upRot.z * hipOffsetM,
+  );
+  _bedPaulLiveRigState.pos = pos;
+  _bedPaulLiveRigState.ori = ori;
+  _bedPaulLiveRigState.scale = ret.glbScale;
+  _bedPaulLiveRigState.angles = ret.angles;
+  return true;
+}
+
+function makePaulBoneRotationProp(getQuatFn) {
+  return new Cesium.NodeTransformationProperty({
+    rotation: new Cesium.CallbackProperty(() => getQuatFn(_bedPaulLiveRigState.angles), false),
+  });
+}
+
+function syncRooftopPaulGlb(viewer, params, corners) {
+  if (!viewer?.entities || typeof Cesium.NodeTransformationProperty !== 'function') return;
+  const cList = corners || _bedLastCorners;
+  const prm = params || _bedLastParams;
+  const entry = BED_PAUL_AVATAR_CATALOG.find((item) => item.id === _bedPaulAvatarId) || BED_PAUL_AVATAR_CATALOG[0];
+  const hidden = Boolean(prm?.hiddenByStitch) || !yardFramesVisible || !_bedLiveOverlayOn || !entry?.uri;
+
+  const existing = viewer.entities.getById(ROOFTOP_PAUL_ENTITY_ID);
+  if (hidden) {
+    if (existing) existing.show = false;
+    _bedLiveStats.paulGlbActive = false;
+    _bedLiveStats.paulAvatarId = entry?.id || 'wireframe';
+    return;
+  }
+  if (!Array.isArray(cList) || cList.length < 4) return;
+
+  const pj =
+    Object.keys(_bedSmoothPaul).length > 0
+      ? _bedSmoothPaul
+      : _bedLastPayload?.sparse_pose?.paul_joints_2d || {};
+  updateBedPaulLiveRigState(pj, cList);
+
+  const glbUri = resolveBaseAssetUrl(entry.uri);
+  if (existing && _bedPaulEntityUri === glbUri) {
+    existing.show = true;
+    _bedLiveStats.paulGlbActive = true;
+    _bedLiveStats.paulAvatarId = entry.id;
+    governorRequestRender('bed-paul-glb');
+    return;
+  }
+  if (existing) {
+    viewer.entities.remove(existing);
+  }
+  _bedPaulEntityUri = glbUri;
+
+  const qZ = (rad) => Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, rad);
+  const qX = (rad) => Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_X, rad);
+  const qZX = (aZ, aX) =>
+    Cesium.Quaternion.multiply(qZ(aZ), qX(aX), new Cesium.Quaternion());
+  const qXZ = (aX, aZ) =>
+    Cesium.Quaternion.multiply(qX(aX), qZ(aZ), new Cesium.Quaternion());
+
+  viewer.entities.add({
+    id: ROOFTOP_PAUL_ENTITY_ID,
+    name: `🕺 ${entry.label} (Bed LiveWire)`,
+    show: true,
+    position: new Cesium.CallbackProperty(() => _bedPaulLiveRigState.pos, false),
+    orientation: new Cesium.CallbackProperty(() => _bedPaulLiveRigState.ori, false),
+    model: {
+      uri: glbUri,
+      runAnimations: false,
+      scale: new Cesium.CallbackProperty(() => _bedPaulLiveRigState.scale, false),
+      minimumPixelSize: 0,
+      maximumScale: 14,
+      lightColor: new Cesium.Color(1.9, 1.85, 1.75, 1.0),
+      imageBasedLightingFactor: new Cesium.Cartesian2(1.25, 0.9),
+      shadows: Cesium.ShadowMode.DISABLED,
+      nodeTransformations: {
+        Head: makePaulBoneRotationProp((a) => qZ(a.headZ)),
+        Neck: makePaulBoneRotationProp((a) => qX(a.neckX)),
+        Spine1: makePaulBoneRotationProp(() => qX(0.03)),
+        Spine2: makePaulBoneRotationProp(() => qX(0.05)),
+        LeftArm: makePaulBoneRotationProp((a) => qX(a.leftArmX)),
+        LeftForeArm: makePaulBoneRotationProp((a) => qXZ(a.leftForeArmX, a.leftForeArmZ)),
+        RightArm: makePaulBoneRotationProp((a) => qX(a.rightArmX)),
+        RightForeArm: makePaulBoneRotationProp((a) => qXZ(a.rightForeArmX, a.rightForeArmZ)),
+        LeftUpLeg: makePaulBoneRotationProp((a) => qZX(a.leftUpLegZ, a.leftUpLegLiftX)),
+        LeftLeg: makePaulBoneRotationProp((a) => qZX(a.leftLegZ, a.leftLegBendX)),
+        RightUpLeg: makePaulBoneRotationProp((a) => qZX(a.rightUpLegZ, a.rightUpLegLiftX)),
+        RightLeg: makePaulBoneRotationProp((a) => qZX(a.rightLegZ, a.rightLegBendX)),
+      },
+    },
+  });
+  _bedLiveStats.paulGlbActive = true;
+  _bedLiveStats.paulAvatarId = entry.id;
+  governorRequestRender('bed-paul-glb-spawn');
+}
+
 function syncRooftopLisaGlb(viewer, params, corners) {
+  _bedActiveViewer = viewer || _bedActiveViewer;
+  if (params) _bedLastParams = params;
+  if (Array.isArray(corners) && corners.length >= 4) _bedLastCorners = corners;
   if (!viewer?.entities || typeof Cesium.NodeTransformationProperty !== 'function' || !Array.isArray(corners) || corners.length < 4) {
     return;
   }
@@ -1265,6 +1624,7 @@ function syncRooftopLisaGlb(viewer, params, corners) {
     existing.orientation = ori;
     existing.model.scale = glbScale;
     _bedLiveStats.lisaGlbActive = true;
+    syncRooftopPaulGlb(viewer, params, corners);
     return;
   }
 
@@ -1314,6 +1674,7 @@ function syncRooftopLisaGlb(viewer, params, corners) {
     },
   });
   _bedLiveStats.lisaGlbActive = true;
+  syncRooftopPaulGlb(viewer, params, corners);
 }
 
 function compositeBedLiveWireFrame(viewer) {
@@ -1425,7 +1786,9 @@ function compositeBedLiveWireFrame(viewer) {
 
     // Compact LiveWire status badge (top-left)
     const handTxt = _bedLiveStats.handMode === 'hand21' ? '21-PT HANDS' : _bedLiveStats.handMode === 'tips' ? 'FINGERTIPS' : 'HANDS STANDBY';
-    const badgeLabel = `● LIVEWIRE BED · ${tel.paul_present ? 'PAUL LIVE' : 'STANDBY'} · ${handTxt} · ${Number(tel.fps || 0).toFixed(1)} FPS · LISA 3D ${_bedBreathHz.toFixed(2)}Hz`;
+    const activeAvatarEntry = BED_PAUL_AVATAR_CATALOG.find((x) => x.id === _bedPaulAvatarId);
+    const paulModeTxt = activeAvatarEntry?.uri ? `GLB: ${activeAvatarEntry.shortLabel}` : (tel.paul_present ? 'PAUL LIVE' : 'STANDBY');
+    const badgeLabel = `● LIVEWIRE BED · ${paulModeTxt} · ${handTxt} · ${Number(tel.fps || 0).toFixed(1)} FPS · LISA 3D ${_bedBreathHz.toFixed(2)}Hz`;
     ctx.save();
     ctx.fillStyle = 'rgba(4, 9, 22, 0.78)';
     ctx.strokeStyle = tel.paul_present ? 'rgba(56, 189, 248, 0.85)' : 'rgba(148, 163, 184, 0.6)';
@@ -1437,6 +1800,15 @@ function compositeBedLiveWireFrame(viewer) {
     ctx.textBaseline = 'middle';
     ctx.fillText(badgeLabel, 18, 22);
     ctx.restore();
+
+    if (_bedPaulAvatarId !== 'wireframe' && _bedLastCorners) {
+      updateBedPaulLiveRigState(_bedSmoothPaul, _bedLastCorners);
+      const nowFrameMs = Date.now();
+      if (nowFrameMs - _bedPaulLastFrameDrawMs > 30) {
+        _bedPaulLastFrameDrawMs = nowFrameMs;
+        syncRooftopPaulGlb(_bedActiveViewer || viewer, _bedLastParams, _bedLastCorners);
+      }
+    }
   }
 
   _bedLiveCurrentCanvas = canv;
@@ -1454,6 +1826,7 @@ function compositeBedLiveWireFrame(viewer) {
 
 function startBedLiveWireLoop(viewer) {
   if (typeof window === 'undefined') return;
+  _bedActiveViewer = viewer || _bedActiveViewer;
   if (!_bedBaseImg && !_bedBaseImgLoading && typeof Image !== 'undefined') {
     _bedBaseImgLoading = true;
     const img = new Image();
@@ -1467,10 +1840,27 @@ function startBedLiveWireLoop(viewer) {
     img.src = resolveBaseAssetUrl('yard-frames/bed-station-solar-2026-11-17.jpg');
   }
   window.__pflGetBedLiveWireState = () => ({ enabled: _bedLiveOverlayOn, ..._bedLiveStats });
+  window.__pflGetBedPaulAvatar = () => _bedPaulAvatarId;
+  window.__pflGetBedPaulAvatarCatalog = () => BED_PAUL_AVATAR_CATALOG;
+  window.__pflSetBedPaulAvatar = (id) => {
+    const valid = BED_PAUL_AVATAR_CATALOG.find((item) => item.id === id);
+    _bedPaulAvatarId = valid ? valid.id : 'wireframe';
+    _bedLiveStats.paulAvatarId = _bedPaulAvatarId;
+    if (_bedPaulAvatarId !== 'wireframe' && !_bedLiveOverlayOn) {
+      _bedLiveOverlayOn = true;
+      try { localStorage.setItem(BED_LIVEWIRE_KEY, '1'); } catch {}
+    }
+    try { localStorage.setItem(BED_PAUL_AVATAR_KEY, _bedPaulAvatarId); } catch {}
+    syncRooftopPaulGlb(_bedActiveViewer || viewer, _bedLastParams, _bedLastCorners);
+    compositeBedLiveWireFrame(_bedActiveViewer || viewer);
+    governorRequestRender('bed-paul-avatar');
+    return _bedPaulAvatarId;
+  };
   window.__pflSetBedLiveWireOverlay = (on) => {
     _bedLiveOverlayOn = Boolean(on);
     try { localStorage.setItem(BED_LIVEWIRE_KEY, _bedLiveOverlayOn ? '1' : '0'); } catch {}
-    compositeBedLiveWireFrame(viewer);
+    syncRooftopPaulGlb(_bedActiveViewer || viewer, _bedLastParams, _bedLastCorners);
+    compositeBedLiveWireFrame(_bedActiveViewer || viewer);
     return _bedLiveOverlayOn;
   };
   if (!_bedPlaybackTimer) {
@@ -1820,6 +2210,7 @@ export function setYardFramesVisible(viewer, visible) {
       if (id === 'bed-station-20261012') {
         const lisaEnt = viewer?.entities?.getById?.(ROOFTOP_LISA_ENTITY_ID);
         if (lisaEnt) lisaEnt.show = yardFramesVisible && !hiddenStitch;
+        syncRooftopPaulGlb(viewer, st.params, _bedLastCorners);
       }
     }
   }
@@ -2015,6 +2406,9 @@ export function destroyYardFrames(viewer) {
     _saveLayoutTimer = null;
   }
   try { viewer?.entities?.removeById?.(ROOFTOP_LISA_ENTITY_ID); } catch {}
+  try { viewer?.entities?.removeById?.(ROOFTOP_PAUL_ENTITY_ID); } catch {}
+  _bedPaulEntityUri = null;
+  _bedLiveStats.paulGlbActive = false;
   if (typeof yardDatumCleanup === 'function') {
     try {
       yardDatumCleanup();

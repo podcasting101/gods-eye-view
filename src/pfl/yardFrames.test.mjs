@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as Cesium from 'cesium';
 import {
+  BED_PAUL_AVATAR_CATALOG,
+  computeBedPaulRetargetPose,
   computeCorners,
   defaultParams,
   FRAME_TEXTURE_COORDINATES,
@@ -83,4 +85,38 @@ test('bed frame defaults to standing and can be laid flat explicitly', () => {
   const bed = YARD_FRAMES.find((frame) => frame.id === 'bed-station-20261012');
   assert.equal(defaultParams(bed).flat, false);
   assert.equal(defaultParams({ ...bed, flat: true }).flat, true);
+});
+
+test('Paul bed avatar catalog keeps wireframe first and includes all 6 outfit GLBs', () => {
+  assert.equal(BED_PAUL_AVATAR_CATALOG[0].id, 'wireframe');
+  assert.equal(BED_PAUL_AVATAR_CATALOG[0].uri, null);
+  const ids = new Set(BED_PAUL_AVATAR_CATALOG.map((item) => item.id));
+  for (const id of ['paul-nasa', 'paul-shorts', 'paul-suit', 'paul-vest', 'paul-casual', 'paul-medieval']) {
+    assert.ok(ids.has(id), `Expected catalog id: ${id}`);
+  }
+});
+
+test('computeBedPaulRetargetPose retargets crossed right leg (knee occluded) and raised right hand', () => {
+  const liveSample = {
+    0: [613.2, 75.4],
+    1: [630.4, 117.5],
+    2: [583.1, 115.3],
+    3: [527.1, 148.3],
+    4: [575.5, 88.7],
+    5: [678.0, 119.4],
+    6: [710.6, 185.4],
+    7: [738.4, 252.6],
+    8: [607.1, 231.4],
+    9: null,
+    10: [681.1, 392.1],
+    11: [677.0, 241.6],
+    12: [682.6, 330.3],
+    13: [667.8, 483.1],
+  };
+  const ret = computeBedPaulRetargetPose(liveSample, 3.0, 1.69);
+  assert.ok(Number.isFinite(ret.glbScale) && ret.glbScale > 0.25 && ret.glbScale < 2.2);
+  assert.ok(ret.angles.rightUpLegZ > 0.16, `Expected right leg crossed (+Z), got ${ret.angles.rightUpLegZ}`);
+  assert.ok(ret.angles.rightUpLegLiftX > 0, `Expected crossed right thigh lift, got ${ret.angles.rightUpLegLiftX}`);
+  assert.ok(ret.angles.rightForeArmX < -0.5, `Expected bent right forearm toward face, got ${ret.angles.rightForeArmX}`);
+  assert.ok(ret.angles.rightForeArmZ < 0, `Expected forward forearm lift toward nose, got ${ret.angles.rightForeArmZ}`);
 });
