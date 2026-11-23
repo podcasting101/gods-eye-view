@@ -1745,7 +1745,7 @@ export function loadPflWindowFramework({ viewer }) {
       file = 'splats/take3-main-hall.spz';
       label = '🏛️ Main Hall & Telling Room';
     } else if (rid === 'master-sw-2f') {
-      file = 'splats/bedroom-10view.spz';
+      file = 'splats/bedroom-10view.splat';
       label = '🛏️ The Red Suite';
     } else if (rid === 'office-nw-2f') {
       file = 'splats/lisa-command-center.spz';
@@ -1809,11 +1809,11 @@ export function loadPflWindowFramework({ viewer }) {
             </div>
           </div>
           <div style="padding:8px 10px;border:1px solid rgba(236,72,153,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
-            <strong style="color:#f9a8d4">🛏️ 4. The Red Suite (<code>bedroom-10view.spz</code>)</strong>
+            <strong style="color:#f9a8d4">🛏️ 4. The Red Suite (<code>bedroom-10view.splat</code>)</strong>
             <span style="font-size:10.5px;color:#94a3b8">Upstairs Telling Room sanctuary · Lisa Holmes &amp; Paul Prime</span>
             <div style="display:flex;gap:5px;margin-top:2px">
-              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/bedroom-10view.spz" style="border-color:#ec4899;color:#f9a8d4">Step In →</button>
-              <a href="${HOLODECK_BASE_URL}?file=splats/bedroom-10view.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/bedroom-10view.splat" style="border-color:#ec4899;color:#f9a8d4">Step In →</button>
+              <a href="${HOLODECK_BASE_URL}?file=splats/bedroom-10view.splat" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
             </div>
           </div>
           <div style="padding:8px 10px;border:1px solid rgba(74,222,128,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">

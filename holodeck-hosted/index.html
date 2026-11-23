@@ -18,34 +18,38 @@
         /* ── Top Cloud Holodeck Navigation Bar ── */
         #holodeck-topbar {
             position: fixed;
-            top: 10px;
+            top: 6px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 40;
             display: flex;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 6px;
-            max-width: calc(100vw - 24px);
-            padding: 6px 10px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 4px;
+            max-width: calc(100vw - 16px);
+            padding: 4px 8px;
             border-radius: 10px;
-            background: rgba(5, 11, 24, 0.86);
+            background: rgba(5, 11, 24, 0.88);
             border: 1px solid rgba(34, 211, 238, 0.42);
             backdrop-filter: blur(8px);
             box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+            scrollbar-width: none;
         }
+        #holodeck-topbar::-webkit-scrollbar { display: none; }
         .hd-btn, .hd-link {
             appearance: none;
             text-decoration: none;
             background: rgba(15, 23, 42, 0.88);
             border: 1px solid rgba(100, 116, 139, 0.45);
             color: #cbd5e1;
-            padding: 4px 9px;
+            padding: 3px 7px;
             border-radius: 6px;
-            font-size: 11px;
+            font-size: 10.5px;
             font-weight: 600;
             cursor: pointer;
             white-space: nowrap;
+            flex-shrink: 0;
             transition: background 0.12s, border-color 0.12s, color 0.12s;
         }
         .hd-btn:hover, .hd-link:hover {
@@ -304,14 +308,14 @@
         /* ── Interact menu & Toast ── */
         #interact-menu {
             position: fixed;
-            top: 50%;
+            top: 52%;
             left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(2, 6, 23, 0.96);
             border: 1px solid #22d3ee;
             border-radius: 10px;
             padding: 18px 22px 14px;
-            z-index: 35;
+            z-index: 60;
             display: none;
             min-width: 280px;
         }
@@ -398,7 +402,7 @@
     <button type="button" class="hd-btn" data-hd-file="splats/take1-room-capture.spz">🚪 Parlor</button>
     <button type="button" class="hd-btn" data-hd-file="splats/take2-alternate-angle.spz">🏋️ 1F Fitness (Lisa)</button>
     <button type="button" class="hd-btn" data-hd-file="splats/take3-main-hall.spz">🏛️ Main Hall</button>
-    <button type="button" class="hd-btn" data-hd-file="splats/bedroom-10view.spz">🛏️ Red Suite</button>
+    <button type="button" class="hd-btn" data-hd-file="splats/bedroom-10view.splat">🛏️ Red Suite</button>
     <button type="button" class="hd-btn" data-hd-file="splats/lisa-command-center.spz">👑 Command / Troi</button>
     <button type="button" class="hd-btn" data-hd-file="splats/arcade_spaceship.spz">🕹️ Arcade</button>
     <button type="button" class="hd-btn" data-hd-file="splats/01-command-deck.splat">🛸 Bridge</button>
