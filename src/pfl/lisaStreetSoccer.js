@@ -660,7 +660,8 @@ export async function loadLisaStreetSoccer({ viewer, signal }) {
   const hasExplicitShareCoords =
     typeof window !== 'undefined' &&
     /[?&#](?:lat|lon)=/i.test(`${window.location?.hash || ''}${window.location?.search || ''}`);
-  let pendingDefaultWide = !hasExplicitShareCoords;
+  // Keep default landing camera on Paul's rooftop bed view unless the user selects Wide/AutoCut.
+  let pendingDefaultWide = false;
   let nearYardSettledAtMs = 0;
   let lightMode = 'bright';
   let destroyed = false;

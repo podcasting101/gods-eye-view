@@ -503,7 +503,109 @@ export function loadPflWindowFramework({ viewer }) {
       governorRequestRender('pfl-bed-paul-avatar');
     });
 
-    ctrlsEl?.prepend(hdrHolodeckBtn, bedAvatarSelect, rbacPill, gatherBtn, resetBtn);
+    const shareViewBtn = document.createElement('button');
+    shareViewBtn.type = 'button';
+    shareViewBtn.id = 'pfl-btn-share-live-view';
+    shareViewBtn.className = 'pfl-std-cbtn';
+    shareViewBtn.title = 'Capture current 3D viewpoint & camera link into a dynamic short URL with live preview image & favicon';
+    shareViewBtn.style.cssText = 'background:rgba(16,185,129,0.20);border-color:#10b981;color:#6ee7b7;white-space:nowrap;flex-shrink:0;font-weight:700';
+    shareViewBtn.innerHTML = '🔗 Share View';
+    for (const ev of ['mousedown', 'pointerdown', 'click']) {
+      shareViewBtn.addEventListener(ev, (e) => e.stopPropagation());
+    }
+    shareViewBtn.addEventListener('click', async () => {
+      const origLabel = '🔗 Share View';
+      shareViewBtn.textContent = '📸 Capturing...';
+      try {
+        let targetUrl = typeof window !== 'undefined' ? window.location.href : 'https://sex-world.ai/gods-eye-view/';
+        if (!/#.*lat=/i.test(targetUrl) && viewer?.camera) {
+          const c = viewer.camera.positionCartographic;
+          if (c) {
+            const lat = Cesium.Math.toDegrees(c.latitude).toFixed(5);
+            const lon = Cesium.Math.toDegrees(c.longitude).toFixed(5);
+            const alt = Number(c.height || 0).toFixed(1);
+            const hdg = Math.round(((Cesium.Math.toDegrees(viewer.camera.heading || 0) % 360) + 360) % 360);
+            const pch = Math.round(Cesium.Math.toDegrees(viewer.camera.pitch || -0.35));
+            const baseOrigin = IS_LOCAL_NODE ? `${window.location.origin}/` : 'https://sex-world.ai/gods-eye-view/';
+            targetUrl = `${baseOrigin}#v=2&lat=${lat}&lon=${lon}&alt=${alt}&heading=${hdg}&pitch=${pch}&roll=0&style=normal&hud=tactical`;
+          }
+        }
+        let imageDataUrl = '';
+        try {
+          viewer.scene.render();
+          const glCanvas = viewer.scene.canvas;
+          if (glCanvas && glCanvas.width > 0 && glCanvas.height > 0) {
+            const cw = 1200;
+            const ch = 630;
+            const outC = document.createElement('canvas');
+            outC.width = cw;
+            outC.height = ch;
+            const ctx = outC.getContext('2d');
+            if (ctx) {
+              const srcAspect = glCanvas.width / glCanvas.height;
+              const dstAspect = cw / ch;
+              let sx = 0, sy = 0, sw = glCanvas.width, sh = glCanvas.height;
+              if (srcAspect > dstAspect) {
+                sw = glCanvas.height * dstAspect;
+                sx = (glCanvas.width - sw) * 0.5;
+              } else {
+                sh = glCanvas.width / dstAspect;
+                sy = (glCanvas.height - sh) * 0.5;
+              }
+              ctx.drawImage(glCanvas, sx, sy, sw, sh, 0, 0, cw, ch);
+              imageDataUrl = outC.toDataURL('image/jpeg', 0.85);
+            }
+            const favC = document.createElement('canvas');
+            favC.width = 64;
+            favC.height = 64;
+            const fCtx = favC.getContext('2d');
+            if (fCtx) {
+              const sq = Math.min(glCanvas.width, glCanvas.height);
+              fCtx.drawImage(glCanvas, (glCanvas.width - sq) * 0.5, (glCanvas.height - sq) * 0.5, sq, sq, 0, 0, 64, 64);
+              const favUri = favC.toDataURL('image/png');
+              document.querySelectorAll('link[rel~="icon"]').forEach((lnk) => {
+                if (lnk.getAttribute('sizes') !== 'any') lnk.href = favUri;
+              });
+            }
+          }
+        } catch {}
+
+        let copiedUrl = targetUrl;
+        if (imageDataUrl && !IS_LOCAL_NODE) {
+          const resp = await fetch('/api/share_view.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              targetUrl,
+              title: "God's Eye View · Live 3D Viewpoint",
+              description: "Interactive 3D God's Eye View live camera snapshot & spatial coordinates.",
+              imageDataUrl,
+            }),
+          });
+          if (resp.ok) {
+            const res = await resp.json();
+            if (res?.ok && res.shortUrl) {
+              copiedUrl = res.shortUrl;
+              window.__pflLastShareResult = res;
+              shareViewBtn.textContent = `✅ /g/${res.slug}`;
+              shareViewBtn.title = `Copied ${res.shortUrl} · Preview: ${res.previewUrl}`;
+            }
+          }
+        }
+        try { await navigator.clipboard?.writeText?.(copiedUrl); } catch {}
+        if (!shareViewBtn.textContent.startsWith('✅')) {
+          shareViewBtn.textContent = '✅ Link Copied';
+          shareViewBtn.title = `Copied: ${copiedUrl}`;
+        }
+      } catch {
+        shareViewBtn.textContent = '⚠ Share Err';
+      }
+      setTimeout(() => {
+        shareViewBtn.textContent = origLabel;
+      }, 5000);
+    });
+
+    ctrlsEl?.prepend(hdrHolodeckBtn, shareViewBtn, bedAvatarSelect, rbacPill, gatherBtn, resetBtn);
   }
 
   setTimeout(() => {
@@ -604,10 +706,10 @@ export function loadPflWindowFramework({ viewer }) {
       try { viewer.trackedEntity = undefined; viewer.selectedEntity = undefined; } catch {}
       try { window.__pflSetSoccerTimeline?.({ camMode: 'free' }); } catch {}
       viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(-95.2314, 29.2477, -11.0),
+        destination: Cesium.Cartesian3.fromDegrees(-95.23141, 29.24765, -9.2),
         orientation: {
-          heading: Cesium.Math.toRadians(172),
-          pitch: Cesium.Math.toRadians(-15),
+          heading: Cesium.Math.toRadians(158),
+          pitch: Cesium.Math.toRadians(-22),
           roll: 0,
         },
         duration: 1.0,

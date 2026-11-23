@@ -207,7 +207,7 @@ export async function loadPflStation({ viewer, cesiumToken, signal, enablePolyma
           cam &&
           Math.abs(Cesium.Math.toDegrees(cam.latitude) - 29.2475) < 0.02 &&
           Math.abs(Cesium.Math.toDegrees(cam.longitude) - -95.2314) < 0.02;
-        if (/alt=-/i.test(hashStr) || /lat=29\.247/i.test(hashStr) || nearLiverpoolCam) {
+        if (!hashStr || /alt=-/i.test(hashStr) || /lat=29\.247/i.test(hashStr) || nearLiverpoolCam) {
           ctrl.enableCollisionDetection = false;
           if ('minimumZoomDistance' in ctrl) ctrl.minimumZoomDistance = 0.25;
         }
