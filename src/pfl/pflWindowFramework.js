@@ -605,7 +605,21 @@ export function loadPflWindowFramework({ viewer }) {
       }, 5000);
     });
 
-    ctrlsEl?.prepend(hdrHolodeckBtn, shareViewBtn, bedAvatarSelect, rbacPill, gatherBtn, resetBtn);
+    const quickFovBtn = document.createElement('button');
+    quickFovBtn.type = 'button';
+    quickFovBtn.id = 'pfl-btn-quick-fov';
+    quickFovBtn.className = 'pfl-std-cbtn';
+    quickFovBtn.title = 'Cycle camera field of view (60° -> 95° Wide -> 115° Ultra-Wide) for indoor viewing without clipping';
+    quickFovBtn.style.cssText = 'border-color:#c084fc;color:#e9d5ff;background:rgba(88,28,135,0.35);white-space:nowrap;flex-shrink:0';
+    quickFovBtn.textContent = '🔭 60°';
+    quickFovBtn.addEventListener('click', () => {
+      const fovNow = Math.round(Cesium.Math.toDegrees(viewer?.camera?.frustum?.fov || Cesium.Math.toRadians(60)));
+      const nextFov = fovNow < 80 ? 95 : (fovNow < 110 ? 115 : 60);
+      window.__pflSetLensFov?.(nextFov);
+      quickFovBtn.textContent = `🔭 ${nextFov}°`;
+    });
+
+    ctrlsEl?.prepend(hdrHolodeckBtn, shareViewBtn, quickFovBtn, bedAvatarSelect, rbacPill, gatherBtn, resetBtn);
   }
 
   setTimeout(() => {
@@ -1720,6 +1734,28 @@ export function loadPflWindowFramework({ viewer }) {
   // 1S788 Holodeck Hallway Portal Window (Cloud /holodeck/ when public, :8766 when local node — 100% CSP-Clean Native DOM)
   const HOLODECK_BASE_URL = IS_LOCAL_NODE ? 'http://127.0.0.1:8766/' : '/holodeck/';
   const HOLODECK_HALLWAY_URL = `${HOLODECK_BASE_URL}?file=splats/take1-room-capture.spz`;
+  function resolveHolodeckRoomForId(roomId) {
+    const rid = String(roomId || '').toLowerCase();
+    let file = 'splats/take1-room-capture.spz';
+    let label = '🚪 Parlor & 7 Hats';
+    if (['gameroom-1f', 'patio-1f', 'galley-1f', 'utility-1f', 'bath3-1f'].includes(rid)) {
+      file = 'splats/take2-alternate-angle.spz';
+      label = '🏋️ 1F Fitness (Lisa Workout)';
+    } else if (['kitchen-2f', 'dining-2f', 'baths-2f'].includes(rid)) {
+      file = 'splats/take3-main-hall.spz';
+      label = '🏛️ Main Hall & Telling Room';
+    } else if (rid === 'master-sw-2f') {
+      file = 'splats/bedroom-10view.spz';
+      label = '🛏️ The Red Suite';
+    } else if (rid === 'office-nw-2f') {
+      file = 'splats/lisa-command-center.spz';
+      label = '👑 Lisa Command & Schoolroom';
+    } else if (rid === 'boathouse-wf') {
+      file = 'splats/arcade_spaceship.spz';
+      label = '🕹️ Arcade Lounge & Quarters';
+    }
+    return { file, label, url: `${HOLODECK_BASE_URL}?file=${file}` };
+  }
   let activeHolodeckUrl = HOLODECK_HALLWAY_URL;
   const holodeckWin = createStandardBox({
     id: 'pfl-win-holodeck-portal',
@@ -1749,53 +1785,69 @@ export function loadPflWindowFramework({ viewer }) {
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px">
           <div style="padding:8px 10px;border:1px solid rgba(34,211,238,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
-            <strong style="color:#67e8f9">🚪 1. Entry Hallway (<code>take1-room-capture.spz</code>)</strong>
-            <span style="font-size:10.5px;color:#94a3b8">1S788 carport threshold · Doors to Main Hall, Command Center &amp; 417 Palm Dr Yard</span>
+            <strong style="color:#67e8f9">🚪 1. The Parlor &amp; 7-Hat Check-In (<code>take1-room-capture.spz</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">BLWL Neon Marquee, Lisa Holmes, Lisa Muse, Paul Prime &amp; One John Ledger</span>
             <div style="display:flex;gap:5px;margin-top:2px">
               <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/take1-room-capture.spz" style="border-color:#22d3ee;color:#67e8f9">Step In →</button>
               <a href="${HOLODECK_BASE_URL}?file=splats/take1-room-capture.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
             </div>
           </div>
+          <div style="padding:8px 10px;border:1px solid rgba(74,222,128,0.65);border-radius:8px;background:rgba(6,78,59,0.28);display:flex;flex-direction:column;gap:4px">
+            <strong style="color:#86efac">🏋️ 2. 1F Fitness Gameroom — Lisa Workout (<code>take2-alternate-angle.spz</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">Zillow 1F exercise balls + Lisa Morning Workout animation &amp; pose wall</span>
+            <div style="display:flex;gap:5px;margin-top:2px">
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/take2-alternate-angle.spz" style="border-color:#22c55e;color:#4ade80">Step In →</button>
+              <a href="${HOLODECK_BASE_URL}?file=splats/take2-alternate-angle.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+            </div>
+          </div>
           <div style="padding:8px 10px;border:1px solid rgba(168,85,247,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
-            <strong style="color:#e9d5ff">🏛️ 2. Main Hall (<code>take3-main-hall.spz</code>)</strong>
-            <span style="font-size:10.5px;color:#94a3b8">Central interior corridor · Connects Entry Hallway, Alt Angle &amp; Lisa Command Center</span>
+            <strong style="color:#e9d5ff">🏛️ 3. Main Hall &amp; Telling Room Lock (<code>take3-main-hall.spz</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">Girls' suite corridor · Wren, Harry Maybourne &amp; locked Telling Room door</span>
             <div style="display:flex;gap:5px;margin-top:2px">
               <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/take3-main-hall.spz" style="border-color:#a855f7;color:#e9d5ff">Step In →</button>
               <a href="${HOLODECK_BASE_URL}?file=splats/take3-main-hall.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
             </div>
           </div>
+          <div style="padding:8px 10px;border:1px solid rgba(236,72,153,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
+            <strong style="color:#f9a8d4">🛏️ 4. The Red Suite (<code>bedroom-10view.spz</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">Upstairs Telling Room sanctuary · Lisa Holmes &amp; Paul Prime</span>
+            <div style="display:flex;gap:5px;margin-top:2px">
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/bedroom-10view.spz" style="border-color:#ec4899;color:#f9a8d4">Step In →</button>
+              <a href="${HOLODECK_BASE_URL}?file=splats/bedroom-10view.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+            </div>
+          </div>
           <div style="padding:8px 10px;border:1px solid rgba(74,222,128,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
-            <strong style="color:#86efac">👑 3. Lisa Command Center (<code>lisa-command-center.spz</code>)</strong>
-            <span style="font-size:10.5px;color:#94a3b8">Sovereign bridge · Doors to Main Hall, Arcade Spaceship &amp; 417 Palm Dr Yard</span>
+            <strong style="color:#86efac">👑 5. Lisa Command &amp; Schoolroom (<code>lisa-command-center.spz</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">Spycraft Academy (Troi) · Lisa Muse &amp; Wren ops bridge</span>
             <div style="display:flex;gap:5px;margin-top:2px">
               <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/lisa-command-center.spz" style="border-color:#4ade80;color:#86efac">Step In →</button>
               <a href="${HOLODECK_BASE_URL}?file=splats/lisa-command-center.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
             </div>
           </div>
           <div style="padding:8px 10px;border:1px solid rgba(251,191,36,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
-            <strong style="color:#fde047">🕹️ 4. Arcade Spaceship (<code>arcade_spaceship.spz</code>)</strong>
-            <span style="font-size:10.5px;color:#94a3b8">Starship deck · Return portal wired back to Lisa Command Center</span>
+            <strong style="color:#fde047">🕹️ 6. Arcade Jukebox Lounge (<code>arcade_spaceship.spz</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">La Grange Jukebox &amp; Guest Suite · Portal to 01 Command Deck</span>
             <div style="display:flex;gap:5px;margin-top:2px">
               <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/arcade_spaceship.spz" style="border-color:#fbbf24;color:#fde047">Step In →</button>
               <a href="${HOLODECK_BASE_URL}?file=splats/arcade_spaceship.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
             </div>
           </div>
-          <div style="padding:8px 10px;border:1px solid rgba(56,189,248,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
-            <strong style="color:#7dd3fc">🛏️ 5. Paul's Bedroom (<code>bedroom-10view.spz</code>)</strong>
-            <span style="font-size:10.5px;color:#94a3b8">10-view interior 3D Gaussian Splat room capture</span>
-            <div style="display:flex;gap:5px;margin-top:2px">
-              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/bedroom-10view.spz" style="border-color:#38bdf8;color:#7dd3fc">Step In →</button>
-              <a href="${HOLODECK_BASE_URL}?file=splats/bedroom-10view.spz" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
-            </div>
-          </div>
           <div style="padding:8px 10px;border:1px solid rgba(192,132,252,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
-            <strong style="color:#d8b4fe">🛸 6. 01 Command Deck (<code>01-command-deck.splat</code>)</strong>
-            <span style="font-size:10.5px;color:#94a3b8">Fast-loading HunyuanWorld bridge splat deck</span>
+            <strong style="color:#d8b4fe">🛸 7. 01 Command Deck (<code>01-command-deck.splat</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">HunyuanWorld bridge splat deck · Paul Prime &amp; Lisa Muse</span>
             <div style="display:flex;gap:5px;margin-top:2px">
               <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="${HOLODECK_BASE_URL}?file=splats/01-command-deck.splat" style="border-color:#c084fc;color:#d8b4fe">Step In →</button>
               <a href="${HOLODECK_BASE_URL}?file=splats/01-command-deck.splat" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
             </div>
           </div>
+          ${IS_LOCAL_NODE ? `<div style="padding:8px 10px;border:1px solid rgba(56,189,248,0.55);border-radius:8px;background:rgba(9,14,26,0.86);display:flex;flex-direction:column;gap:4px">
+            <strong style="color:#7dd3fc">🏫 Local Chinese Classroom (<code>classroom.ply</code>)</strong>
+            <span style="font-size:10.5px;color:#94a3b8">High-detail 283 MB local Splat Server (:8766) schoolroom</span>
+            <div style="display:flex;gap:5px;margin-top:2px">
+              <button type="button" class="pfl-std-cbtn" data-pfl-holo-nav="http://127.0.0.1:8766/?file=splats/classroom.ply" style="border-color:#38bdf8;color:#7dd3fc">Step In →</button>
+              <a href="http://127.0.0.1:8766/?file=splats/classroom.ply" target="_blank" rel="noopener" class="pfl-std-cbtn" style="text-decoration:none">New Tab ↗</a>
+            </div>
+          </div>` : ''}
         </div>
       </div>
     </div>
@@ -4284,6 +4336,8 @@ export function loadPflWindowFramework({ viewer }) {
       b.style.borderColor = match ? '#c084fc' : '';
       b.style.color = match ? '#e9d5ff' : '';
     });
+    const qfBtn = document.getElementById('pfl-btn-quick-fov');
+    if (qfBtn) qfBtn.textContent = `🔭 ${Math.round(clamped)}°`;
   }
 
   function setOpticalLensFov(deg) {
@@ -7038,6 +7092,7 @@ export function loadPflWindowFramework({ viewer }) {
           <button type="button" class="pfl-std-cbtn" data-mls-floor="waterfront">⚓ Boathouse/Gazebo</button>
         </div>
         <div style="display:flex;gap:5px;align-items:center">
+          <button type="button" class="pfl-std-cbtn" id="pfl-mls-enter-splat" style="border-color:#22c55e;color:#86efac;background:rgba(6,78,59,0.45);font-weight:700" title="Beam directly from this 417 Palm Dr room into its walkable 3D Gaussian Splat Holodeck suite">🌀 Enter Room Splat</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-mls-360-btn" style="border-color:#22d3ee;color:#67e8f9" title="Open interactive 360° Sphere &amp; Nov 4 2018 ↔ 2026 Time Machine for this room">🌐 360° Interactive View</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-mls-pins-toggle" style="border-color:#4ade80;color:#86efac" title="Show/hide clickable 3D room hotspot pins around 417 Palm Drive">📍 3D Room Pins: ON</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-mls-close-btn" style="border-color:#f43f5e;color:#fda4af">✕ Close</button>
@@ -7228,10 +7283,16 @@ export function loadPflWindowFramework({ viewer }) {
     const badgeEl = mlsWin.body.querySelector('#pfl-mls-photo-badge');
     const headEl = mlsWin.body.querySelector('#pfl-mls-room-heading');
     const capEl = mlsWin.body.querySelector('#pfl-mls-photo-caption');
+    const splatBtn = mlsWin.body.querySelector('#pfl-mls-enter-splat');
     if (imgEl) imgEl.src = p.url;
     if (badgeEl) badgeEl.textContent = `${p.idx + 1} / 32 · ${p.code}`;
     if (headEl) headEl.textContent = p.roomTitle;
     if (capEl) capEl.textContent = p.caption;
+    if (splatBtn) {
+      const targetHolo = resolveHolodeckRoomForId(p.roomId);
+      splatBtn.setAttribute('data-holo-url', targetHolo.url);
+      splatBtn.textContent = `🌀 Splat: ${targetHolo.label}`;
+    }
     mlsWin.body.querySelectorAll('[data-mls-room]').forEach((b) => {
       const match = b.getAttribute('data-mls-room') === p.roomId;
       const svgRect = b.querySelector?.('rect');
@@ -7352,6 +7413,11 @@ export function loadPflWindowFramework({ viewer }) {
     e.currentTarget.style.borderColor = mlsRoomPinsOn ? '#4ade80' : 'rgba(148,163,184,0.35)';
     e.currentTarget.style.color = mlsRoomPinsOn ? '#86efac' : '#94a3b8';
     syncMlsRoomPins(MLS_PHOTOS[currentMlsIdx]?.roomId || null);
+  });
+  mlsWin.body.querySelector('#pfl-mls-enter-splat')?.addEventListener('click', () => {
+    const rid = MLS_PHOTOS[currentMlsIdx]?.roomId || 'living-2f';
+    const target = resolveHolodeckRoomForId(rid);
+    window.location.href = target.url;
   });
   mlsWin.body.querySelector('#pfl-mls-360-btn')?.addEventListener('click', () => {
     const rid = MLS_PHOTOS[currentMlsIdx]?.roomId || 'kitchen-2f';
@@ -7564,13 +7630,14 @@ export function loadPflWindowFramework({ viewer }) {
       const eid = `pfl-360-orb-${item.id}`;
       const wp = resolveSphereWorldPose(item);
       const gAlt = resolveLocalGroundM(wp.lon, wp.lat);
+      const orbR = item.downloadedMatch ? 0.28 : 0.24;
       const ent = viewer.entities.add({
         id: eid,
         name: `🌐 360° Sphere · ${item.label} (${item.capturedAt})`,
         position: Cesium.Cartesian3.fromDegrees(wp.lon, wp.lat, gAlt + wp.altOff),
         ellipsoid: {
-          radii: new Cesium.Cartesian3(0.42, 0.42, 0.42),
-          material: Cesium.Color.fromCssColorString(item.downloadedMatch ? '#facc15' : '#22d3ee').withAlpha(0.75),
+          radii: new Cesium.Cartesian3(orbR, orbR, orbR),
+          material: Cesium.Color.fromCssColorString(item.downloadedMatch ? '#facc15' : '#22d3ee').withAlpha(0.72),
           outline: true,
           outlineColor: Cesium.Color.WHITE.withAlpha(0.85),
         },
@@ -7612,6 +7679,7 @@ export function loadPflWindowFramework({ viewer }) {
           <button type="button" class="pfl-std-cbtn" id="pfl-360-prev" style="padding:3px 8px">◀ Prev Spot</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-360-next" style="padding:3px 8px">Next Spot ▶</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-360-time-play" style="border-color:#facc15;color:#fde047;background:rgba(250,204,21,0.16);padding:3px 9px">▶️ Play Over Time (2018 → 2026)</button>
+          <button type="button" class="pfl-std-cbtn" id="pfl-360-enter-splat" style="border-color:#22c55e;color:#86efac;background:rgba(6,78,59,0.45);padding:3px 9px;font-weight:700" title="Walk directly inside this room's high-detail 3D Gaussian Splat suite in Holodeck">🌀 Walk in Splat Holodeck</button>
           <button type="button" class="pfl-std-cbtn" id="pfl-360-align-cam" style="border-color:#22d3ee;color:#67e8f9;padding:3px 8px" title="Teleport Cesium 3D Camera here matching exact look heading">🧭 Sync 3D Globe Here</button>
         </div>
         <button type="button" class="pfl-std-cbtn" id="pfl-360-close" style="border-color:#f43f5e;color:#fda4af">✕ Close</button>
@@ -7751,6 +7819,12 @@ export function loadPflWindowFramework({ viewer }) {
     const titleLbl = viewer360Win.body.querySelector('#pfl-360-title-lbl');
     if (titleLbl) {
       titleLbl.textContent = `${item.label} · 🕰️ ${item.capturedAt || item.era} · ${item.camera || '360°'}`;
+    }
+    const enterSplatBtn = viewer360Win.body.querySelector('#pfl-360-enter-splat');
+    if (enterSplatBtn) {
+      const targetHolo = resolveHolodeckRoomForId(item.roomId);
+      enterSplatBtn.setAttribute('data-holo-url', targetHolo.url);
+      enterSplatBtn.textContent = `🌀 Walk Splat: ${targetHolo.label}`;
     }
 
     // Show matching 2026 MLS room comparison PIP when available
@@ -7904,6 +7978,11 @@ export function loadPflWindowFramework({ viewer }) {
   viewer360Win.body.querySelector('#pfl-360-time-play')?.addEventListener('click', () => {
     if (timePlay360Mode) stop360TimePlay();
     else open360ViewerModal(active360Item, null, true);
+  });
+  viewer360Win.body.querySelector('#pfl-360-enter-splat')?.addEventListener('click', () => {
+    const rid = active360Item?.roomId || 'living-2f';
+    const target = resolveHolodeckRoomForId(rid);
+    window.location.href = target.url;
   });
   viewer360Win.body.querySelector('#pfl-360-align-cam')?.addEventListener('click', () => {
     if (!active360Item || !viewer?.camera) return;

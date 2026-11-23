@@ -1,5 +1,7 @@
 Options -Indexes
 AddType application/octet-stream .spz .splat .ply
+AddType model/gltf-binary .glb .gltf
+AddType image/webp .webp
 AddType text/javascript .js .mjs
 AddType application/json .json
 
@@ -7,7 +9,7 @@ AddType application/json .json
   <FilesMatch "\.(html|json)$">
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
-  <FilesMatch "\.(spz|splat|jpg|js|mjs)$">
+  <FilesMatch "\.(spz|splat|jpg|webp|glb|js|mjs)$">
     Header set Cache-Control "public, max-age=86400"
   </FilesMatch>
 </IfModule>

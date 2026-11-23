@@ -363,20 +363,49 @@
             z-index: 35;
             display: none;
         }
+        #room-banner {
+            position: fixed;
+            bottom: 48px;
+            left: 14px;
+            z-index: 14;
+            display: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            background: rgba(2, 6, 23, 0.84);
+            border: 1px solid rgba(236, 72, 153, 0.55);
+            color: #f9a8d4;
+            font-size: 11.5px;
+            font-weight: 600;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+            pointer-events: none;
+        }
+        .hd-btn-gravity-on {
+            border-color: #22c55e !important;
+            color: #86efac !important;
+            background: rgba(6, 78, 59, 0.55) !important;
+        }
+        .hd-btn-fov {
+            border-color: #c084fc !important;
+            color: #e9d5ff !important;
+            background: rgba(88, 28, 135, 0.38) !important;
+        }
     </style>
 </head>
 <body>
 
 <div id="holodeck-topbar">
-    <a class="hd-link hd-link-home" href="/gods-eye-view/">🌐 ← 417 Palm Dr (God's Eye View)</a>
-    <button type="button" class="hd-btn" data-hd-file="splats/take1-room-capture.spz">🚪 Entry Hallway</button>
+    <a class="hd-link hd-link-home" href="/gods-eye-view/">🌐 ← 417 Palm Dr (GEV)</a>
+    <button type="button" class="hd-btn" data-hd-file="splats/take1-room-capture.spz">🚪 Parlor</button>
+    <button type="button" class="hd-btn" data-hd-file="splats/take2-alternate-angle.spz">🏋️ 1F Fitness (Lisa)</button>
     <button type="button" class="hd-btn" data-hd-file="splats/take3-main-hall.spz">🏛️ Main Hall</button>
-    <button type="button" class="hd-btn" data-hd-file="splats/lisa-command-center.spz">👑 Lisa Command</button>
+    <button type="button" class="hd-btn" data-hd-file="splats/bedroom-10view.spz">🛏️ Red Suite</button>
+    <button type="button" class="hd-btn" data-hd-file="splats/lisa-command-center.spz">👑 Command / Troi</button>
     <button type="button" class="hd-btn" data-hd-file="splats/arcade_spaceship.spz">🕹️ Arcade</button>
-    <button type="button" class="hd-btn" data-hd-file="splats/bedroom-10view.spz">🛏️ Bedroom</button>
-    <button type="button" class="hd-btn" data-hd-file="splats/01-command-deck.splat">🛸 Command Deck</button>
+    <button type="button" class="hd-btn" data-hd-file="splats/01-command-deck.splat">🛸 Bridge</button>
+    <button type="button" class="hd-btn hd-btn-gravity-on" id="hd-gravity-btn" title="Toggle floor gravity (G)">🌍 Gravity: ON</button>
+    <button type="button" class="hd-btn hd-btn-fov" id="hd-fov-btn" title="Cycle indoor wide-angle FOV (V)">🔭 FOV: 85°</button>
     <button type="button" class="hd-btn" id="hd-toggle-overlay">🎛 Controls</button>
-    <span class="hd-badge">Cloud Splat Holodeck · Local Metabase/Matrix/AI-Town deferred</span>
+    <span class="hd-badge">Chicken Ranch · 417 Palm Dr Holodeck</span>
 </div>
 
 <div id="overlay">
@@ -445,7 +474,8 @@
     <div>POS Z: <span id="tele-z" style="color:#fff">0.00</span></div>
     <div style="margin-top:4px;border-top:1px dashed rgba(56,189,248,0.25);padding-top:4px;">PITCH: <span id="tele-pitch" style="color:#fde047">0°</span> · YAW: <span id="tele-yaw" style="color:#fde047">0°</span></div>
 </div>
-<div id="hud">Drag — look · WASD — move · Q/E — float · Shift — sprint · Esc — controls</div>
+<div id="room-banner"></div>
+<div id="hud">Drag — look · WASD — move · Q/E — float · G — Gravity · V — FOV · Esc — menu</div>
 <div id="status"></div>
 
 <div id="dpad">
@@ -463,10 +493,13 @@
 
 <div id="interact-menu">
     <button id="interact-close">✕</button>
-    <div id="interact-title">📍 HOTSPOT</div>
-    <button class="interact-btn" data-action="pick">🔓 Pick the lock</button>
-    <button class="interact-btn" data-action="examine">🔍 Examine</button>
+    <div id="interact-title">🔒 DOOR LOCK</div>
+    <div id="interact-note" style="font-size:11px;color:#94a3b8;text-align:center;margin-bottom:10px;display:none"></div>
+    <button class="interact-btn" id="interact-unlock" style="border-color:#4ade80;color:#86efac;font-weight:700;display:none">🔓 Unlock &amp; Enter</button>
+    <button class="interact-btn" data-action="pick">🗝️ Pick the lock</button>
+    <button class="interact-btn" data-action="examine">🔍 Examine lock</button>
     <button class="interact-btn" data-action="knock">✊ Knock</button>
+    <button class="interact-btn" data-action="scan">📡 Scan RF badge</button>
     <button class="interact-btn" data-action="leave">🚶 Step back</button>
 </div>
 <div id="interact-response"></div>
@@ -481,6 +514,7 @@
 
 <script type="module">
 import * as THREE from 'three';
+import { GLTFLoader } from './three/addons/loaders/GLTFLoader.js';
 import {
     applyFpsCameraRotation,
     createFallbackScene,
@@ -521,7 +555,9 @@ const tuneValX = document.getElementById('tune-val-x');
 const tuneValY = document.getElementById('tune-val-y');
 const tuneValZ = document.getElementById('tune-val-z');
 
-const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.01, 500);
+const FOV_PRESETS = [75, 85, 95, 110, 60];
+let currentFovDeg = 85;
+const camera = new THREE.PerspectiveCamera(currentFovDeg, innerWidth / innerHeight, 0.01, 500);
 camera.rotation.order = 'YXZ';
 camera.position.set(0, EYE_H, 0);
 
@@ -541,39 +577,101 @@ let lastX = 0, lastY = 0, yaw = 0, pitch = 0;
 let floorY = -3.0, velY = 0, onGround = true;
 const keys = {};
 
+let glbLoadedCount = 0;
+const glbNames = [];
+const avatarAnimations = [];
+const propAnimations = [];
+const activeMixers = [];
+
+function syncGravityButtonUi() {
+    const btn = document.getElementById('hd-gravity-btn');
+    const on = Boolean(useBoundsCheckbox?.checked);
+    if (!btn) return;
+    btn.textContent = on ? '🌍 Gravity: ON' : '🪶 Fly: FREE';
+    btn.classList.toggle('hd-btn-gravity-on', on);
+}
+
+function setGravityEnabled(on) {
+    if (useBoundsCheckbox) useBoundsCheckbox.checked = Boolean(on);
+    if (currentScene) currentScene.bounds = Boolean(on);
+    if (on && camera.position.y < floorY + EYE_H) {
+        camera.position.y = floorY + EYE_H;
+        velY = 0;
+        onGround = true;
+    }
+    syncGravityButtonUi();
+}
+
+function setFovDeg(deg) {
+    currentFovDeg = Math.max(50, Math.min(120, Number(deg) || 85));
+    camera.fov = currentFovDeg;
+    camera.updateProjectionMatrix();
+    const btn = document.getElementById('hd-fov-btn');
+    if (btn) btn.textContent = `🔭 FOV: ${currentFovDeg}°`;
+}
+
+function updateRoomBannerUi(sceneObj) {
+    const rb = document.getElementById('room-banner');
+    if (!rb) return;
+    const text = sceneObj?.label ? `${sceneObj.label}${glbNames.length ? ' · Cast: ' + glbNames.join(', ') : ''}` : '';
+    rb.textContent = text;
+    rb.style.display = active && text ? 'block' : 'none';
+}
+
 window.__holodeckState = () => ({
     file: currentScene?.file || null,
     label: currentScene?.label || null,
     loaded: Boolean(splatLoaded),
     splatCount,
     camPos: [camera.position.x, camera.position.y, camera.position.z],
+    gravityOn: Boolean(useBoundsCheckbox?.checked),
+    fovDeg: currentFovDeg,
+    glbLoadedCount,
+    glbNames: glbNames.slice(),
+    roomBanner: document.getElementById('room-banner')?.textContent || '',
     hotspotsCount: HOTSPOTS.length,
     hotspotsTargets: HOTSPOTS.map((h) => h.action_target).filter(Boolean),
     errors: runtimeErrors.slice(),
 });
 
-// ── 3D Overlay Renderer (Entry Hallway table + glowing holographic orb) ──
+// ── 3D Overlay Renderer (Chicken Ranch GLB Cast, Props & Hallway Table) ──
 const overlayCanvas = document.createElement('canvas');
 overlayCanvas.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:6;';
 document.body.appendChild(overlayCanvas);
 const overlayRenderer = new THREE.WebGLRenderer({ canvas: overlayCanvas, alpha: true, antialias: true });
 overlayRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 overlayRenderer.setSize(innerWidth, innerHeight);
+overlayRenderer.outputColorSpace = THREE.SRGBColorSpace;
+
 const overlayScene = new THREE.Scene();
-overlayScene.add(new THREE.AmbientLight(0xffffff, 1.2));
+overlayScene.add(new THREE.AmbientLight(0xffffff, 1.35));
+overlayScene.add(new THREE.HemisphereLight(0xbae6fd, 0x3f2e21, 0.85));
+const keyDirLight = new THREE.DirectionalLight(0xfff1e6, 1.15);
+keyDirLight.position.set(4, 7, 4);
+overlayScene.add(keyDirLight);
 [[4, 3, 2], [-4, 3, -2], [2, 3, -4], [-2, 3, 4]].forEach(([x, y, z]) => {
-    const l = new THREE.PointLight(0xffffff, 0.5, 20);
+    const l = new THREE.PointLight(0xffffff, 0.45, 22);
     l.position.set(x, y, z);
     overlayScene.add(l);
 });
+
+const scenePropsGroup = new THREE.Group();
+overlayScene.add(scenePropsGroup);
+const gltfLoader = new GLTFLoader();
+const texLoader = new THREE.TextureLoader();
 
 let orbMesh = null;
 let tableGroup = null;
 function buildTableObject() {
     if (tableGroup) {
-        overlayScene.remove(tableGroup);
+        scenePropsGroup.remove(tableGroup);
+        tableGroup = null;
+    }
+    if (orbMesh) {
+        scenePropsGroup.remove(orbMesh);
         orbMesh = null;
     }
+    if (currentScene?.file !== 'splats/take1-room-capture.spz') return;
     tableGroup = new THREE.Group();
     const wood = new THREE.MeshPhongMaterial({ color: 0x8a5520, emissive: 0x2a1408, emissiveIntensity: 0.4, shininess: 35, side: THREE.DoubleSide });
     const dark = new THREE.MeshPhongMaterial({ color: 0x4d2a0a, emissive: 0x150800, emissiveIntensity: 0.3, shininess: 8, side: THREE.DoubleSide });
@@ -589,7 +687,7 @@ function buildTableObject() {
         tableGroup.add(leg);
     });
     tableGroup.position.set(0, floorY, 0.4);
-    overlayScene.add(tableGroup);
+    scenePropsGroup.add(tableGroup);
 
     orbMesh = new THREE.Mesh(
         new THREE.SphereGeometry(0.1, 24, 24),
@@ -603,9 +701,8 @@ function buildTableObject() {
     );
     ring.rotation.x = Math.PI / 2;
     orbMesh.add(ring);
-    overlayScene.add(orbMesh);
+    scenePropsGroup.add(orbMesh);
 }
-buildTableObject();
 
 // ── Mouse Look & Keyboard ──
 window.addEventListener('mousedown', (e) => {
@@ -638,6 +735,16 @@ window.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
     keys[e.code] = true;
     if (e.code === 'Space') e.preventDefault();
+    if (e.code === 'KeyG' && !e.repeat) {
+        setGravityEnabled(!useBoundsCheckbox?.checked);
+        showToast(useBoundsCheckbox?.checked ? '🌍 Gravity ON — Floor Lock Active' : '🪶 Free-Flight Mode ON (Q/E up/down)');
+    }
+    if (e.code === 'KeyV' && !e.repeat) {
+        const idx = FOV_PRESETS.indexOf(currentFovDeg);
+        const nextFov = FOV_PRESETS[(idx + 1) % FOV_PRESETS.length];
+        setFovDeg(nextFov);
+        showToast(`🔭 Camera FOV set to ${nextFov}°`);
+    }
     if (e.code === 'Escape') {
         const im = document.getElementById('interact-menu');
         if (im && im.style.display === 'block') { im.style.display = 'none'; return; }
@@ -668,9 +775,12 @@ for (const [id, code] of Object.entries(DPAD_MAP)) {
     el.addEventListener('click', () => { keys[code] = true; setTimeout(() => { keys[code] = false; }, 150); });
 }
 
-// ── Interact Menu ──
+// ── Interact Menu & Interactive Door Locks ──
 const interactMenu = document.getElementById('interact-menu');
 const interactResp = document.getElementById('interact-response');
+const interactNoteEl = document.getElementById('interact-note');
+const interactUnlockBtn = document.getElementById('interact-unlock');
+let activeInteractHotspot = null;
 let toastTimer = null;
 function showToast(msg) {
     interactResp.textContent = msg;
@@ -678,13 +788,47 @@ function showToast(msg) {
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { interactResp.style.display = 'none'; }, 3500);
 }
+function navigateHotspotTarget(target) {
+    if (!target) return;
+    if (/^(\/|https?:\/\/)/i.test(target)) {
+        location.href = target;
+    } else {
+        const url = new URL(location.href);
+        url.searchParams.delete('floorY');
+        url.searchParams.delete('rot');
+        url.searchParams.delete('bounds');
+        url.searchParams.set('file', target);
+        location.href = url.toString();
+    }
+}
+window.__holodeckUnlockActiveDoor = () => {
+    if (!activeInteractHotspot) return false;
+    const tgt = activeInteractHotspot.action_target;
+    interactMenu.style.display = 'none';
+    showToast(`🔓 Unlocked ${activeInteractHotspot.label} — entering suite...`);
+    if (tgt) navigateHotspotTarget(tgt);
+    return Boolean(tgt);
+};
+interactUnlockBtn?.addEventListener('click', () => window.__holodeckUnlockActiveDoor());
 document.getElementById('interact-close')?.addEventListener('click', () => {
     interactMenu.style.display = 'none';
+    activeInteractHotspot = null;
 });
-document.querySelectorAll('.interact-btn').forEach((btn) => {
+document.querySelectorAll('.interact-btn[data-action]').forEach((btn) => {
     btn.addEventListener('click', () => {
+        const act = btn.dataset.action;
+        if (act === 'pick' && activeInteractHotspot?.action_target) {
+            window.__holodeckUnlockActiveDoor();
+            return;
+        }
+        const msgMap = {
+            examine: '🔍 5-pin smart deadbolt + RF transponder behind brass plate.',
+            knock: '✊ Three firm knocks. Voices stop inside... "Who is it?"',
+            scan: '📡 433MHz PFL transponder active · One John clearance valid.',
+            leave: '🚶 You step back into the corridor.',
+        };
         interactMenu.style.display = 'none';
-        showToast('Interacted: ' + btn.textContent.trim());
+        showToast(msgMap[act] || ('Interacted: ' + btn.textContent.trim()));
     });
 });
 
@@ -706,25 +850,33 @@ function loadHotspotsFromCatalog(sceneFile) {
             worldPos: new THREE.Vector3(h.x, h.y, h.z),
             label: h.label,
             icon: h.icon || '📍',
-            maxDist: Number(h.maxDist || 12.0),
+            maxDist: Number(h.maxDist || 14.0),
+            locked: Boolean(h.locked),
+            lockNote: h.lockNote || '',
             action_type: h.action_type || 'interact',
             action_target: h.action_target || '',
             el,
         };
         el.addEventListener('click', () => {
-            if (hs.action_type === 'door' && hs.action_target) {
-                if (/^(\/|https?:\/\/)/i.test(hs.action_target)) {
-                    location.href = hs.action_target;
-                } else {
-                    const url = new URL(location.href);
-                    url.searchParams.delete('floorY');
-                    url.searchParams.delete('rot');
-                    url.searchParams.delete('bounds');
-                    url.searchParams.set('file', hs.action_target);
-                    location.href = url.toString();
-                }
-            } else {
+            if (hs.locked) {
+                activeInteractHotspot = hs;
                 document.getElementById('interact-title').textContent = `${hs.icon} ${hs.label.toUpperCase()}`;
+                if (interactNoteEl) {
+                    interactNoteEl.textContent = hs.lockNote || 'Encrypted PFL suite door.';
+                    interactNoteEl.style.display = 'block';
+                }
+                if (interactUnlockBtn) {
+                    interactUnlockBtn.textContent = `🔓 Unlock & Enter → ${hs.label.replace(/^🔒\s*/, '')}`;
+                    interactUnlockBtn.style.display = 'block';
+                }
+                interactMenu.style.display = 'block';
+            } else if (hs.action_type === 'door' && hs.action_target) {
+                navigateHotspotTarget(hs.action_target);
+            } else {
+                activeInteractHotspot = hs;
+                document.getElementById('interact-title').textContent = `${hs.icon} ${hs.label.toUpperCase()}`;
+                if (interactNoteEl) interactNoteEl.style.display = 'none';
+                if (interactUnlockBtn) interactUnlockBtn.style.display = 'none';
                 interactMenu.style.display = 'block';
             }
         });
@@ -732,10 +884,258 @@ function loadHotspotsFromCatalog(sceneFile) {
     }
 }
 
+function makeCanvasPlane(widthPx, heightPx, worldW, worldH, drawFn) {
+    const c = document.createElement('canvas');
+    c.width = widthPx;
+    c.height = heightPx;
+    const ctx = c.getContext('2d');
+    drawFn(ctx, widthPx, heightPx);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(worldW, worldH),
+        new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, transparent: true }),
+    );
+    mesh.frustumCulled = false;
+    return { mesh, canvas: c, ctx, tex };
+}
+
+function makeNameplateSprite(name, role, accent = '#22d3ee') {
+    const c = document.createElement('canvas');
+    c.width = 512;
+    c.height = 128;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.88)';
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.roundRect(8, 8, 496, 112, 22);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 38px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(name || '').slice(0, 22), 256, 58);
+    ctx.fillStyle = accent;
+    ctx.font = 'bold 24px monospace';
+    ctx.fillText(String(role || '').slice(0, 28), 256, 98);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+    sp.scale.set(1.18, 0.30, 1);
+    sp.frustumCulled = false;
+    return sp;
+}
+
+function clearSceneProps() {
+    while (scenePropsGroup.children.length > 0) {
+        const ch = scenePropsGroup.children.pop();
+        scenePropsGroup.remove(ch);
+    }
+    tableGroup = null;
+    orbMesh = null;
+    avatarAnimations.length = 0;
+    propAnimations.length = 0;
+    activeMixers.length = 0;
+    glbLoadedCount = 0;
+    glbNames.length = 0;
+}
+
 function loadSceneObjectsFromCatalog(sceneFile) {
+    clearSceneProps();
+    buildTableObject();
+    const baseY = Number.isFinite(floorY) ? floorY : -3.0;
     const list = catalogData.objects?.[sceneFile] || [];
     for (const obj of list) {
-        if (obj.type === 'pedestal') {
+        if (obj.type === 'glb' && obj.url) {
+            const targetH = Number(obj.height || 1.72);
+            const floorOff = Number(obj.floorOffset || 0);
+            const anchorY = baseY + floorOff;
+            const holder = new THREE.Group();
+            holder.position.set(obj.x || 0, anchorY, obj.z || 0);
+            holder.rotation.y = THREE.MathUtils.degToRad(Number(obj.yawDeg || 0));
+            scenePropsGroup.add(holder);
+
+            gltfLoader.load(obj.url, (gltf) => {
+                const root = gltf.scene;
+                root.traverse((child) => {
+                    if (child.isMesh) child.frustumCulled = false;
+                });
+                const box = new THREE.Box3().setFromObject(root);
+                const size = new THREE.Vector3();
+                box.getSize(size);
+                const scale = size.y > 0.05 ? (targetH / size.y) : 1.0;
+                root.scale.setScalar(scale);
+                const scaledBox = new THREE.Box3().setFromObject(root);
+                const minY = Number.isFinite(scaledBox.min.y) ? scaledBox.min.y : 0;
+                const offsetY = -minY;
+                root.position.y = offsetY;
+                holder.add(root);
+
+                const badge = makeNameplateSprite(obj.name || 'Cast', obj.role || '', obj.accent || '#22d3ee');
+                badge.position.set(0, targetH + 0.24, 0);
+                holder.add(badge);
+
+                if (gltf.animations && gltf.animations.length > 0) {
+                    const mixer = new THREE.AnimationMixer(root);
+                    mixer.clipAction(gltf.animations[0]).play();
+                    activeMixers.push(mixer);
+                }
+                avatarAnimations.push({
+                    root,
+                    holder,
+                    baseY: offsetY,
+                    baseScale: scale,
+                    animMode: obj.animMode || 'idle',
+                    phase: avatarAnimations.length * 1.4,
+                });
+                glbLoadedCount += 1;
+                if (obj.name && !glbNames.includes(obj.name)) glbNames.push(obj.name);
+                updateRoomBannerUi(currentScene);
+            }, undefined, (err) => {
+                runtimeErrors.push(`GLB failed (${obj.url}): ${err?.message || err}`);
+            });
+        } else if (obj.type === 'marquee') {
+            const { mesh, ctx, tex } = makeCanvasPlane(1024, 256, 3.0, 0.75, (c2) => {
+                c2.fillStyle = 'rgba(20, 6, 26, 0.94)';
+                c2.fillRect(0, 0, 1024, 256);
+                c2.strokeStyle = '#ec4899';
+                c2.lineWidth = 10;
+                c2.strokeRect(8, 8, 1008, 240);
+                c2.fillStyle = '#f9a8d4';
+                c2.font = 'bold 34px monospace';
+                c2.textAlign = 'center';
+                c2.fillText(String(obj.text || 'THE CHICKEN RANCH'), 512, 110);
+                c2.fillStyle = '#67e8f9';
+                c2.font = 'bold 22px monospace';
+                c2.fillText(String(obj.sub || ''), 512, 182);
+            });
+            mesh.position.set(obj.x || 0, obj.y ?? (baseY + 2.3), obj.z || -1.5);
+            mesh.rotation.y = THREE.MathUtils.degToRad(Number(obj.rotYDeg || 0));
+            scenePropsGroup.add(mesh);
+            if (obj.flickerL) {
+                propAnimations.push({ kind: 'marqueeFlicker', mesh, ctx, tex, text: obj.text, sub: obj.sub });
+            }
+        } else if (obj.type === 'hat_rack') {
+            const hats = obj.hats || ['DEPUTY', 'MADAM', 'BRAT', 'GIRLFRIEND', 'JEALOUS', 'HORNY', 'INSATIABLE'];
+            const { mesh } = makeCanvasPlane(1024, 256, 2.5, 0.62, (c2) => {
+                c2.fillStyle = 'rgba(36, 18, 10, 0.92)';
+                c2.fillRect(0, 0, 1024, 256);
+                c2.strokeStyle = '#f59e0b';
+                c2.lineWidth = 8;
+                c2.strokeRect(6, 6, 1012, 244);
+                c2.fillStyle = '#fde68a';
+                c2.font = 'bold 24px sans-serif';
+                c2.textAlign = 'center';
+                c2.fillText('7 HATS ON PEGS · PICK ONE', 512, 42);
+                const step = 960 / hats.length;
+                hats.forEach((h, i) => {
+                    const cx = 32 + step * i + step * 0.5;
+                    const hot = i === Number(obj.swingIdx ?? 6);
+                    c2.fillStyle = hot ? '#ec4899' : '#1e293b';
+                    c2.strokeStyle = hot ? '#fbcfe8' : '#38bdf8';
+                    c2.lineWidth = 3;
+                    c2.beginPath();
+                    c2.roundRect(cx - 58, 72, 116, 136, 14);
+                    c2.fill();
+                    c2.stroke();
+                    c2.fillStyle = '#ffffff';
+                    c2.font = 'bold 28px sans-serif';
+                    c2.fillText(hot ? '🔥' : '👒', cx, 128);
+                    c2.font = 'bold 14px monospace';
+                    c2.fillStyle = hot ? '#fdf2f8' : '#7dd3fc';
+                    c2.fillText(h.slice(0, 10), cx, 182);
+                });
+            });
+            mesh.position.set(obj.x || 0, obj.y ?? (baseY + 1.55), obj.z || -1.2);
+            mesh.rotation.y = THREE.MathUtils.degToRad(Number(obj.rotYDeg || 0));
+            scenePropsGroup.add(mesh);
+            propAnimations.push({ kind: 'sway', mesh, baseRotZ: mesh.rotation.z });
+        } else if (obj.type === 'charter_board') {
+            const lines = obj.lines || [];
+            const { mesh } = makeCanvasPlane(1024, 512, 2.2, 1.1, (c2) => {
+                c2.fillStyle = 'rgba(4, 12, 28, 0.94)';
+                c2.fillRect(0, 0, 1024, 512);
+                c2.strokeStyle = '#22d3ee';
+                c2.lineWidth = 10;
+                c2.strokeRect(8, 8, 1008, 496);
+                c2.fillStyle = '#fde047';
+                c2.font = 'bold 30px monospace';
+                c2.textAlign = 'left';
+                c2.fillText(String(obj.title || 'CHICKEN RANCH'), 38, 66);
+                c2.fillStyle = '#e2e8f0';
+                c2.font = 'bold 23px monospace';
+                lines.forEach((ln, idx) => c2.fillText(ln, 38, 140 + idx * 78));
+            });
+            mesh.position.set(obj.x || 0, obj.y ?? (baseY + 1.45), obj.z || -1.2);
+            mesh.rotation.y = THREE.MathUtils.degToRad(Number(obj.rotYDeg || 0));
+            scenePropsGroup.add(mesh);
+        } else if (obj.type === 'gallery_wall' && obj.url) {
+            const w = Number(obj.width || 1.6);
+            const h = Number(obj.height || 1.0);
+            const g = new THREE.Group();
+            const frame = new THREE.Mesh(
+                new THREE.BoxGeometry(w + 0.08, h + 0.08, 0.03),
+                new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.35, metalness: 0.7 }),
+            );
+            frame.position.z = -0.02;
+            frame.frustumCulled = false;
+            g.add(frame);
+
+            const picMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+            texLoader.load(obj.url, (tex) => {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                picMat.map = tex;
+                picMat.needsUpdate = true;
+            });
+            const pic = new THREE.Mesh(new THREE.PlaneGeometry(w, h), picMat);
+            pic.frustumCulled = false;
+            g.add(pic);
+
+            if (obj.title) {
+                const { mesh: cap } = makeCanvasPlane(512, 64, w, 0.16, (c2) => {
+                    c2.fillStyle = 'rgba(2, 6, 23, 0.9)';
+                    c2.fillRect(0, 0, 512, 64);
+                    c2.fillStyle = '#7dd3fc';
+                    c2.font = 'bold 22px monospace';
+                    c2.textAlign = 'center';
+                    c2.fillText(String(obj.title).slice(0, 42), 256, 40);
+                });
+                cap.position.set(0, -(h * 0.5 + 0.12), 0.01);
+                g.add(cap);
+            }
+            g.position.set(obj.x || 0, obj.y ?? (baseY + 1.45), obj.z || -3.0);
+            g.rotation.y = THREE.MathUtils.degToRad(Number(obj.rotYDeg || 0));
+            scenePropsGroup.add(g);
+        } else if (obj.type === 'workout_zone') {
+            const g = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.65 });
+            const yogaMat = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.025, 0.78), mat);
+            yogaMat.position.y = 0.013;
+            yogaMat.frustumCulled = false;
+            g.add(yogaMat);
+
+            const greenBall = new THREE.Mesh(
+                new THREE.SphereGeometry(0.32, 28, 28),
+                new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.35, metalness: 0.15 }),
+            );
+            greenBall.position.set(0.68, 0.32, 0.42);
+            greenBall.frustumCulled = false;
+            g.add(greenBall);
+
+            const silverBall = new THREE.Mesh(
+                new THREE.SphereGeometry(0.28, 28, 28),
+                new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.25, metalness: 0.6 }),
+            );
+            silverBall.position.set(1.18, 0.28, -0.08);
+            silverBall.frustumCulled = false;
+            g.add(silverBall);
+
+            g.position.set(obj.x || 0, baseY, obj.z || -2.6);
+            g.rotation.y = THREE.MathUtils.degToRad(Number(obj.rotYDeg || 0));
+            scenePropsGroup.add(g);
+            propAnimations.push({ kind: 'workoutBalls', greenBall, silverBall });
+        } else if (obj.type === 'pedestal') {
             const g = new THREE.Group();
             const col = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.45, 0.45, 1.2, 24),
@@ -751,33 +1151,10 @@ function loadSceneObjectsFromCatalog(sceneFile) {
             g.add(orb);
             g.position.set(obj.x, obj.y, obj.z);
             g.scale.set(obj.scale_x || 1, obj.scale_y || 1, obj.scale_z || 1);
-            overlayScene.add(g);
-        } else if (obj.type === 'whiteboard') {
-            const c = document.createElement('canvas');
-            c.width = 512; c.height = 384;
-            const ctx = c.getContext('2d');
-            ctx.fillStyle = 'rgba(8, 16, 32, 0.92)';
-            ctx.fillRect(0, 0, 512, 384);
-            ctx.strokeStyle = '#22d3ee';
-            ctx.lineWidth = 10;
-            ctx.strokeRect(0, 0, 512, 384);
-            ctx.fillStyle = '#67e8f9';
-            ctx.font = 'bold 26px sans-serif';
-            ctx.fillText('PFL CLOUD HOLODECK', 36, 62);
-            ctx.fillStyle = '#e2e8f0';
-            ctx.font = '20px monospace';
-            ctx.fillText('STATUS: ONLINE (STATIC)', 36, 120);
-            ctx.fillText('NODE: 1S788 CARPORT', 36, 160);
-            ctx.fillText('ANCHOR: 417 PALM DR', 36, 200);
-            const m = new THREE.Mesh(
-                new THREE.PlaneGeometry(2.0, 1.5),
-                new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), side: THREE.DoubleSide, transparent: true, opacity: 0.94 }),
-            );
-            m.position.set(obj.x, obj.y, obj.z);
-            m.scale.set(obj.scale_x || 1, obj.scale_y || 1, obj.scale_z || 1);
-            overlayScene.add(m);
+            scenePropsGroup.add(g);
         }
     }
+    updateRoomBannerUi(currentScene);
 }
 
 function updateHotspots() {
@@ -852,15 +1229,54 @@ function tick() {
         onGround = true;
     }
     updateHotspots();
+    const nowSec = performance.now() * 0.001;
+    for (const mx of activeMixers) mx.update(dt);
     if (currentScene?.file === 'splats/take1-room-capture.spz' && orbMesh) {
-        const t = Date.now() * 0.001;
-        orbMesh.rotation.y = t * 0.9;
-        orbMesh.position.y = floorY + 0.835 + Math.sin(t * 1.6) * 0.032;
-        if (orbMesh.children[0]) orbMesh.children[0].rotation.z = t * 0.55;
-        overlayRenderer.render(overlayScene, camera);
-    } else if (catalogData.objects?.[currentScene?.file]?.length) {
-        overlayRenderer.render(overlayScene, camera);
+        orbMesh.rotation.y = nowSec * 0.9;
+        orbMesh.position.y = floorY + 0.835 + Math.sin(nowSec * 1.6) * 0.032;
+        if (orbMesh.children[0]) orbMesh.children[0].rotation.z = nowSec * 0.55;
     }
+    for (const av of avatarAnimations) {
+        if (av.animMode === 'workout') {
+            const wave = Math.sin(nowSec * 2.3 + av.phase);
+            const squat = Math.max(0, wave);
+            av.root.position.y = av.baseY - squat * 0.14;
+            av.root.rotation.y = Math.sin(nowSec * 1.15) * 0.24;
+            av.root.scale.set(av.baseScale * (1 + squat * 0.04), av.baseScale * (1 - squat * 0.06), av.baseScale * (1 + squat * 0.04));
+        } else {
+            av.root.position.y = av.baseY + Math.sin(nowSec * 1.8 + av.phase) * 0.012;
+        }
+    }
+    for (const pr of propAnimations) {
+        if (pr.kind === 'sway') {
+            pr.mesh.rotation.z = pr.baseRotZ + Math.sin(nowSec * 2.1) * 0.025;
+        } else if (pr.kind === 'workoutBalls') {
+            pr.greenBall.position.y = 0.32 + Math.abs(Math.sin(nowSec * 2.4)) * 0.07;
+            pr.silverBall.position.y = 0.28 + Math.abs(Math.cos(nowSec * 2.0)) * 0.06;
+        } else if (pr.kind === 'marqueeFlicker') {
+            const on = Math.sin(nowSec * 9.0) * Math.sin(nowSec * 3.7) > -0.65;
+            if (pr.lastState !== on) {
+                pr.lastState = on;
+                const c2 = pr.ctx;
+                c2.fillStyle = 'rgba(20, 6, 26, 0.94)';
+                c2.fillRect(0, 0, 1024, 256);
+                c2.strokeStyle = on ? '#ec4899' : '#be185d';
+                c2.lineWidth = 10;
+                c2.strokeRect(8, 8, 1008, 240);
+                c2.fillStyle = '#f9a8d4';
+                c2.font = 'bold 34px monospace';
+                c2.textAlign = 'center';
+                const full = String(pr.text || 'THE BEST LITTLE WHOREHOUSE IN LIVERPOOL');
+                const txt = (on || !full.endsWith('L')) ? full : (full.slice(0, -1) + ' ');
+                c2.fillText(txt, 512, 110);
+                c2.fillStyle = '#67e8f9';
+                c2.font = 'bold 22px monospace';
+                c2.fillText(String(pr.sub || ''), 512, 182);
+                pr.tex.needsUpdate = true;
+            }
+        }
+    }
+    overlayRenderer.render(overlayScene, camera);
 }
 tick();
 
@@ -877,7 +1293,6 @@ function enterScene() {
     dpad.style.display = 'block';
     const fv = parseFloat(floorYInput.value);
     floorY = Number.isFinite(fv) ? fv : -3.0;
-    buildTableObject();
     const startX = currentScene?.startX ?? 0;
     const startY = currentScene?.startY ?? (floorY + EYE_H);
     const startZ = currentScene?.startZ ?? 3;
@@ -887,6 +1302,7 @@ function enterScene() {
     camera.rotation.set(pitch, yaw, 0);
     clock.getDelta();
     active = true;
+    updateRoomBannerUi(currentScene);
 }
 
 function exitScene() {
@@ -895,6 +1311,7 @@ function exitScene() {
     crosshair.style.display = 'none';
     hud.style.display = 'none';
     dpad.style.display = 'none';
+    updateRoomBannerUi(currentScene);
 }
 
 document.getElementById('hd-toggle-overlay')?.addEventListener('click', () => {
@@ -1052,8 +1469,23 @@ async function main() {
     const urlBounds = urlParams.get('bounds');
     floorYInput.value = urlFloorY !== null ? urlFloorY : (scene.floorY ?? -3.0);
     rotSelect.value = urlRot !== null ? urlRot : (scene.rot || 'none');
-    useBoundsCheckbox.checked = urlBounds !== null ? (urlBounds === 'true') : Boolean(scene.bounds);
+    useBoundsCheckbox.checked = urlBounds !== null ? (urlBounds === 'true') : (scene.bounds !== undefined ? Boolean(scene.bounds) : true);
     scene = { ...scene, floorY: parseFloat(floorYInput.value), rot: rotSelect.value, bounds: useBoundsCheckbox.checked };
+    currentScene = scene;
+    floorY = Number.isFinite(scene.floorY) ? scene.floorY : -3.0;
+    setFovDeg(urlParams.get('fov') || 85);
+    syncGravityButtonUi();
+
+    document.getElementById('hd-gravity-btn')?.addEventListener('click', () => {
+        setGravityEnabled(!useBoundsCheckbox.checked);
+        showToast(useBoundsCheckbox.checked ? '🌍 Gravity ON — Floor Lock Active' : '🪶 Free-Flight Mode ON (Q/E up/down)');
+    });
+    document.getElementById('hd-fov-btn')?.addEventListener('click', () => {
+        const idx = FOV_PRESETS.indexOf(currentFovDeg);
+        const nextFov = FOV_PRESETS[(idx + 1) % FOV_PRESETS.length];
+        setFovDeg(nextFov);
+        showToast(`🔭 Camera FOV set to ${nextFov}°`);
+    });
 
     const reloadPresets = () => {
         const url = new URL(location.href);
@@ -1065,7 +1497,7 @@ async function main() {
     };
     floorYInput.addEventListener('change', reloadPresets);
     rotSelect.addEventListener('change', reloadPresets);
-    useBoundsCheckbox.addEventListener('change', reloadPresets);
+    useBoundsCheckbox.addEventListener('change', () => setGravityEnabled(useBoundsCheckbox.checked));
 
     loadHotspotsFromCatalog(scene.file);
     loadSceneObjectsFromCatalog(scene.file);
