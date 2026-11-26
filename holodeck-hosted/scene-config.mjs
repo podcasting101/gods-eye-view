@@ -45,8 +45,11 @@ export function createFallbackScene(file) {
         });
     } else if (normalizedFile.includes('arcade')) {
         Object.assign(scene, {
-            rot: 'cw180z',
-            floorY: -10.0,
+            rot: 'zup2yup',
+            floorY: -0.9,
+            eyeHeight: 0.9,
+            startX: 0.0,
+            startZ: 1.65,
             minX: -8.0,
             maxX: 8.0,
             minZ: -8.0,

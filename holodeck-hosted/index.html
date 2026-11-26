@@ -400,7 +400,7 @@
 <div id="holodeck-topbar">
     <a class="hd-link hd-link-home" href="/gods-eye-view/">🌐 ← 417 Palm Dr (GEV)</a>
     <button type="button" class="hd-btn" data-hd-file="splats/take1-room-capture.spz">🚪 Parlor</button>
-    <button type="button" class="hd-btn" data-hd-file="splats/take2-alternate-angle.spz">🏋️ 1F Fitness (Lisa)</button>
+    <button type="button" class="hd-btn" data-hd-file="splats/palm-1f-fitness.splat">🏋️ 1F Fitness (417 Real)</button>
     <button type="button" class="hd-btn" data-hd-file="splats/take3-main-hall.spz">🏛️ Main Hall</button>
     <button type="button" class="hd-btn" data-hd-file="splats/bedroom-10view.splat">🛏️ Red Suite</button>
     <button type="button" class="hd-btn" data-hd-file="splats/lisa-command-center.spz">👑 Command / Troi</button>
@@ -431,6 +431,8 @@
             <option value="cw180z" selected>180° CW Z</option>
             <option value="cw90z">90° CW Z</option>
             <option value="yup">180° CW X (Y-Up Flip)</option>
+            <option value="zup2yup">-90° X (Z-Up to Y-Up)</option>
+            <option value="arcade70">110° X (Arcade Fix)</option>
         </select>
     </div>
     <div class="ov-row" style="justify-content:flex-start;">
@@ -526,6 +528,10 @@ import {
 } from './scene-config.mjs';
 
 const EYE_H = 2.25;
+function getEyeHeight() {
+    const v = Number(currentScene?.eyeHeight);
+    return Number.isFinite(v) && v > 0.2 ? v : EYE_H;
+}
 const SPEED = 4.0;
 const SPRINT_MUL = 2.5;
 const JUMP_VEL = 5.5;
@@ -598,8 +604,9 @@ function syncGravityButtonUi() {
 function setGravityEnabled(on) {
     if (useBoundsCheckbox) useBoundsCheckbox.checked = Boolean(on);
     if (currentScene) currentScene.bounds = Boolean(on);
-    if (on && camera.position.y < floorY + EYE_H) {
-        camera.position.y = floorY + EYE_H;
+    const minCamY = floorY + getEyeHeight();
+    if (on && camera.position.y < minCamY) {
+        camera.position.y = minCamY;
         velY = 0;
         onGround = true;
     }
@@ -1227,8 +1234,9 @@ function tick() {
         velY += GRAVITY * dt;
         camera.position.y += velY * dt;
     }
-    if (enforceBounds && camera.position.y < floorY + EYE_H) {
-        camera.position.y = floorY + EYE_H;
+    const minCamY = floorY + getEyeHeight();
+    if (enforceBounds && camera.position.y < minCamY) {
+        camera.position.y = minCamY;
         velY = 0;
         onGround = true;
     }
@@ -1298,7 +1306,7 @@ function enterScene() {
     const fv = parseFloat(floorYInput.value);
     floorY = Number.isFinite(fv) ? fv : -3.0;
     const startX = currentScene?.startX ?? 0;
-    const startY = currentScene?.startY ?? (floorY + EYE_H);
+    const startY = currentScene?.startY ?? (floorY + getEyeHeight());
     const startZ = currentScene?.startZ ?? 3;
     camera.position.set(startX, startY, startZ);
     yaw = currentScene?.yaw ?? 0;
@@ -1373,6 +1381,7 @@ async function loadScene(scene) {
             selfDrivenMode: true,
             sharedMemoryForWorkers: false,
             dynamicScene: false,
+            sceneRevealMode: 2,
             camera,
             webXRMode: 0,
             useBuiltInControls: false,
@@ -1474,7 +1483,13 @@ async function main() {
     floorYInput.value = urlFloorY !== null ? urlFloorY : (scene.floorY ?? -3.0);
     rotSelect.value = urlRot !== null ? urlRot : (scene.rot || 'none');
     useBoundsCheckbox.checked = urlBounds !== null ? (urlBounds === 'true') : (scene.bounds !== undefined ? Boolean(scene.bounds) : true);
-    scene = { ...scene, floorY: parseFloat(floorYInput.value), rot: rotSelect.value, bounds: useBoundsCheckbox.checked };
+    scene = {
+        ...scene,
+        floorY: parseFloat(floorYInput.value),
+        rot: rotSelect.value,
+        bounds: useBoundsCheckbox.checked,
+        ...(urlRot !== null ? { rotX: 0, rotY: 0, rotZ: 0 } : {}),
+    };
     currentScene = scene;
     floorY = Number.isFinite(scene.floorY) ? scene.floorY : -3.0;
     setFovDeg(urlParams.get('fov') || 85);
@@ -1507,6 +1522,11 @@ async function main() {
     loadSceneObjectsFromCatalog(scene.file);
     await loadScene(scene);
 }
+
+window.addEventListener('pagehide', () => {
+    try { currentViewer?.dispose?.(); } catch {}
+    try { overlayRenderer?.dispose?.(); } catch {}
+});
 
 main();
 </script>
